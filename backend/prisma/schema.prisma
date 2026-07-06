@@ -1,0 +1,866 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  PROPRIETAIRE
+}
+
+enum FarmStatus {
+  ACTIVE
+  EN_PREPARATION
+  SUSPENDUE
+  FERMEE
+}
+
+enum FarmActivityType {
+  ELEVAGE
+  CULTURE
+  MIXTE
+  PISCICULTURE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskStatus {
+  A_FAIRE
+  EN_COURS
+  TERMINEE
+  EN_RETARD
+  ANNULEE
+}
+
+enum TaskCategory {
+  ALIMENTATION
+  SANITAIRE
+  PRODUCTION
+  RECOLTE
+  VENTE
+  STOCK
+  FINANCE
+  MAINTENANCE
+  CULTURE
+  REPRODUCTION
+  NETTOYAGE
+  CONTROLE
+  ADMINISTRATIF
+}
+
+enum TaskRepeatRule {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AlertStatus {
+  NEW
+  PENDING
+  ACKNOWLEDGED
+  RESOLVED
+  IGNORED
+}
+
+enum AlertType {
+  REMINDER
+  OPERATIONAL
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  WEB_PUSH
+  SOUND
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SCHEDULED
+  SENT
+  FAILED
+  CANCELED
+}
+
+enum ReminderTriggerType {
+  SEVEN_DAYS
+  TWENTY_FOUR_HOURS
+  FEW_HOURS
+  SIX_HOURS
+  ONE_HOUR
+  AT_TIME
+  OVERDUE
+}
+
+enum StockCategory {
+  ALIMENTS
+  MEDICAMENTS
+  SEMENCES
+  ENGRAIS
+  EQUIPEMENTS
+  MATERIELS
+}
+
+enum StockMovementType {
+  ENTREE
+  SORTIE
+  INVENTAIRE
+  AJUSTEMENT
+}
+
+enum AnimalTrackingMode {
+  INDIVIDUAL
+  LOT
+}
+
+enum AnimalSex {
+  MALE
+  FEMALE
+  MIXTE
+  INCONNU
+}
+
+enum AnimalStatus {
+  ACTIF
+  VENDU
+  DECEDE
+}
+
+enum AnimalEventType {
+  NAISSANCE
+  ACHAT
+  VENTE
+  DECES
+  REPRODUCTION
+  VACCINATION
+  TRAITEMENT
+  PESEE
+  PRODUCTION
+}
+
+enum FinancialTransactionType {
+  DEPENSE
+  REVENU
+}
+
+enum PlotStatus {
+  AVAILABLE
+  CULTIVATED
+  RESTING
+  MAINTENANCE
+}
+
+enum CropStatus {
+  PLANNED
+  ACTIVE
+  HARVESTED
+  ARCHIVED
+}
+
+enum CropOperationType {
+  PREPARATION_SOL
+  SEMIS
+  IRRIGATION
+  FERTILISATION
+  TRAITEMENT
+  DESHERBAGE
+  ENTRETIEN
+  RECOLTE
+}
+
+enum CropOperationStatus {
+  PLANNED
+  COMPLETED
+  CANCELED
+}
+
+enum HarvestQuality {
+  EXCELLENT
+  BONNE
+  MOYENNE
+  FAIBLE
+}
+
+enum BuildingType {
+  POULAILLER
+  ETABLE
+  BERGERIE
+  PORCHERIE
+  BASSIN
+  HANGAR
+  MAGASIN
+}
+
+enum EnclosureType {
+  ENCLOS_GENERIC
+  PATURAGE
+  PARC_ISOLE
+  BASSIN_OUVERT
+}
+
+enum InfrastructureStatus {
+  OPERATIONNEL
+  MAINTENANCE
+  INACTIF
+  SATURATED
+}
+
+enum SanitaryEventType {
+  MALADIE
+  VACCINATION
+  TRAITEMENT
+  CONSULTATION
+  MORTALITE
+  CONTROLE
+}
+
+enum SanitaryEventStatus {
+  PLANIFIE
+  EN_COURS
+  TERMINE
+  CRITIQUE
+}
+
+enum ReportType {
+  TECHNIQUE
+  SANITAIRE
+  FINANCIER
+  PRODUCTION
+  RENTABILITE
+}
+
+enum ReportFileFormat {
+  PDF
+  XLSX
+}
+
+enum ProductionSourceType {
+  ANIMAL_GROUP
+  BUILDING
+  ENCLOSURE
+  CROP
+  HARVEST
+  GENERAL
+}
+
+enum ProductionType {
+  EGGS
+  FISH_GROWTH
+  FISH_HARVEST
+  CROP_HARVEST
+  GENERAL
+}
+
+enum ProductStockStatus {
+  AVAILABLE
+  LOW
+  OUT_OF_STOCK
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK_TRANSFER
+  CARD
+  CREDIT
+  OTHER
+}
+
+model User {
+  id             String   @id @default(cuid())
+  fullName       String
+  email          String   @unique
+  passwordHash   String
+  role           UserRole
+  isActive       Boolean  @default(true)
+  assignedFarms  Farm[]   @relation("FarmOwner")
+  animalEvents   AnimalEvent[]
+  financialTransactions FinancialTransaction[]
+  sanitaryEvents SanitaryEvent[]
+  cropOperations CropOperation[]
+  harvests       Harvest[]
+  generatedReports Report[]
+  productionRecords ProductionRecord[]
+  productSales   ProductSale[]
+  traceabilityEvents TraceabilityEvent[]
+  refreshSessions RefreshSession[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model RefreshSession {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash       String
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  userAgent       String?
+  ipAddress       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, expiresAt])
+  @@index([userId, revokedAt])
+}
+
+model Farm {
+  id           String           @id @default(cuid())
+  name         String
+  description  String
+  location     String
+  surfaceArea  Float
+  status       FarmStatus
+  activityType FarmActivityType
+  ownerUserId  String?
+  owner        User?            @relation("FarmOwner", fields: [ownerUserId], references: [id])
+  archivedAt   DateTime?
+  deactivatedAt DateTime?
+  deletedAt    DateTime?
+  agendaTasks  AgendaTask[]
+  alerts       Alert[]
+  notifications Notification[]
+  plots        Plot[]
+  crops        Crop[]
+  cropOperations CropOperation[]
+  harvests     Harvest[]
+  buildings    Building[]
+  enclosures   Enclosure[]
+  stockItems   StockItem[]
+  stockMoves   StockMovement[]
+  animalGroups AnimalGroup[]
+  animalEvents AnimalEvent[]
+  financialTransactions FinancialTransaction[]
+  sanitaryEvents SanitaryEvent[]
+  reports      Report[]
+  productionRecords ProductionRecord[]
+  fishHarvests FishHarvest[]
+  productStocks ProductStock[]
+  productSales ProductSale[]
+  traceabilityEvents TraceabilityEvent[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model Building {
+  id             String               @id @default(cuid())
+  farmId         String
+  farm           Farm                 @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  name           String
+  buildingType   BuildingType
+  capacity       Int?
+  assignedTo     String?
+  conditionLabel String?
+  status         InfrastructureStatus @default(OPERATIONNEL)
+  notes          String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+}
+
+model Enclosure {
+  id             String               @id @default(cuid())
+  farmId         String
+  farm           Farm                 @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  name           String
+  enclosureType  EnclosureType
+  capacity       Int?
+  assignedTo     String?
+  conditionLabel String?
+  status         InfrastructureStatus @default(OPERATIONNEL)
+  notes          String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+}
+
+model Plot {
+  id             String      @id @default(cuid())
+  farmId         String
+  farm           Farm        @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  name           String
+  location       String?
+  surfaceArea    Float
+  soilType       String?
+  irrigationType String?
+  status         PlotStatus  @default(AVAILABLE)
+  notes          String?
+  crops          Crop[]
+  operations     CropOperation[]
+  harvests       Harvest[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Crop {
+  id                String       @id @default(cuid())
+  farmId            String
+  farm              Farm         @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  plotId            String
+  plot              Plot         @relation(fields: [plotId], references: [id], onDelete: Cascade)
+  name              String
+  variety           String?
+  cultivatedArea    Float
+  cycleLabel        String?
+  plantedAt         DateTime
+  expectedHarvestAt DateTime?
+  status            CropStatus   @default(PLANNED)
+  expectedYield     Float?
+  actualYield       Float?
+  notes             String?
+  operations        CropOperation[]
+  harvests          Harvest[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model CropOperation {
+  id              String               @id @default(cuid())
+  farmId          String
+  farm            Farm                 @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  cropId          String
+  crop            Crop                 @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  plotId          String?
+  plot            Plot?                @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  operationType   CropOperationType
+  status          CropOperationStatus  @default(COMPLETED)
+  performedAt     DateTime
+  quantity        Float?
+  unit            String?
+  cost            Float?
+  notes           String?
+  createdByUserId String
+  createdByUser   User                 @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+}
+
+model Harvest {
+  id              String          @id @default(cuid())
+  farmId          String
+  farm            Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  cropId          String
+  crop            Crop            @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  plotId          String?
+  plot            Plot?           @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  harvestedAt     DateTime
+  quantity        Float
+  unit            String
+  quality         HarvestQuality?
+  revenue         Float?
+  notes           String?
+  createdByUserId String
+  createdByUser   User            @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model AgendaTask {
+  id             String       @id @default(cuid())
+  farmId         String
+  farm           Farm         @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  title          String
+  description    String
+  priority       TaskPriority
+  status         TaskStatus
+  category       TaskCategory @default(ADMINISTRATIF)
+  scheduledFor   DateTime
+  scheduledLabel String
+  sourceModule   String?
+  sourceRecordId String?
+  linkedModule   String?
+  linkedEntityType String?
+  linkedEntityId String?
+  linkedEntityLabel String?
+  reminderPreset String?
+  repeatRule     TaskRepeatRule @default(NONE)
+  repeatEvery    Int?
+  notes          String?
+  notifications  Notification[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([farmId, sourceModule, sourceRecordId])
+  @@index([farmId, linkedModule, linkedEntityType, linkedEntityId])
+}
+
+model Alert {
+  id             String         @id @default(cuid())
+  farmId         String
+  farm           Farm           @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  type           AlertType      @default(OPERATIONAL)
+  priority       AlertPriority  @default(MEDIUM)
+  status         AlertStatus    @default(NEW)
+  title          String
+  severity       AlertSeverity
+  message        String
+  sourceModule   String?
+  sourceRecordId String?
+  dueAt          DateTime?
+  notification   Notification?
+  readAt         DateTime?
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  ignoredAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([farmId, status, createdAt])
+  @@index([farmId, sourceModule, sourceRecordId])
+}
+
+model Notification {
+  id              String               @id @default(cuid())
+  farmId          String
+  farm            Farm                 @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  agendaTaskId    String?
+  agendaTask      AgendaTask?          @relation(fields: [agendaTaskId], references: [id], onDelete: SetNull)
+  alertId         String?              @unique
+  alert           Alert?               @relation(fields: [alertId], references: [id], onDelete: SetNull)
+  channel         NotificationChannel
+  status          NotificationStatus   @default(PENDING)
+  triggerType     ReminderTriggerType
+  title           String
+  message         String
+  scheduledFor    DateTime
+  deliveredAt     DateTime?
+  acknowledgedAt  DateTime?
+  errorMessage    String?
+  payload         Json?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([agendaTaskId, channel, triggerType])
+  @@index([farmId, status, scheduledFor])
+  @@index([agendaTaskId, status])
+}
+
+model StockItem {
+  id                String          @id @default(cuid())
+  farmId            String
+  farm              Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  category          StockCategory
+  name              String
+  unit              String
+  currentQuantity   Float
+  lowStockThreshold Float
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  movements         StockMovement[]
+}
+
+model StockMovement {
+  id           String            @id @default(cuid())
+  farmId       String
+  farm         Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  stockItemId  String
+  stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  movementType StockMovementType
+  quantity     Float
+  note         String?
+  createdAt    DateTime          @default(now())
+}
+
+model AnimalGroup {
+  id                   String             @id @default(cuid())
+  farmId               String
+  farm                 Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  trackingMode         AnimalTrackingMode
+  identificationNumber String
+  name                 String?
+  species              String
+  subtype              String
+  breed                String
+  sex                  AnimalSex
+  birthDate            DateTime
+  currentAgeDays       Int
+  currentWeight        Float?
+  status               AnimalStatus       @default(ACTIF)
+  photoUrl             String?
+  initialCount         Int?
+  currentCount         Int?
+  events               AnimalEvent[]
+  sanitaryEvents       SanitaryEvent[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+model AnimalEvent {
+  id               String          @id @default(cuid())
+  farmId           String
+  farm             Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  animalGroupId    String
+  animalGroup      AnimalGroup     @relation(fields: [animalGroupId], references: [id], onDelete: Cascade)
+  eventType        AnimalEventType
+  eventDate        DateTime
+  quantity         Int?
+  weight           Float?
+  notes            String
+  recordedByUserId String
+  recordedByUser   User            @relation(fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime        @default(now())
+}
+
+model FinancialTransaction {
+  id               String                   @id @default(cuid())
+  farmId           String
+  farm             Farm                     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  transactionType  FinancialTransactionType
+  category         String
+  amount           Float
+  transactionDate  DateTime
+  referenceModule  String?
+  notes            String
+  recordedByUserId String
+  recordedByUser   User                     @relation(fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+}
+
+model SanitaryEvent {
+  id               String              @id @default(cuid())
+  farmId           String
+  farm             Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  animalGroupId    String?
+  animalGroup      AnimalGroup?        @relation(fields: [animalGroupId], references: [id], onDelete: SetNull)
+  eventType        SanitaryEventType
+  eventDate        DateTime
+  status           SanitaryEventStatus
+  isAutoGenerated  Boolean             @default(false)
+  protocolLabel    String?
+  originKey        String?
+  notes            String
+  recordedByUserId String
+  recordedByUser   User                @relation(fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([farmId, animalGroupId, originKey])
+}
+
+model Report {
+  id                String           @id @default(cuid())
+  farmId            String
+  farm              Farm             @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  reportType        ReportType
+  periodStart       DateTime?
+  periodEnd         DateTime?
+  fileFormat        ReportFileFormat
+  fileUrl           String
+  generatedAt       DateTime         @default(now())
+  generatedByUserId String
+  generatedByUser   User             @relation(fields: [generatedByUserId], references: [id], onDelete: Restrict)
+}
+
+model ProductionRecord {
+  id               String               @id @default(cuid())
+  uniqueCode       String               @unique
+  farmId           String
+  farm             Farm                 @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  sourceType       ProductionSourceType
+  sourceId         String
+  productionType   ProductionType
+  productionLabel  String
+  quantityProduced Float
+  quantityLost     Float                @default(0)
+  quantitySellable Float
+  unit             String
+  productionDate   DateTime
+  totalRevenue     Float?
+  totalCost        Float?
+  margin           Float?
+  notes            String?
+  createdByUserId  String
+  createdByUser    User                 @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  eggRecord        EggProductionRecord?
+  fishGrowthRecord FishGrowthRecord?
+  fishHarvest      FishHarvest?
+  productStocks    ProductStock[]
+  productSales     ProductSale[]
+  traceabilityEvents TraceabilityEvent[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([farmId, productionType, productionDate])
+  @@index([farmId, sourceType, sourceId])
+}
+
+model EggProductionRecord {
+  id                  String           @id @default(cuid())
+  productionRecordId  String           @unique
+  productionRecord    ProductionRecord @relation(fields: [productionRecordId], references: [id], onDelete: Cascade)
+  animalGroupId       String
+  currentHeadcount    Int
+  eggsProduced        Int
+  eggsBroken          Int
+  eggsDirty           Int
+  eggsLost            Int
+  eggsSellable        Int
+  traysProduced       Float
+  layingRate          Float
+  mortalityToday      Int
+  feedConsumed        Float?
+  feedCost            Float?
+  feedCostPerEgg      Float?
+  feedCostPerTray     Float?
+  observations        String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([animalGroupId, createdAt])
+}
+
+model FishGrowthRecord {
+  id                   String           @id @default(cuid())
+  productionRecordId   String           @unique
+  productionRecord     ProductionRecord @relation(fields: [productionRecordId], references: [id], onDelete: Cascade)
+  animalGroupId        String?
+  buildingId           String?
+  enclosureId          String?
+  species              String
+  initialFingerlings   Int
+  currentHeadcount     Int
+  stockingDate         DateTime
+  initialAverageWeight Float
+  currentAverageWeight Float
+  mortality            Int
+  estimatedBiomass     Float
+  feedDistributed      Float?
+  feedCost             Float?
+  feedConversionIndex  Float?
+  waterQuality         String?
+  temperature          Float?
+  oxygen               Float?
+  ph                   Float?
+  growthRate           Float?
+  observations         String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+model FishHarvest {
+  id                 String           @id @default(cuid())
+  productionRecordId String           @unique
+  productionRecord   ProductionRecord @relation(fields: [productionRecordId], references: [id], onDelete: Cascade)
+  farmId             String
+  farm               Farm             @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  animalGroupId      String?
+  buildingId         String?
+  enclosureId        String?
+  harvestedAt        DateTime
+  totalWeight        Float
+  fishCount          Int
+  averageWeight      Float
+  losses             Float
+  sellableQuantity   Float
+  destination        String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model ProductStock {
+  id                 String             @id @default(cuid())
+  farmId             String
+  farm               Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  productionRecordId String?
+  productionRecord   ProductionRecord?  @relation(fields: [productionRecordId], references: [id], onDelete: SetNull)
+  productName        String
+  productionType     ProductionType
+  unit               String
+  totalQuantity      Float
+  availableQuantity  Float
+  reservedQuantity   Float              @default(0)
+  lowStockThreshold  Float              @default(0)
+  status             ProductStockStatus @default(AVAILABLE)
+  notes              String?
+  sales              ProductSale[]
+  traceabilityEvents TraceabilityEvent[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([farmId, productName, productionType])
+}
+
+model ProductSale {
+  id                 String            @id @default(cuid())
+  saleCode           String            @unique
+  farmId             String
+  farm               Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  stockId            String
+  stock              ProductStock      @relation(fields: [stockId], references: [id], onDelete: Restrict)
+  productionRecordId String?
+  productionRecord   ProductionRecord? @relation(fields: [productionRecordId], references: [id], onDelete: SetNull)
+  productName        String
+  quantitySold       Float
+  unit               String
+  unitPrice          Float
+  totalAmount        Float
+  amountPaid         Float
+  remainingAmount    Float
+  paymentMethod      PaymentMethod
+  customerName       String
+  saleDate           DateTime
+  notes              String?
+  createdByUserId    String
+  createdByUser      User              @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  payments           SalePayment[]
+  traceabilityEvents TraceabilityEvent[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([farmId, saleDate])
+}
+
+model SalePayment {
+  id            String        @id @default(cuid())
+  saleId        String
+  sale          ProductSale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  paymentDate   DateTime
+  amount        Float
+  paymentMethod PaymentMethod
+  note          String?
+  createdAt     DateTime      @default(now())
+}
+
+model TraceabilityEvent {
+  id                 String            @id @default(cuid())
+  farmId             String
+  farm               Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  productionRecordId String?
+  productionRecord   ProductionRecord? @relation(fields: [productionRecordId], references: [id], onDelete: SetNull)
+  stockId            String?
+  stock              ProductStock?     @relation(fields: [stockId], references: [id], onDelete: SetNull)
+  saleId             String?
+  sale               ProductSale?      @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  title              String
+  eventType          String
+  eventDate          DateTime
+  details            String?
+  createdByUserId    String?
+  createdByUser      User?             @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt          DateTime          @default(now())
+
+  @@index([farmId, eventDate])
+}

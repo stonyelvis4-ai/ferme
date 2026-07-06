@@ -1,0 +1,383 @@
+openapi: 3.1.0
+info:
+  title: FERM+ API
+  version: 0.1.0
+  description: >
+    Contract for the initial FERM+ web platform covering authentication,
+    farm management, intelligent agenda, alerts, and core operational modules.
+servers:
+  - url: https://api.ferm-plus.local
+tags:
+  - name: Auth
+  - name: Farms
+  - name: Agenda
+  - name: Alerts
+  - name: Livestock
+  - name: Crops
+  - name: Inventory
+  - name: Sanitary
+  - name: Finance
+  - name: Dashboards
+  - name: Reports
+paths:
+  /auth/session:
+    post:
+      tags: [Auth]
+      summary: Sign in and create a user session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+  /me:
+    get:
+      tags: [Auth]
+      summary: Return current user context
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+  /farms:
+    get:
+      tags: [Farms]
+      summary: List farms visible to the current user
+      responses:
+        '200':
+          description: Farm list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FarmSummary'
+    post:
+      tags: [Farms]
+      summary: Create a farm
+      responses:
+        '201':
+          description: Farm created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmDetail'
+  /farms/{farmId}:
+    get:
+      tags: [Farms]
+      summary: Get detailed farm workspace information
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '200':
+          description: Farm detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmDetail'
+    patch:
+      tags: [Farms]
+      summary: Update farm information
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '200':
+          description: Farm updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmDetail'
+  /farms/{farmId}/agenda:
+    get:
+      tags: [Agenda]
+      summary: Get agenda data for a farm
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+        - in: query
+          name: view
+          schema:
+            type: string
+            enum: [daily, weekly, monthly, list]
+      responses:
+        '200':
+          description: Agenda payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgendaResponse'
+  /farms/{farmId}/agenda/tasks:
+    post:
+      tags: [Agenda]
+      summary: Create or regenerate a task set for a farm
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '201':
+          description: Task set created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgendaTask'
+  /farms/{farmId}/alerts:
+    get:
+      tags: [Alerts]
+      summary: List alerts for a farm
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '200':
+          description: Alert list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Alert'
+  /farms/{farmId}/livestock/animals:
+    get:
+      tags: [Livestock]
+      summary: List animals or lots
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '200':
+          description: Animal list
+    post:
+      tags: [Livestock]
+      summary: Create an animal or lot record
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '201':
+          description: Animal created
+  /farms/{farmId}/crops/plots:
+    get:
+      tags: [Crops]
+      summary: List crop plots
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '200':
+          description: Crop plot list
+    post:
+      tags: [Crops]
+      summary: Create a crop plot
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '201':
+          description: Crop plot created
+  /farms/{farmId}/inventory/items:
+    get:
+      tags: [Inventory]
+      summary: List inventory items
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '200':
+          description: Inventory list
+    post:
+      tags: [Inventory]
+      summary: Create an inventory item
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '201':
+          description: Inventory item created
+  /farms/{farmId}/sanitary/events:
+    get:
+      tags: [Sanitary]
+      summary: List sanitary events
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '200':
+          description: Sanitary event list
+    post:
+      tags: [Sanitary]
+      summary: Record a sanitary event
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '201':
+          description: Sanitary event created
+  /farms/{farmId}/finance/transactions:
+    get:
+      tags: [Finance]
+      summary: List financial transactions
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '200':
+          description: Transaction list
+    post:
+      tags: [Finance]
+      summary: Record a financial transaction
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '201':
+          description: Transaction created
+  /farms/{farmId}/dashboard:
+    get:
+      tags: [Dashboards]
+      summary: Get farm dashboard aggregates
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '200':
+          description: Dashboard data
+  /farms/{farmId}/reports:
+    post:
+      tags: [Reports]
+      summary: Generate a report
+      parameters:
+        - $ref: '#/components/parameters/FarmId'
+      responses:
+        '202':
+          description: Report generation queued or completed
+components:
+  parameters:
+    FarmId:
+      in: path
+      name: farmId
+      required: true
+      schema:
+        type: string
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    SessionResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/CurrentUser'
+    CurrentUser:
+      type: object
+      required: [id, fullName, email, role]
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, PROPRIETAIRE]
+        assignedFarmIds:
+          type: array
+          items:
+            type: string
+    FarmSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        activityType:
+          type: string
+        location:
+          type: string
+    FarmDetail:
+      allOf:
+        - $ref: '#/components/schemas/FarmSummary'
+        - type: object
+          properties:
+            description:
+              type: string
+            surfaceArea:
+              type: number
+            ownerUserId:
+              type: string
+              nullable: true
+    AgendaResponse:
+      type: object
+      properties:
+        today:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgendaTask'
+        upcoming:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgendaTask'
+        completed:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgendaTask'
+        overdue:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgendaTask'
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+    AgendaTask:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        scheduledDate:
+          type: string
+          format: date
+        scheduledTime:
+          type: string
+        priority:
+          type: string
+        status:
+          type: string
+          enum: [A_FAIRE, EN_COURS, TERMINEE, EN_RETARD]
+        isAutoGenerated:
+          type: boolean
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+        alertType:
+          type: string
+        severity:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        triggeredAt:
+          type: string
+          format: date-time
