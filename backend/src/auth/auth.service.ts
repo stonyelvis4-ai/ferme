@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { compare, hash } from 'bcryptjs';
+import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../shared/database/prisma.service.js';
 import { JwtService } from '@nestjs/jwt';
 import type { PrismaClient } from '@prisma/client';
@@ -41,7 +42,8 @@ export class AuthService {
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService
   ) {}
 
   private get prismaClient() {
@@ -62,8 +64,21 @@ export class AuthService {
       throw new UnauthorizedException('Identifiants invalides');
     }
 
+    if (!user.isActive || user.status === 'DISABLED') {
+      throw new UnauthorizedException('Compte desactive');
+    }
+
     const sessionUser = this.toSessionUser(user);
     const tokens = await this.createSessionTokens(sessionUser, meta);
+
+    await this.auditService.recordLogin({
+      userId: user.id,
+      userRole: user.role,
+      farmId: user.assignedFarms[0]?.id ?? null,
+      source: 'WEB',
+      userAgent: meta?.userAgent ?? null,
+      ipAddress: meta?.ipAddress ?? null
+    });
 
     return {
       token: tokens.accessToken,
@@ -107,13 +122,24 @@ export class AuthService {
         email: normalizedEmail,
         passwordHash: await this.hashPassword(password),
         role: 'ADMIN',
-        isActive: true
+        isActive: true,
+        status: 'ACTIVE',
+        passwordChangedAt: new Date(),
+        lastActivityAt: new Date()
       },
       include: { assignedFarms: true }
     });
 
     const sessionUser = this.toSessionUser(user);
     const tokens = await this.createSessionTokens(sessionUser, meta);
+
+    await this.auditService.recordLogin({
+      userId: user.id,
+      userRole: user.role,
+      source: 'WEB',
+      userAgent: meta?.userAgent ?? null,
+      ipAddress: meta?.ipAddress ?? null
+    });
 
     return {
       token: tokens.accessToken,
@@ -127,7 +153,8 @@ export class AuthService {
     fullName: string,
     email: string,
     password: string,
-    farmId?: string | null
+    farmId?: string | null,
+    actor?: { id: string; role: UserRole } | null
   ): Promise<SessionUser> {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedFullName = fullName.trim();
@@ -156,7 +183,10 @@ export class AuthService {
         email: normalizedEmail,
         passwordHash: await this.hashPassword(password),
         role: 'PROPRIETAIRE',
-        isActive: true
+        isActive: true,
+        status: 'ACTIVE',
+        passwordChangedAt: new Date(),
+        lastActivityAt: new Date()
       },
       include: { assignedFarms: true }
     });
@@ -172,6 +202,24 @@ export class AuthService {
 
     if (!nextUser) {
       throw new NotFoundException('Compte proprietaire introuvable');
+    }
+
+    if (actor) {
+      void this.auditService.record({
+        farmId: farmId ?? null,
+        userId: actor.id,
+        userRole: actor.role,
+        module: 'users',
+        entityType: 'User',
+        entityId: nextUser.id,
+        entityLabel: nextUser.fullName,
+        actionType: 'CREATION',
+        newValue: {
+          fullName: nextUser.fullName,
+          email: nextUser.email,
+          farmId: farmId ?? null
+        }
+      });
     }
 
     return this.toSessionUser(nextUser);
@@ -240,6 +288,10 @@ export class AuthService {
       throw new UnauthorizedException('Session de rafraichissement invalide');
     }
 
+    if (!refreshSession.user.isActive || refreshSession.user.status === 'DISABLED') {
+      throw new UnauthorizedException('Compte desactive');
+    }
+
     const validRefreshToken = await compare(refreshToken, refreshSession.tokenHash);
     if (!validRefreshToken) {
       throw new UnauthorizedException('Refresh token invalide');
@@ -254,6 +306,13 @@ export class AuthService {
 
     const sessionUser = this.toSessionUser(refreshSession.user);
     const nextTokens = await this.createSessionTokens(sessionUser, meta);
+
+    await this.prisma.user.update({
+      where: { id: refreshSession.user.id },
+      data: {
+        lastActivityAt: new Date()
+      }
+    });
 
     return {
       token: nextTokens.accessToken,
@@ -283,9 +342,74 @@ export class AuthService {
           revokedAt: new Date()
         }
       });
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        include: { assignedFarms: true }
+      });
+
+      if (user) {
+        await this.auditService.recordLogout({
+          userId: user.id,
+          userRole: user.role,
+          farmId: user.assignedFarms[0]?.id ?? null,
+          source: 'WEB'
+        });
+      }
     } catch {
       return;
     }
+  }
+
+  async changeAdminPassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { assignedFarms: true }
+    });
+
+    if (!user || user.role !== 'ADMIN' || !user.isActive) {
+      throw new UnauthorizedException('Compte administrateur introuvable');
+    }
+
+    const isValidPassword = await this.validatePassword(user.id, user.passwordHash, currentPassword);
+    if (!isValidPassword) {
+      throw new UnauthorizedException('Mot de passe actuel invalide');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await this.hashPassword(newPassword),
+        passwordChangedAt: new Date(),
+        forcePasswordReset: false,
+        status: 'ACTIVE',
+        isActive: true
+      }
+    });
+
+    await this.prismaClient.refreshSession.updateMany({
+      where: {
+        userId: user.id,
+        revokedAt: null
+      },
+      data: {
+        revokedAt: new Date()
+      }
+    });
+
+    await this.auditService.record({
+      farmId: user.assignedFarms?.[0]?.id ?? null,
+      userId: user.id,
+      userRole: user.role,
+      module: 'auth',
+      entityType: 'User',
+      entityId: user.id,
+      entityLabel: user.fullName,
+      actionType: 'MODIFICATION',
+      newValue: {
+        passwordChangedAt: new Date().toISOString()
+      }
+    });
   }
 
   async assignFarmToOwner(ownerId: string, farmId: string) {
@@ -303,6 +427,15 @@ export class AuthService {
     await this.prisma.farm.update({
       where: { id: farmId },
       data: { ownerUserId: owner.id }
+    });
+
+    await this.prisma.user.update({
+      where: { id: owner.id },
+      data: {
+        status: 'ACTIVE',
+        isActive: true,
+        lastActivityAt: new Date()
+      }
     });
   }
 
@@ -327,7 +460,16 @@ export class AuthService {
   }
 
   async hydrateSessionUser(payload: SessionUser): Promise<SessionUser> {
-    const assignedFarmIds = await this.getVisibleFarmIds(payload.id);
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.id },
+      include: { assignedFarms: true }
+    });
+
+    if (!user || !user.isActive || user.status === 'DISABLED') {
+      throw new UnauthorizedException('Compte desactive');
+    }
+
+    const assignedFarmIds = user.assignedFarms.map((farm) => farm.id);
     return {
       ...payload,
       assignedFarmIds

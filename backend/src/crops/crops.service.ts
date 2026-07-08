@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { type SessionUser } from '../auth/auth.service.js';
 import { FarmsService } from '../farms/farms.service.js';
+import { ReminderService } from '../notifications/reminder.service.js';
 import { PrismaService } from '../shared/database/prisma.service.js';
 
 export interface PlotView {
@@ -64,7 +65,8 @@ export interface HarvestView {
 export class CropsService {
   constructor(
     private readonly farmsService: FarmsService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly reminderService: ReminderService
   ) {}
 
   async listPlots(user: SessionUser, farmId: string) {
@@ -287,6 +289,18 @@ export class CropsService {
       })
     ]);
 
+    await this.createCropFollowUpTask(farm.id, {
+      title: `Contrôle de reprise - ${input.name}`,
+      description: 'Vérifier l’état de la culture, l’humidité et la levée après implantation.',
+      scheduledFor: this.offsetDays(plantedAt, 3),
+      sourceModule: 'crops',
+      sourceRecordId: crop.id,
+      linkedModule: 'crops',
+      linkedEntityType: 'CROP',
+      linkedEntityId: crop.id,
+      linkedEntityLabel: crop.name
+    });
+
     return crop;
   }
 
@@ -317,7 +331,7 @@ export class CropsService {
       throw new BadRequestException("Date d'operation invalide");
     }
 
-    return this.prisma.cropOperation.create({
+    const operation = await this.prisma.cropOperation.create({
       data: {
         farmId: farm.id,
         cropId: crop.id,
@@ -332,6 +346,20 @@ export class CropsService {
         createdByUserId: user.id
       }
     });
+
+    await this.createCropFollowUpTask(farm.id, {
+      title: `Suivi opération ${input.operationType} - ${crop.name}`,
+      description: 'Vérifier les impacts de l’opération et planifier la prochaine intervention.',
+      scheduledFor: this.offsetDays(performedAt, input.operationType === 'RECOLTE' ? 1 : 7),
+      sourceModule: 'crops',
+      sourceRecordId: operation.id,
+      linkedModule: 'crops',
+      linkedEntityType: 'CROP',
+      linkedEntityId: crop.id,
+      linkedEntityLabel: crop.name
+    });
+
+    return operation;
   }
 
   async createHarvest(
@@ -396,6 +424,60 @@ export class CropsService {
       })
     ]);
 
+    await this.createCropFollowUpTask(farm.id, {
+      title: `Vérifier la valorisation - ${crop.name}`,
+      description: 'Contrôler le stock de récolte, les ventes possibles et la rentabilité.',
+      scheduledFor: this.offsetDays(harvestedAt, 1),
+      sourceModule: 'crops',
+      sourceRecordId: harvest.id,
+      linkedModule: 'crops',
+      linkedEntityType: 'HARVEST',
+      linkedEntityId: harvest.id,
+      linkedEntityLabel: crop.name
+    });
+
     return harvest;
+  }
+
+  private offsetDays(base: Date, days: number) {
+    const next = new Date(base);
+    next.setDate(next.getDate() + days);
+    return next;
+  }
+
+  private async createCropFollowUpTask(
+    farmId: string,
+    input: {
+      title: string;
+      description: string;
+      scheduledFor: Date;
+      sourceModule: string;
+      sourceRecordId: string;
+      linkedModule: string;
+      linkedEntityType: string;
+      linkedEntityId: string;
+      linkedEntityLabel: string;
+    }
+  ) {
+    const task = await this.prisma.agendaTask.create({
+      data: {
+        farmId,
+        title: input.title,
+        description: input.description,
+        priority: 'MEDIUM',
+        status: input.scheduledFor.getTime() < Date.now() ? 'EN_RETARD' : 'A_FAIRE',
+        scheduledFor: input.scheduledFor,
+        scheduledLabel: input.scheduledFor.toISOString().slice(0, 10),
+        sourceModule: input.sourceModule,
+        sourceRecordId: input.sourceRecordId,
+        linkedModule: input.linkedModule,
+        linkedEntityType: input.linkedEntityType,
+        linkedEntityId: input.linkedEntityId,
+        linkedEntityLabel: input.linkedEntityLabel
+      }
+    });
+
+    await this.reminderService.syncTaskReminders(task);
+    return task;
   }
 }

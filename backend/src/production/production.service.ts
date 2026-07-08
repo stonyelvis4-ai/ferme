@@ -431,7 +431,13 @@ export class ProductionService {
     await this.createProductionFollowUpTask(farm.id, {
       title: `Saisir la production pondeuse suivante - ${animalGroup.identificationNumber}`,
       description: "Preparer la prochaine saisie d'oeufs, mortalite et alimentation.",
-      scheduledFor: this.offsetDays(productionDate, 1)
+      scheduledFor: this.offsetDays(productionDate, 1),
+      sourceModule: 'layers/production',
+      sourceRecordId: created.id,
+      linkedModule: 'layers/production',
+      linkedEntityType: 'LOT',
+      linkedEntityId: animalGroup.id,
+      linkedEntityLabel: animalGroup.identificationNumber
     });
 
     if (layingRate < 65 || eggsBroken >= Math.max(5, input.eggsProduced * 0.1)) {
@@ -575,7 +581,13 @@ export class ProductionService {
     await this.createProductionFollowUpTask(farm.id, {
       title: `Controle eau et alimentation - ${input.species}`,
       description: 'Verifier oxygene, pH, alimentation et croissance du bassin.',
-      scheduledFor: this.offsetDays(productionDate, 7)
+      scheduledFor: this.offsetDays(productionDate, 7),
+      sourceModule: 'pisciculture',
+      sourceRecordId: record.id,
+      linkedModule: 'pisciculture',
+      linkedEntityType: input.enclosureId ? 'BASSIN' : input.buildingId ? 'BATIMENT' : 'LOT',
+      linkedEntityId: input.enclosureId ?? input.buildingId ?? input.animalGroupId ?? null,
+      linkedEntityLabel: input.species
     });
 
     if ((input.oxygen ?? 10) < 4 || (input.ph ?? 7) < 5.5 || (input.ph ?? 7) > 9) {
@@ -813,7 +825,13 @@ export class ProductionService {
     await this.createProductionFollowUpTask(farm.id, {
       title: `Vendre ou stocker la recolte ${crop.name}`,
       description: `Suivre le stock recolte et la rentabilite de ${crop.name}.`,
-      scheduledFor: this.offsetDays(harvestedAt, 1)
+      scheduledFor: this.offsetDays(harvestedAt, 1),
+      sourceModule: 'crops',
+      sourceRecordId: record.id,
+      linkedModule: 'crops',
+      linkedEntityType: 'CROP',
+      linkedEntityId: crop.id,
+      linkedEntityLabel: crop.name
     });
 
     return record;
@@ -1116,7 +1134,17 @@ export class ProductionService {
 
   private async createProductionFollowUpTask(
     farmId: string,
-    input: { title: string; description: string; scheduledFor: Date }
+    input: {
+      title: string;
+      description: string;
+      scheduledFor: Date;
+      sourceModule?: string;
+      sourceRecordId?: string;
+      linkedModule?: string;
+      linkedEntityType?: string;
+      linkedEntityId?: string | null;
+      linkedEntityLabel?: string | null;
+    }
   ) {
     const task = await this.prisma.agendaTask.create({
       data: {
@@ -1127,7 +1155,12 @@ export class ProductionService {
         status: input.scheduledFor.getTime() < Date.now() ? 'EN_RETARD' : 'A_FAIRE',
         scheduledFor: input.scheduledFor,
         scheduledLabel: input.scheduledFor.toISOString().slice(0, 10),
-        sourceModule: 'PRODUCTION'
+        sourceModule: input.sourceModule ?? 'PRODUCTION',
+        sourceRecordId: input.sourceRecordId ?? null,
+        linkedModule: input.linkedModule ?? input.sourceModule ?? 'PRODUCTION',
+        linkedEntityType: input.linkedEntityType ?? null,
+        linkedEntityId: input.linkedEntityId ?? null,
+        linkedEntityLabel: input.linkedEntityLabel ?? null
       }
     });
 

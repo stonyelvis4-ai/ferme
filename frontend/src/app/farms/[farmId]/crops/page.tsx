@@ -1,8 +1,9 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
 import { CalendarDays, Leaf, Scissors, Sprout, TrendingUp } from 'lucide-react';
 import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../../components/app-shell';
 import { Badge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
@@ -84,26 +85,10 @@ function harvestBadge(quality: NonNullable<HarvestView['quality']> | null | unde
 }
 
 const cropWorkflowSteps = [
-  {
-    title: 'Parcelle',
-    description: 'Identifier la surface, la campagne et le point d’ancrage.',
-    icon: Leaf
-  },
-  {
-    title: 'Culture',
-    description: 'Suivre le semis, l’état de croissance et le calendrier.',
-    icon: Sprout
-  },
-  {
-    title: 'Intervention',
-    description: 'Planifier irrigation, traitement et opérations culturales.',
-    icon: CalendarDays
-  },
-  {
-    title: 'Récolte',
-    description: 'Relier la récolte, les rendements et les revenus.',
-    icon: TrendingUp
-  }
+  { title: 'Parcelle', icon: Leaf },
+  { title: 'Culture', icon: Sprout },
+  { title: 'Intervention', icon: CalendarDays },
+  { title: 'Récolte', icon: TrendingUp }
 ] as const;
 
 export default function FarmCropsPage({
@@ -113,6 +98,7 @@ export default function FarmCropsPage({
 }) {
   const session = useSession();
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const [farmId, setFarmId] = useState('');
   const [farmName, setFarmName] = useState('Ferme');
   const [plots, setPlots] = useState<PlotView[]>([]);
@@ -194,6 +180,14 @@ export default function FarmCropsPage({
   const activePlotCount = plots.filter((plot) => plot.status === 'CULTIVATED').length;
   const restingPlotCount = plots.filter((plot) => plot.status === 'RESTING').length;
 
+  function openAgendaComposer() {
+    if (!farmId) {
+      return;
+    }
+
+    router.push(`/farms/${farmId}/agenda?compose=1&module=crops&entityType=CROP`);
+  }
+
   function submitCrop(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session?.token) {
@@ -218,16 +212,16 @@ export default function FarmCropsPage({
         setCropForm((current) => ({ ...defaultCropForm, plotId: current.plotId }));
         await refresh(farmId, session.token);
         pushToast({
-          title: 'Culture ajoutee',
+          title: 'Culture ajoutée',
           description: 'La campagne culturale a ete creee avec succes.',
           variant: 'success'
         });
       } catch (submissionError) {
         const message =
-          submissionError instanceof Error ? submissionError.message : 'Creation impossible';
+          submissionError instanceof Error ? submissionError.message : 'Création impossible';
         setError(message);
         pushToast({
-          title: 'Creation impossible',
+          title: 'Création impossible',
           description: message,
           variant: 'error'
         });
@@ -261,16 +255,16 @@ export default function FarmCropsPage({
         setOperationForm((current) => ({ ...current, quantity: 0, cost: 0, notes: '' }));
         await refresh(farmId, session.token);
         pushToast({
-          title: 'Operation ajoutee',
-          description: `${operationForm.operationType} enregistree sur la culture.`,
+          title: 'Opération ajoutée',
+          description: `${operationForm.operationType} enregistrée sur la culture.`,
           variant: 'success'
         });
       } catch (submissionError) {
         const message =
-          submissionError instanceof Error ? submissionError.message : 'Operation impossible';
+          submissionError instanceof Error ? submissionError.message : 'Opération impossible';
         setError(message);
         pushToast({
-          title: 'Operation impossible',
+          title: 'Opération impossible',
           description: message,
           variant: 'error'
         });
@@ -303,16 +297,16 @@ export default function FarmCropsPage({
         setHarvestForm((current) => ({ ...current, quantity: 0, revenue: 0, notes: '' }));
         await refresh(farmId, session.token);
         pushToast({
-          title: 'Recolte declaree',
+          title: 'Récolte déclarée',
           description: `${harvestForm.quantity} ${harvestForm.unit} ajoutes a l'historique.`,
           variant: 'success'
         });
       } catch (submissionError) {
         const message =
-          submissionError instanceof Error ? submissionError.message : 'Recolte impossible';
+          submissionError instanceof Error ? submissionError.message : 'Récolte impossible';
         setError(message);
         pushToast({
-          title: 'Recolte impossible',
+          title: 'Récolte impossible',
           description: message,
           variant: 'error'
         });
@@ -336,7 +330,7 @@ export default function FarmCropsPage({
             </Badge>
           </div>
           <p className="hero-copy module-hero-copy">
-            Une expérience plus executive pour lancer les cultures, suivre les interventions et
+            Une expérience plus exécutive pour lancer les cultures, suivre les interventions et
             consolider les récoltes depuis une seule vue.
           </p>
           <div className="module-pill-row">
@@ -352,6 +346,23 @@ export default function FarmCropsPage({
               <TrendingUp className="h-4 w-4" />
               {stats.actualYield.toFixed(1)} rendement cumulé
             </span>
+          </div>
+          <div className="module-inline-actions">
+            <Button
+              className="module-submit-button production-action-button production-action-button-primary"
+              type="button"
+              onClick={openAgendaComposer}
+            >
+              Planifier une tâche
+            </Button>
+            <Button
+              className="module-submit-button production-action-button production-action-button-secondary"
+              type="button"
+              variant="secondary"
+              onClick={() => router.push(`/farms/${farmId}/agenda`)}
+            >
+              Voir l’agenda
+            </Button>
           </div>
           <div className="module-kpi-grid crops-hero-grid">
             <article className="module-kpi-card">
@@ -372,7 +383,7 @@ export default function FarmCropsPage({
                 <Badge variant="info">Parcelles</Badge>
               </div>
               <strong>{activePlotCount}</strong>
-              <span>parcelles actuellement cultivees</span>
+              <span>parcelles actuellement cultivées</span>
             </article>
             <article className="module-kpi-card">
               <div className="module-kpi-header">
@@ -427,20 +438,20 @@ export default function FarmCropsPage({
           <h2>Priorités du cycle cultural</h2>
           <div className="module-detail-list">
             <span>
-              Dernière opération: {latestOperation ? latestOperation.operationType : 'Aucune'}
+              Dernière opération : {latestOperation ? latestOperation.operationType : 'Aucune'}
             </span>
             <span>
-              Dernière récolte: {latestHarvest ? `${latestHarvest.quantity} ${latestHarvest.unit}` : 'Aucune'}
+              Dernière récolte : {latestHarvest ? `${latestHarvest.quantity} ${latestHarvest.unit}` : 'Aucune'}
             </span>
             <span>Rendement attendu: {stats.expectedYield.toFixed(1)}</span>
           </div>
           <div className="module-detail-list module-focus-strip">
-            <span>Parcelles actives: {activePlotCount}</span>
-            <span>Parcelles au repos: {restingPlotCount}</span>
-            <span>Revenu total recoltes: {stats.totalHarvestRevenue.toFixed(1)}</span>
+            <span>Parcelles actives : {activePlotCount}</span>
+            <span>Parcelles au repos : {restingPlotCount}</span>
+            <span>Revenu total récoltes : {stats.totalHarvestRevenue.toFixed(1)}</span>
           </div>
-          <p>
-            Les formulaires sont découpés pour faciliter la saisie terrain: une zone pour la campagne,
+            <p>
+            Les formulaires sont découpés pour faciliter la saisie terrain : une zone pour la campagne,
             une zone pour les opérations et une zone pour la récolte.
           </p>
         </article>
@@ -461,7 +472,6 @@ export default function FarmCropsPage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -537,7 +547,7 @@ export default function FarmCropsPage({
               </label>
             </div>
             <div className="module-inline-note">
-              <span>Chaque campagne s'appuie sur une parcelle déjà enregistrée.</span>
+            <span>Chaque campagne s’appuie sur une parcelle déjà enregistrée.</span>
               {session?.user.role === 'ADMIN' ? (
                 <Button className="module-submit-button" type="submit" disabled={isPending || !cropForm.plotId}>
                   Ajouter la culture
@@ -574,7 +584,7 @@ export default function FarmCropsPage({
             <form className="stack-form" onSubmit={submitOperation}>
               <div className="field-grid">
                 <label className="field">
-                  <span>Operation</span>
+                  <span>Opération</span>
                   <select value={operationForm.operationType} onChange={(event) => setOperationForm((current) => ({ ...current, operationType: event.target.value as CropOperationView['operationType'] }))}>
                   <option value="PREPARATION_SOL">Préparation du sol</option>
                     <option value="SEMIS">Semis</option>
@@ -624,7 +634,7 @@ export default function FarmCropsPage({
                     type="submit"
                     disabled={isPending || !selectedCropId}
                   >
-                    Ajouter l'opération
+                    Ajouter l’opération
                   </Button>
                 ) : (
                   <Badge variant="warning">Lecture seule</Badge>
@@ -647,7 +657,7 @@ export default function FarmCropsPage({
                   <input value={harvestForm.unit} onChange={(event) => setHarvestForm((current) => ({ ...current, unit: event.target.value }))} />
                 </label>
                 <label className="field">
-                  <span>Qualite</span>
+                  <span>Qualité</span>
                   <select value={harvestForm.quality} onChange={(event) => setHarvestForm((current) => ({ ...current, quality: event.target.value as NonNullable<HarvestView['quality']> }))}>
                     <option value="EXCELLENT">Excellente</option>
                     <option value="BONNE">Bonne</option>
@@ -702,7 +712,7 @@ export default function FarmCropsPage({
               <div className="module-detail-list">
                 <span>Surface: {crop.cultivatedArea} ha</span>
                 <span>Cycle: {crop.cycleLabel || '-'}</span>
-                <span>Plantée le: {new Date(crop.plantedAt).toLocaleDateString('fr-FR')}</span>
+                <span>Plantée le : {new Date(crop.plantedAt).toLocaleDateString('fr-FR')}</span>
                 <span>Rendement: {(crop.actualYield ?? 0).toFixed(1)} / {(crop.expectedYield ?? 0).toFixed(1)}</span>
               </div>
             </motion.article>
@@ -711,8 +721,8 @@ export default function FarmCropsPage({
           <article className="module-catalog-card crops-catalog-card module-empty-card">
             <div>
               <p className="eyebrow">Démarrage</p>
-              <h2>Aucune culture enregistree</h2>
-              <p>Commence par creer une parcelle puis lance une premiere culture.</p>
+              <h2>Aucune culture enregistrée</h2>
+              <p>Commence par créer une parcelle puis lance une première culture.</p>
             </div>
           </article>
         )}
@@ -722,7 +732,7 @@ export default function FarmCropsPage({
         <article className="module-list-card crops-list-card">
           <div className="dashboard-inline-actions">
             <div>
-              <p className="eyebrow">Operations recentes</p>
+              <p className="eyebrow">Opérations récentes</p>
               <h2>Calendrier cultural</h2>
             </div>
             <div className="farm-module-icon">
@@ -776,3 +786,4 @@ export default function FarmCropsPage({
     </AppShell>
   );
 }
+

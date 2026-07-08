@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
 import { HeartPulse, ShieldAlert, ShieldCheck, Syringe } from 'lucide-react';
@@ -50,26 +50,10 @@ function sanitaryBadge(status: SanitaryEventView['status']) {
 }
 
 const sanitaryWorkflowSteps = [
-  {
-    title: 'Prévention',
-    description: 'Planifier les vaccinations et rappels importants.',
-    icon: Syringe
-  },
-  {
-    title: 'Suivi',
-    description: 'Associer chaque acte au lot ou à l’animal concerné.',
-    icon: HeartPulse
-  },
-  {
-    title: 'Alerte',
-    description: 'Repérer les situations critiques sans délai.',
-    icon: ShieldAlert
-  },
-  {
-    title: 'Calendrier',
-    description: 'Synchroniser automatiquement les protocoles sanitaires.',
-    icon: ShieldCheck
-  }
+  { title: 'Prévention', icon: Syringe },
+  { title: 'Suivi', icon: HeartPulse },
+  { title: 'Alerte', icon: ShieldAlert },
+  { title: 'Calendrier', icon: ShieldCheck }
 ] as const;
 
 export default function FarmSanitaryPage({
@@ -267,7 +251,6 @@ export default function FarmSanitaryPage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -419,3 +402,4 @@ export default function FarmSanitaryPage({
     </AppShell>
   );
 }
+

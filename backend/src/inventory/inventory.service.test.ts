@@ -35,6 +35,30 @@ describe('InventoryService', () => {
               lowStockThreshold: 5
             }
           ])
+        },
+        stockMovement: {
+          findMany: vi.fn(async () => [
+            {
+              id: 'movement-1',
+              stockItemId: 'stock-low',
+              movementType: 'SORTIE',
+              quantity: 2,
+              note: null,
+              movementDate: new Date('2026-07-01T10:00:00.000Z'),
+              sourceModule: 'INVENTORY',
+              sourceEntityType: 'STOCK_ITEM',
+              sourceEntityId: 'stock-low',
+              sourceEntityLabel: 'Vitamines',
+              relatedLotId: null,
+              relatedPlotId: null,
+              relatedProductionRecordId: null,
+              relatedSaleId: null,
+              relatedTaskId: null,
+              recordedByUser: { fullName: 'Admin' },
+              farmId: 'farm-1',
+              createdAt: new Date('2026-07-01T10:00:00.000Z')
+            }
+          ])
         }
       } as never,
       {
@@ -56,7 +80,12 @@ describe('InventoryService', () => {
     expect(response.stats).toEqual({
       totalItems: 3,
       lowStockCount: 1,
-      outOfStockCount: 1
+      outOfStockCount: 1,
+      criticalItemsCount: 2,
+      averageAutonomyDays: expect.any(Number),
+      recentMovementsCount: 1,
+      outgoingQuantity30d: 2,
+      incomingQuantity30d: 0
     });
     expect(response.items.map((item) => item.stockStatus)).toEqual([
       'AVAILABLE',
@@ -65,5 +94,7 @@ describe('InventoryService', () => {
     ]);
     expect(response.items[1]?.recommendedReorderQuantity).toBe(4);
     expect(response.items[2]?.recommendedReorderQuantity).toBe(10);
+    expect(response.items[1]?.categoryLabel).toBe('Medicaments');
+    expect(response.movements[0]?.sourceEntityLabel).toBe('Vitamines');
   });
 });

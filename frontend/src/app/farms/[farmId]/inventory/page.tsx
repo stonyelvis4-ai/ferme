@@ -1,7 +1,20 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
-import { AlertTriangle, Boxes, PackagePlus, TrendingDown } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  Boxes,
+  Clock3,
+  Filter,
+  History,
+  PackagePlus,
+  Search,
+  Sparkles,
+  TrendingDown
+} from 'lucide-react';
 import { useEffect, useState, useTransition } from 'react';
 import { AppShell } from '../../../../components/app-shell';
 import { Badge } from '../../../../components/ui/badge';
@@ -13,10 +26,11 @@ import {
   createStockMovement,
   getFarm,
   getFarmStockItems,
+  type StockMovementView,
   type StockItemView
 } from '../../../../services/farm-client';
 
-const defaultItem = {
+const defaultItem: InventoryForm = {
   category: 'ALIMENTS' as const,
   name: '',
   unit: 'kg',
@@ -24,27 +38,41 @@ const defaultItem = {
   lowStockThreshold: 10
 };
 
+type InventoryForm = {
+  category: StockItemView['category'];
+  name: string;
+  unit: string;
+  currentQuantity: number;
+  lowStockThreshold: number;
+};
+
+const movementTypeLabels = {
+  ENTREE: 'Entrée',
+  SORTIE: 'Sortie',
+  INVENTAIRE: 'Inventaire',
+  AJUSTEMENT: 'Ajustement'
+} as const;
+
 const inventoryWorkflowSteps = [
-  {
-    title: 'Article',
-    description: 'Créer la ressource avec son seuil de sécurité.',
-    icon: Boxes
-  },
-  {
-    title: 'Seuil',
-    description: 'Déclencher les alertes avant la rupture.',
-    icon: AlertTriangle
-  },
-  {
-    title: 'Mouvement',
-    description: 'Suivre les sorties et les consommations terrain.',
-    icon: PackagePlus
-  },
-  {
-    title: 'Stock',
-    description: 'Lire la disponibilité réelle en un coup d’œil.',
-    icon: TrendingDown
-  }
+  { title: 'Article', icon: Boxes },
+  { title: 'Prévision', icon: Sparkles },
+  { title: 'Mouvement', icon: PackagePlus },
+  { title: 'Traçabilité', icon: History }
+] as const;
+
+const categoryOptions = [
+  { value: 'ALIMENTS', label: 'Aliments' },
+  { value: 'MEDICAMENTS', label: 'Medicaments' },
+  { value: 'SEMENCES', label: 'Semences' },
+  { value: 'ENGRAIS', label: 'Engrais' },
+  { value: 'EQUIPEMENTS', label: 'Equipements' },
+  { value: 'MATERIELS', label: 'Materiels' },
+  { value: 'VACCINS', label: 'Vaccins' },
+  { value: 'CARBURANT', label: 'Carburant' },
+  { value: 'PRODUITS_VETERINAIRES', label: 'Produits veterinaires' },
+  { value: 'PRODUITS_ELEVAGE', label: "Produits d'elevage" },
+  { value: 'PRODUITS_PISCICOLES', label: 'Produits piscicoles' },
+  { value: 'PRODUITS_AGRICOLES', label: 'Produits agricoles' }
 ] as const;
 
 export default function FarmInventoryPage({
@@ -57,18 +85,28 @@ export default function FarmInventoryPage({
   const [farmId, setFarmId] = useState('');
   const [farmName, setFarmName] = useState('Ferme');
   const [items, setItems] = useState<StockItemView[]>([]);
+  const [movements, setMovements] = useState<StockMovementView[]>([]);
   const [stats, setStats] = useState({
     totalItems: 0,
     lowStockCount: 0,
-    outOfStockCount: 0
+    outOfStockCount: 0,
+    criticalItemsCount: 0,
+    averageAutonomyDays: 0,
+    recentMovementsCount: 0,
+    outgoingQuantity30d: 0,
+    incomingQuantity30d: 0
   });
-  const [form, setForm] = useState(defaultItem);
+  const [form, setForm] = useState<InventoryForm>(defaultItem);
+  const [query, setQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [error, setError] = useState<string | null>(null);
   const { pushToast } = useToast();
 
   function refresh(activeFarmId: string, token: string) {
     return getFarmStockItems(activeFarmId, token).then((response) => {
       setItems(response.items);
+      setMovements(response.movements);
       setStats(response.stats);
     });
   }
@@ -131,7 +169,12 @@ export default function FarmInventoryPage({
             stockItemId: item.id,
             movementType: 'SORTIE',
             quantity: Math.max(1, Math.min(5, item.currentQuantity || 1)),
-            note: 'Sortie operationnelle'
+            note: 'Sortie operationnelle',
+            sourceModule: 'INVENTORY',
+            sourceEntityType: 'STOCK_ITEM',
+            sourceEntityId: item.id,
+            sourceEntityLabel: item.name,
+            movementDate: new Date().toISOString()
           },
           session.token
         );
@@ -157,6 +200,18 @@ export default function FarmInventoryPage({
   const lowStockCount = stats.lowStockCount;
   const outOfStockCount = stats.outOfStockCount;
   const availableCount = items.filter((item) => item.stockStatus === 'AVAILABLE').length;
+  const filteredItems = items.filter((item) => {
+    const matchesQuery =
+      !query ||
+      item.name.toLowerCase().includes(query.toLowerCase()) ||
+      item.categoryLabel.toLowerCase().includes(query.toLowerCase()) ||
+      item.family.toLowerCase().includes(query.toLowerCase());
+    const matchesCategory = categoryFilter === 'ALL' || item.category === categoryFilter;
+    const matchesStatus = statusFilter === 'ALL' || item.stockStatus === statusFilter;
+
+    return matchesQuery && matchesCategory && matchesStatus;
+  });
+  const recentMovements = movements.slice(0, 8);
 
   return (
     <AppShell title={`Stocks - ${farmName}`}>
@@ -167,15 +222,15 @@ export default function FarmInventoryPage({
           <div className="dashboard-hero-top">
             <div>
               <p className="eyebrow">Stocks intelligents</p>
-              <h2 className="dashboard-hero-title">Une lecture plus claire de vos ressources</h2>
+              <h2 className="dashboard-hero-title">Un centre logistique clair et traçable</h2>
             </div>
             <Badge variant={lowStockCount ? 'warning' : 'success'}>
               {lowStockCount ? 'Approvisionnement requis' : 'Niveau stable'}
             </Badge>
           </div>
           <p className="hero-copy dashboard-hero-copy">
-            Suivez vos articles, reperez les seuils faibles plus vite et pilotez les sorties avec
-            une interface plus nette.
+            Suivez vos articles de consommation et de production, anticipez les ruptures et
+            gardez une trace nette de chaque entrée, sortie et ajustement.
           </p>
           <div className="dashboard-hero-pills">
             <span className="dashboard-hero-pill">
@@ -187,8 +242,8 @@ export default function FarmInventoryPage({
               {lowStockCount} alerte(s)
             </span>
             <span className="dashboard-hero-pill">
-              <TrendingDown className="h-4 w-4" />
-              {outOfStockCount} rupture(s)
+              <Clock3 className="h-4 w-4" />
+              {stats.recentMovementsCount} mouvement(s) 30j
             </span>
           </div>
           <div className="dashboard-hero-stat-grid inventory-hero-grid">
@@ -206,6 +261,11 @@ export default function FarmInventoryPage({
               <span className="dashboard-hero-stat-label">Ruptures</span>
               <strong>{outOfStockCount}</strong>
               <span>Articles a traiter en urgence</span>
+            </article>
+            <article className="dashboard-hero-stat">
+              <span className="dashboard-hero-stat-label">Autonomie moyenne</span>
+              <strong>{stats.averageAutonomyDays.toFixed(1)}</strong>
+              <span>Jours avant tension de stock</span>
             </article>
           </div>
         </article>
@@ -228,6 +288,20 @@ export default function FarmInventoryPage({
           <div className="inventory-summary-strip">
             <span className="status-pill">{availableCount} disponibles</span>
             <span className="status-pill">{stats.totalItems} total</span>
+            <span className="status-pill">{stats.incomingQuantity30d.toFixed(0)} entrées 30j</span>
+            <span className="status-pill">{stats.outgoingQuantity30d.toFixed(0)} sorties 30j</span>
+          </div>
+          <div className="inventory-mini-forecast">
+            <article className="inventory-mini-metric">
+              <ArrowDownRight className="h-4 w-4" />
+              <span>Critiques</span>
+              <strong>{stats.criticalItemsCount}</strong>
+            </article>
+            <article className="inventory-mini-metric">
+              <ArrowUpRight className="h-4 w-4" />
+              <span>Autonomie</span>
+              <strong>{stats.averageAutonomyDays.toFixed(1)} j</strong>
+            </article>
           </div>
         </article>
       </section>
@@ -247,10 +321,54 @@ export default function FarmInventoryPage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
+      </section>
+
+      <section className="panel inventory-search-panel">
+        <div className="dashboard-inline-actions">
+          <div>
+            <p className="eyebrow">Lecture rapide</p>
+            <h2 className="farms-section-title">Filtrer les articles et suivre les mouvements</h2>
+          </div>
+          <div className="farm-module-icon">
+            <Filter className="h-5 w-5" />
+          </div>
+        </div>
+        <div className="field-grid inventory-filter-grid">
+          <div className="field">
+            <span>Recherche</span>
+            <div className="field-with-icon">
+              <Search className="field-icon h-4 w-4" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Nom, categorie ou famille"
+              />
+            </div>
+          </div>
+          <label className="field">
+            <span>Categorie</span>
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <option value="ALL">Toutes les categories</option>
+              {categoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Statut</span>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="ALL">Tous les statuts</option>
+              <option value="AVAILABLE">Disponible</option>
+              <option value="LOW">Faible</option>
+              <option value="OUT_OF_STOCK">Rupture</option>
+            </select>
+          </label>
+        </div>
       </section>
 
       <section className="dashboard-kpi-grid">
@@ -293,7 +411,7 @@ export default function FarmInventoryPage({
         <div className="dashboard-inline-actions">
           <div>
             <p className="eyebrow">Nouveau stock</p>
-            <h2 className="farms-section-title">Ajouter un article avec seuil intelligent</h2>
+            <h2 className="farms-section-title">Ajouter un article avec seuil et famille clairs</h2>
           </div>
           <div className="farm-module-icon">
             <PackagePlus className="h-5 w-5" />
@@ -303,21 +421,20 @@ export default function FarmInventoryPage({
           <div className="field-grid">
             <label className="field">
               <span>Categorie</span>
-              <select
-                value={form.category}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    category: event.target.value as typeof form.category
-                  }))
-                }
-              >
-                <option value="ALIMENTS">Aliments</option>
-                <option value="MEDICAMENTS">Medicaments</option>
-                <option value="SEMENCES">Semences</option>
-                <option value="ENGRAIS">Engrais</option>
-                <option value="EQUIPEMENTS">Equipements</option>
-                <option value="MATERIELS">Materiels</option>
+                <select
+                  value={form.category}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      category: event.target.value as InventoryForm['category']
+                    }))
+                  }
+                >
+                {categoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="field">
@@ -370,14 +487,14 @@ export default function FarmInventoryPage({
             type="submit"
             disabled={isPending}
           >
-            Ajouter le stock
+            Ajouter l'article
           </Button>
         </form>
       </section>
 
       <section className="dashboard-summary-grid inventory-summary-grid">
-        {items.length ? (
-          items.map((item, index) => (
+        {filteredItems.length ? (
+          filteredItems.map((item, index) => (
             <motion.article
               key={item.id}
               className={`panel dashboard-summary-card inventory-card ${
@@ -392,7 +509,10 @@ export default function FarmInventoryPage({
               transition={{ delay: index * 0.04 }}
             >
               <div className="dashboard-inline-actions">
-                <p className="eyebrow">{item.category}</p>
+                <div>
+                  <p className="eyebrow">{item.categoryLabel}</p>
+                  <p className="inventory-family-label">{item.family === 'PRODUCTION' ? 'Stock produit' : item.family === 'SUPPORT' ? 'Stock support' : 'Stock consommation'}</p>
+                </div>
                 <Badge
                   variant={
                     item.stockStatus === 'OUT_OF_STOCK'
@@ -410,10 +530,21 @@ export default function FarmInventoryPage({
                 </Badge>
               </div>
               <h2>{item.name}</h2>
+              <div className="inventory-card-meta">
+                <span>Dernier mouvement: {item.lastMovementAt ? new Date(item.lastMovementAt).toLocaleDateString('fr-FR') : 'Aucun'}</span>
+                <span>30j: {item.movementCount30d}</span>
+              </div>
               <strong className="metric-number">
                 {item.currentQuantity} {item.unit}
               </strong>
               <p className="muted">Seuil critique: {item.lowStockThreshold}</p>
+              <p className="muted">
+                Consommation moyenne: {item.averageDailyConsumption.toFixed(2)} {item.unit} / jour
+              </p>
+              <p className="muted">
+                Autonomie estimée:{' '}
+                {item.daysOfAutonomy !== null ? `${item.daysOfAutonomy.toFixed(1)} jours` : 'non calculable'}
+              </p>
               {item.recommendedReorderQuantity > 0 ? (
                 <p className="muted">
                   Reappro conseille: {item.recommendedReorderQuantity} {item.unit}
@@ -421,6 +552,11 @@ export default function FarmInventoryPage({
               ) : (
                 <p className="muted">Niveau de stock confortable.</p>
               )}
+              {item.estimatedStockoutAt ? (
+                <p className="muted">
+                  Rupture estimee: {new Date(item.estimatedStockoutAt).toLocaleDateString('fr-FR')}
+                </p>
+              ) : null}
               {session?.user.role === 'ADMIN' ? (
                 <Button
                   variant="secondary"
@@ -437,11 +573,59 @@ export default function FarmInventoryPage({
           ))
         ) : (
           <article className="panel empty-state farms-empty-state">
-            <h2>Aucun stock enregistre</h2>
-            <p className="muted">Ajoute un premier article pour commencer le suivi des stocks.</p>
+            <h2>Aucun article ne correspond aux filtres</h2>
+            <p className="muted">
+              Ajuste la recherche ou les filtres pour retrouver les articles de stock.
+            </p>
           </article>
+        )}
+      </section>
+
+      <section className="panel inventory-timeline-panel">
+        <div className="dashboard-inline-actions">
+          <div>
+            <p className="eyebrow">Traçabilité</p>
+            <h2 className="farms-section-title">Mouvements récents</h2>
+          </div>
+          <div className="farm-module-icon">
+            <Activity className="h-5 w-5" />
+          </div>
+        </div>
+        {recentMovements.length ? (
+          <div className="inventory-timeline-list">
+            {recentMovements.map((movement) => (
+              <article key={movement.id} className="inventory-timeline-row">
+                <div className="inventory-timeline-badge">
+                  {movement.movementType === 'SORTIE' ? (
+                    <ArrowDownRight className="h-4 w-4" />
+                  ) : (
+                    <ArrowUpRight className="h-4 w-4" />
+                  )}
+                </div>
+                <div className="inventory-timeline-body">
+                  <div className="inventory-timeline-top">
+                    <strong>{movementTypeLabels[movement.movementType]}</strong>
+                    <Badge variant={movement.movementType === 'SORTIE' ? 'warning' : 'success'}>
+                      {movement.quantity}
+                    </Badge>
+                  </div>
+                  <p>
+                    {movement.sourceEntityLabel || movement.note || 'Mouvement trace'}{' '}
+                    {movement.sourceModule ? `· ${movement.sourceModule}` : ''}
+                  </p>
+                  <span>
+                    {new Date(movement.movementDate).toLocaleString('fr-FR')}
+                    {movement.recordedByUserName ? ` · ${movement.recordedByUserName}` : ''}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">Aucun mouvement recent pour le moment.</p>
         )}
       </section>
     </AppShell>
   );
 }
+

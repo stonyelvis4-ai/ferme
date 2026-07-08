@@ -107,24 +107,54 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="page-shell">
-      <section className="hero-grid">
-        <motion.section className="hero-card login-hero-card" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-          <Badge variant="success">Acces securise FERM+</Badge>
-          <h1>Prenez la main sur votre plateforme agricole en quelques secondes.</h1>
-          <p className="hero-copy">
-            La création libre est réservée au premier administrateur. Les propriétaires sont ensuite
-            rattachés depuis l’espace d’administration.
-          </p>
+    <main className="login-shell">
+      <div className="login-atmosphere login-atmosphere-left" aria-hidden="true" />
+      <div className="login-atmosphere login-atmosphere-right" aria-hidden="true" />
+      <div className="login-atmosphere login-atmosphere-grid" aria-hidden="true" />
+
+      <section className="login-stage">
+        <motion.section
+          className="hero-card login-hero-card login-hero-card-premium"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="login-hero-topline">
+            <Badge variant="success">Accès sécurisé FERM+</Badge>
+            <span className="login-hero-minor-note">Création admin verrouillée, propriétaires contrôlés.</span>
+          </div>
+
+          <div className="login-hero-copy-block">
+            <p className="eyebrow">Accès sécurisé FERM+</p>
+            <h1>Prenez la main sur votre plateforme agricole en quelques secondes.</h1>
+            <p className="hero-copy">
+              La création libre est réservée au premier administrateur. Les propriétaires sont ensuite rattachés
+              depuis l&apos;espace d&apos;administration.
+            </p>
+          </div>
+
           <div className="login-hero-pills">
             <span className="module-detail-chip">Admin unique</span>
             <span className="module-detail-chip">Propriétaires rattachés</span>
             <span className="module-detail-chip">Mobile prêt</span>
           </div>
+
+          <div className="login-hero-foot" aria-hidden="true">
+            <div className="login-hero-lines">
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="login-hero-nature">
+              <span className="login-leaf login-leaf-a" />
+              <span className="login-leaf login-leaf-b" />
+              <span className="login-leaf login-leaf-c" />
+            </div>
+          </div>
         </motion.section>
 
         <motion.section
-          className="panel auth-panel auth-panel-premium"
+          className="panel auth-panel auth-panel-premium login-auth-card"
           initial={{ opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
@@ -133,6 +163,7 @@ export default function LoginPage() {
             <KeyRound className="h-4 w-4" />
             <span>Connexion rapide, création admin verrouillée, accès propriétaire contrôlé.</span>
           </div>
+
           <div className="auth-mode-switch">
             <button
               type="button"
@@ -165,7 +196,7 @@ export default function LoginPage() {
               <p className="muted">
                 Connectez-vous avec un compte administrateur ou un compte propriétaire déjà créé.
               </p>
-              {!bootstrapLoaded ? <p className="muted">Vérification de l’accès administrateur...</p> : null}
+              {!bootstrapLoaded ? <p className="muted">Vérification de l&apos;accès administrateur...</p> : null}
               <form className="stack-form" onSubmit={loginForm.handleSubmit(submitLogin)}>
                 <label className="field">
                   <span>Email</span>
@@ -203,13 +234,17 @@ export default function LoginPage() {
               <p className="eyebrow">Premier administrateur</p>
               <h2>Créer le premier compte de votre organisation</h2>
               <p className="muted">
-                Cette création n’est possible que lorsqu’aucun administrateur actif n’existe encore.
+                Cette création n&apos;est possible que lorsqu&apos;aucun administrateur actif n&apos;existe encore.
               </p>
               <form className="stack-form" onSubmit={registerForm.handleSubmit(submitRegister)}>
                 <div className="field-grid">
                   <label className="field">
                     <span>Nom complet</span>
-                    <input {...registerForm.register('fullName', { required: true, minLength: 3 })} type="text" autoComplete="name" />
+                    <input
+                      {...registerForm.register('fullName', { required: true, minLength: 3 })}
+                      type="text"
+                      autoComplete="name"
+                    />
                   </label>
                   <label className="field">
                     <span>Email</span>
@@ -258,18 +293,18 @@ export default function LoginPage() {
                 <div className="hero-actions">
                   <Button type="submit" disabled={isPending} className="auth-submit-button">
                     <UserPlus className="h-4 w-4" />
-                    {isPending ? 'Creation...' : 'Creer le compte admin'}
+                    {isPending ? 'Création...' : 'Créer le compte admin'}
                   </Button>
                 </div>
               </form>
               <div className="table-list auth-summary-list">
                 <article className="table-row auth-summary-row">
-                  <strong>Role cree</strong>
+                  <strong>Rôle créé</strong>
                   <span>Administrateur uniquement</span>
                 </article>
                 <article className="table-row auth-summary-row">
-                  <strong>Prochaine etape</strong>
-                  <span>Configurer la ferme puis creer les proprietaires depuis l espace admin.</span>
+                  <strong>Prochaine étape</strong>
+                  <span>Configurer la ferme puis créer les propriétaires depuis l&apos;espace admin.</span>
                 </article>
               </div>
             </>

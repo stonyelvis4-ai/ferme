@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
 import { Layers2, MapPinned, Sprout, Waves } from 'lucide-react';
@@ -11,26 +11,10 @@ import { useSession } from '../../../../hooks/use-session';
 import { createFarmPlot, getFarm, getFarmPlots, type PlotView } from '../../../../services/farm-client';
 
 const plotWorkflowSteps = [
-  {
-    title: 'Parcelle',
-    description: 'Nommer, localiser et dimensionner la zone.',
-    icon: MapPinned
-  },
-  {
-    title: 'Rotation',
-    description: 'Contrôler les périodes actives et de repos.',
-    icon: Waves
-  },
-  {
-    title: 'Culture',
-    description: 'Relier la parcelle à une campagne concrète.',
-    icon: Sprout
-  },
-  {
-    title: 'Disponibilité',
-    description: 'Visualiser rapidement les zones prêtes à l’emploi.',
-    icon: Layers2
-  }
+  { title: 'Parcelle', icon: MapPinned },
+  { title: 'Rotation', icon: Waves },
+  { title: 'Culture', icon: Sprout },
+  { title: 'Disponibilité', icon: Layers2 }
 ] as const;
 
 type PlotFormState = {
@@ -250,7 +234,6 @@ export default function FarmPlotsPage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -375,3 +358,4 @@ export default function FarmPlotsPage({
     </AppShell>
   );
 }
+

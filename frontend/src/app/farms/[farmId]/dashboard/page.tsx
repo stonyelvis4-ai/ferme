@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -9,11 +9,14 @@ import {
   BadgeEuro,
   Bell,
   Boxes,
+  CloudOff,
   HeartPulse,
   LineChart as LineChartIcon,
   PawPrint,
   ShieldAlert,
   Sprout,
+  Users,
+  Settings2,
   TrendingUp
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -44,25 +47,36 @@ import { getFarmDashboard, type FarmDashboardView } from '../../../../services/f
 const COLORS = ['#16A34A', '#0EA5E9', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 const dashboardWorkflowSteps = [
+  { title: 'Vue', icon: Sprout },
+  { title: 'Planning', icon: Activity },
+  { title: 'Sanitaire', icon: ShieldAlert },
+  { title: 'Finance', icon: BadgeEuro }
+] as const;
+
+const adminQuickLinks = [
   {
-    title: 'Vue',
-    description: 'Comprendre l’état global de la ferme en une lecture.',
-    icon: Sprout
+    title: 'Utilisateurs',
+    description: 'Créer et assigner les propriétaires.',
+    href: 'users',
+    icon: Users
   },
   {
-    title: 'Planning',
-    description: 'Relier les tâches du jour, les alertes et le calendrier.',
-    icon: Activity
+    title: 'Paramètres métier',
+    description: 'Régler les seuils et règles de ferme.',
+    href: 'settings',
+    icon: Settings2
   },
   {
-    title: 'Sanitaire',
-    description: 'Repérer immédiatement les points de vigilance.',
-    icon: ShieldAlert
+    title: 'Audit',
+    description: 'Relire les actions importantes.',
+    href: 'audit',
+    icon: LineChartIcon
   },
   {
-    title: 'Finance',
-    description: 'Garder un œil sur la marge et les flux économiques.',
-    icon: BadgeEuro
+    title: 'Synchronisation',
+    description: 'Surveiller la file hors ligne.',
+    href: 'sync',
+    icon: CloudOff
   }
 ] as const;
 
@@ -105,14 +119,14 @@ export default function FarmDashboardPage({
         {
           label: 'Taches du jour',
           value: metrics.agendaToday,
-          delta: metrics.overdueTasks > 0 ? `${metrics.overdueTasks} en retard` : 'Aucune derive',
+          delta: metrics.overdueTasks > 0 ? `${metrics.overdueTasks} en retard` : 'Aucune dérive',
           trend: metrics.overdueTasks > 0 ? 'down' : 'up',
           icon: Activity
         },
         {
           label: 'Alertes critiques',
           value: metrics.unreadAlerts,
-          delta: metrics.criticalSanitaryEvents > 0 ? 'Surveillance renforcee' : 'Sous controle',
+          delta: metrics.criticalSanitaryEvents > 0 ? 'Surveillance renforcée' : 'Sous contrôle',
           trend: metrics.unreadAlerts > 0 ? 'down' : 'up',
           icon: Bell
         },
@@ -128,12 +142,12 @@ export default function FarmDashboardPage({
 
   const operationsSeries = metrics
     ? [
-        { name: 'Lun', taches: Math.max(2, metrics.agendaToday - 1), alertes: Math.max(0, metrics.unreadAlerts - 1) },
-        { name: 'Mar', taches: Math.max(2, metrics.agendaToday + 1), alertes: Math.max(0, metrics.unreadAlerts) },
-        { name: 'Mer', taches: Math.max(3, metrics.agendaToday + 2), alertes: Math.max(0, metrics.unreadAlerts + 1) },
-        { name: 'Jeu', taches: Math.max(2, metrics.agendaToday), alertes: Math.max(0, metrics.unreadAlerts - 1) },
-        { name: 'Ven', taches: Math.max(1, metrics.agendaToday - 2), alertes: Math.max(0, metrics.unreadAlerts) },
-        { name: 'Sam', taches: Math.max(1, metrics.agendaToday - 1), alertes: Math.max(0, metrics.unreadAlerts - 1) }
+        { name: 'Lun', tâches: Math.max(2, metrics.agendaToday - 1), alertes: Math.max(0, metrics.unreadAlerts - 1) },
+        { name: 'Mar', tâches: Math.max(2, metrics.agendaToday + 1), alertes: Math.max(0, metrics.unreadAlerts) },
+        { name: 'Mer', tâches: Math.max(3, metrics.agendaToday + 2), alertes: Math.max(0, metrics.unreadAlerts + 1) },
+        { name: 'Jeu', tâches: Math.max(2, metrics.agendaToday), alertes: Math.max(0, metrics.unreadAlerts - 1) },
+        { name: 'Ven', tâches: Math.max(1, metrics.agendaToday - 2), alertes: Math.max(0, metrics.unreadAlerts) },
+        { name: 'Sam', tâches: Math.max(1, metrics.agendaToday - 1), alertes: Math.max(0, metrics.unreadAlerts - 1) }
       ]
     : [];
 
@@ -170,17 +184,17 @@ export default function FarmDashboardPage({
         {
           label: 'Animaux actifs',
           value: metrics.activeAnimals,
-          note: 'Suivi des lots en temps reel'
+          note: 'Suivi des lots en temps réel'
         },
         {
           label: 'Taches du jour',
           value: metrics.agendaToday,
-          note: metrics.overdueTasks > 0 ? `${metrics.overdueTasks} en retard` : 'Planning stabilise'
+          note: metrics.overdueTasks > 0 ? `${metrics.overdueTasks} en retard` : 'Planning stabilisé'
         },
         {
           label: 'Alertes critiques',
           value: metrics.unreadAlerts,
-          note: metrics.criticalSanitaryEvents > 0 ? 'Surveillance renforcee' : 'Risque contenu'
+          note: metrics.criticalSanitaryEvents > 0 ? 'Surveillance renforcée' : 'Risque contenu'
         },
         {
           label: 'Balance',
@@ -191,23 +205,23 @@ export default function FarmDashboardPage({
     : [];
 
   return (
-    <AppShell title={`Dashboard - ${dashboard?.farm.name ?? farmId}`}>
+    <AppShell title={`Tableau de bord - ${dashboard?.farm.name ?? farmId}`}>
       {error ? <p className="error-text">{error}</p> : null}
 
       <section className="dashboard-hero-grid">
         <article className="dashboard-hero-card">
           <div className="dashboard-hero-top">
             <div>
-              <p className="eyebrow">Vue executive</p>
-              <h2 className="dashboard-hero-title">{dashboard?.farm.name ?? 'Dashboard ferme'}</h2>
+              <p className="eyebrow">Vue exécutive</p>
+              <h2 className="dashboard-hero-title">{dashboard?.farm.name ?? 'Tableau de bord de la ferme'}</h2>
             </div>
             <Badge variant={(metrics?.unreadAlerts ?? 0) > 0 ? 'warning' : 'success'}>
               {(metrics?.unreadAlerts ?? 0) > 0 ? `${metrics?.unreadAlerts ?? 0} signal(s)` : 'Stable'}
             </Badge>
           </div>
           <p className="hero-copy dashboard-hero-copy">
-            Une lecture immediate de la sante operationnelle, du planning, du sanitaire et de la
-            performance economique de la ferme.
+            Une lecture immédiate de la santé opérationnelle, du planning, du sanitaire et de la
+            performance économique de la ferme.
           </p>
           <div className="dashboard-hero-pills">
             <span className="dashboard-hero-pill">
@@ -261,14 +275,14 @@ export default function FarmDashboardPage({
             </div>
           </div>
           <div className="metric-list">
-            <span>Statut: {dashboard?.farm.status ?? '-'}</span>
-            <span>Activite: {dashboard?.farm.activityType ?? '-'}</span>
-            <span>Alertes non lues: {metrics?.unreadAlerts ?? 0}</span>
+            <span>Statut : {dashboard?.farm.status ?? '-'}</span>
+            <span>Activité : {dashboard?.farm.activityType ?? '-'}</span>
+            <span>Alertes non lues : {metrics?.unreadAlerts ?? 0}</span>
           </div>
           <div className="hero-actions">
             <Link href={`/farms/${farmId}`}>
               <Button variant="secondary" className="dashboard-action-button dashboard-action-button-secondary">
-                Retour a la fiche ferme
+                Retour à la fiche ferme
               </Button>
             </Link>
             <Link href={`/farms/${farmId}/reports`}>
@@ -295,7 +309,6 @@ export default function FarmDashboardPage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -342,7 +355,7 @@ export default function FarmDashboardPage({
         </article>
         <article className={`panel dashboard-summary-card ${(metrics?.overdueTasks ?? 0) > 0 ? 'alert-warning' : ''}`}>
           <p className="eyebrow">Agenda</p>
-          <h2>{metrics?.agendaToday ?? 0} taches du jour</h2>
+          <h2>{metrics?.agendaToday ?? 0} tâches du jour</h2>
           <div className="metric-list">
             <span>En retard: {metrics?.overdueTasks ?? 0}</span>
           </div>
@@ -362,7 +375,7 @@ export default function FarmDashboardPage({
         </article>
         <article className={`panel dashboard-summary-card ${(metrics?.criticalSanitaryEvents ?? 0) > 0 ? 'alert-critical' : ''}`}>
           <p className="eyebrow">Sanitaire</p>
-          <h2>{metrics?.sanitaryEvents ?? 0} evenements</h2>
+          <h2>{metrics?.sanitaryEvents ?? 0} événements</h2>
           <div className="metric-list">
             <span>Critiques: {metrics?.criticalSanitaryEvents ?? 0}</span>
           </div>
@@ -370,6 +383,31 @@ export default function FarmDashboardPage({
             Voir le suivi sanitaire
           </Link>
         </article>
+      </section>
+
+      <section className="dashboard-summary-grid dashboard-admin-grid">
+        {adminQuickLinks.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <article key={item.title} className="panel dashboard-summary-card dashboard-admin-card">
+              <div className="dashboard-inline-actions">
+                <div>
+                  <p className="eyebrow">Administration</p>
+                  <h2>{item.title}</h2>
+                </div>
+                <div className="farm-module-icon">
+                  <Icon className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="muted">{item.description}</p>
+              <Link href={`/farms/${farmId}/${item.href}`} className="inline-link">
+                Ouvrir
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </article>
+          );
+        })}
       </section>
 
       <section className="dashboard-chart-grid">
@@ -533,7 +571,7 @@ export default function FarmDashboardPage({
           <strong>Signal sanitaire</strong>
           <p className="muted">
             {(metrics?.criticalSanitaryEvents ?? 0) > 0
-              ? `${metrics?.criticalSanitaryEvents ?? 0} evenement(s) critique(s) doivent etre traites sans attendre.`
+              ? `${metrics?.criticalSanitaryEvents ?? 0} événement(s) critique(s) doivent être traités sans attendre.`
               : 'Le niveau sanitaire remonte actuellement une situation stable.'}
           </p>
         </article>
@@ -541,3 +579,4 @@ export default function FarmDashboardPage({
     </AppShell>
   );
 }
+

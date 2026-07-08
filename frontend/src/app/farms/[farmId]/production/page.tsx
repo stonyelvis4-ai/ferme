@@ -139,27 +139,27 @@ export default function ProductionPage({
   const workflowSteps = useMemo(() => {
     if (isFishRoute) {
       return [
-        { title: 'Bassin', description: 'Créer le lot et sécuriser la base de suivi.', icon: Package },
-        { title: 'Empoissonnement', description: 'Rattacher les alevins à la zone de production.', icon: Activity },
-        { title: 'Croissance', description: 'Suivre biomasse, alimentation et qualité de l’eau.', icon: TrendingUp },
-        { title: 'Récolte', description: 'Relier récolte, stock poissons, vente et finance.', icon: DollarSign }
+        { title: 'Bassin', icon: Package },
+        { title: 'Empoissonnement', icon: Activity },
+        { title: 'Croissance', icon: TrendingUp },
+        { title: 'Récolte', icon: DollarSign }
       ];
     }
 
     if (isLayersRoute) {
       return [
-        { title: 'Lot', description: 'Sécuriser le lot et le point de départ.', icon: Package },
-        { title: 'Production quotidienne', description: 'Enregistrer les œufs produits et les pertes.', icon: Activity },
-        { title: 'Stock d’œufs', description: 'Basculer la production vers le stock disponible.', icon: Boxes },
-        { title: 'Vente & finance', description: 'Relier les plateaux vendus au chiffre d’affaires.', icon: DollarSign }
+        { title: 'Lot', icon: Package },
+        { title: 'Production quotidienne', icon: Activity },
+        { title: 'Stock d’œufs', icon: Boxes },
+        { title: 'Vente & finance', icon: DollarSign }
       ];
     }
 
     return [
-      { title: 'Production', description: 'Lancer le cycle et suivre les volumes.', icon: Package },
-      { title: 'Stock', description: 'Garder une lecture nette des ressources.', icon: Boxes },
-      { title: 'Vente', description: 'Tracer les sorties et les clients.', icon: DollarSign },
-      { title: 'Finance', description: 'Contrôler la rentabilité finale.', icon: TrendingUp }
+      { title: 'Production', icon: Package },
+      { title: 'Stock', icon: Boxes },
+      { title: 'Vente', icon: DollarSign },
+      { title: 'Finance', icon: TrendingUp }
     ];
   }, [isFishRoute, isLayersRoute]);
 
@@ -430,7 +430,6 @@ export default function ProductionPage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -1188,6 +1187,7 @@ export default function ProductionPage({
     </AppShell>
   );
 }
+
 
 
 

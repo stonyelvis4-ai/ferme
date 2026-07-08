@@ -1,14 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState, useTransition } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Activity,
   ArrowRight,
   BadgeCheck,
-  BellRing,
   Building2,
   ClipboardList,
+  CloudOff,
   HeartPulse,
   Leaf,
   LineChart,
@@ -18,62 +18,15 @@ import {
   Settings2,
   Sprout,
   Tractor,
+  Users,
   Wallet,
   Warehouse
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AppShell } from '../../../components/app-shell';
 import { Badge } from '../../../components/ui/badge';
-import { Button } from '../../../components/ui/button';
 import { useSession } from '../../../hooks/use-session';
-import {
-  archiveFarm,
-  assignFarmOwner,
-  changeFarmStatus,
-  deactivateFarm,
-  getFarm,
-  getFarmOwnerOptions,
-  restoreFarm,
-  softDeleteFarm,
-  updateFarm,
-  type FarmOwnerOption,
-  type FarmSummary
-} from '../../../services/farm-client';
-import { createOwnerAccount } from '../../../services/auth-client';
-
-type FarmEditForm = {
-  name: string;
-  description: string;
-  location: string;
-  surfaceArea: number;
-  status: FarmSummary['status'];
-  activityType: FarmSummary['activityType'];
-};
-
-const emptyEditForm: FarmEditForm = {
-  name: '',
-  description: '',
-  location: '',
-  surfaceArea: 0,
-  status: 'ACTIVE' as const,
-  activityType: 'MIXTE' as const
-};
-
-function formatActivityLabel(activityType: FarmSummary['activityType']) {
-  if (activityType === 'ELEVAGE') {
-    return 'Elevage';
-  }
-
-  if (activityType === 'CULTURE') {
-    return 'Culture';
-  }
-
-  if (activityType === 'PISCICULTURE') {
-    return 'Pisciculture';
-  }
-
-  return 'Mixte';
-}
+import { getFarm, type FarmSummary } from '../../../services/farm-client';
 
 type FarmModuleCard = {
   eyebrow: string;
@@ -178,8 +131,50 @@ const moduleCards: FarmModuleCard[] = [
     href: 'recommendations',
     linkLabel: 'Ouvrir les recommandations',
     icon: Sprout
+  },
+  {
+    eyebrow: 'Parametres',
+    title: 'Reglages de la ferme',
+    description: 'Centralise le statut, le proprietaire et les actions d administration dans un espace dedie.',
+    href: 'settings',
+    linkLabel: 'Ouvrir les parametres',
+    icon: Settings2
   }
 ];
+
+const adminWorkflowCards: FarmModuleCard[] = [
+  {
+    eyebrow: 'Utilisateurs',
+    title: 'Comptes et proprietaires',
+    description: 'Creer un proprietaire, relier ses fermes et conserver un accès lecture seule côté propriétaire.',
+    href: 'users',
+    linkLabel: 'Gerer les utilisateurs',
+    icon: Users
+  },
+  {
+    eyebrow: 'Traçabilité',
+    title: 'Journal d audit',
+    description: 'Revoir chaque mutation importante de la ferme, du planning aux opérations terrain.',
+    href: 'audit',
+    linkLabel: 'Ouvrir le journal',
+    icon: ClipboardList
+  },
+  {
+    eyebrow: 'Synchronisation',
+    title: 'Mode hors ligne',
+    description: 'Contrôler la file d attente locale, la remontée et l état de synchronisation.',
+    href: 'sync',
+    linkLabel: 'Ouvrir la synchronisation',
+    icon: CloudOff
+  }
+];
+
+function formatActivityLabel(activityType: FarmSummary['activityType']) {
+  if (activityType === 'ELEVAGE') return 'Elevage';
+  if (activityType === 'CULTURE') return 'Culture';
+  if (activityType === 'PISCICULTURE') return 'Pisciculture';
+  return 'Mixte';
+}
 
 export default function FarmDetailPage({
   params
@@ -187,23 +182,9 @@ export default function FarmDetailPage({
   params: Promise<{ farmId: string }>;
 }) {
   const session = useSession();
-  const [isPending, startTransition] = useTransition();
-  const [farmId, setFarmId] = useState<string>('');
+  const [farmId, setFarmId] = useState('');
   const [farm, setFarm] = useState<FarmSummary | null>(null);
-  const [ownerOptions, setOwnerOptions] = useState<FarmOwnerOption[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [showEdit, setShowEdit] = useState(false);
-  const [showOwnerAssignment, setShowOwnerAssignment] = useState(false);
-  const [showOwnerCreation, setShowOwnerCreation] = useState(false);
-  const [editForm, setEditForm] = useState(emptyEditForm);
-  const [selectedOwnerId, setSelectedOwnerId] = useState('');
-  const [ownerForm, setOwnerForm] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    assignToCurrentFarm: true
-  });
 
   useEffect(() => {
     params.then((value) => setFarmId(value.farmId));
@@ -218,20 +199,9 @@ export default function FarmDetailPage({
 
     getFarm(farmId, session.token)
       .then((farmResponse) => {
-        if (cancelled) {
-          return;
+        if (!cancelled) {
+          setFarm(farmResponse);
         }
-
-        setFarm(farmResponse);
-        setEditForm({
-          name: farmResponse.name,
-          description: farmResponse.description,
-          location: farmResponse.location,
-          surfaceArea: farmResponse.surfaceArea,
-          status: farmResponse.status,
-          activityType: farmResponse.activityType
-        });
-        setSelectedOwnerId(farmResponse.ownerUserId ?? '');
       })
       .catch((loadError) => {
         if (!cancelled) {
@@ -239,367 +209,16 @@ export default function FarmDetailPage({
         }
       });
 
-    if (session.user.role === 'ADMIN') {
-      getFarmOwnerOptions(session.token)
-        .then((response) => {
-          if (!cancelled) {
-            setOwnerOptions(response.items);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setOwnerOptions([]);
-          }
-        });
-    }
-
     return () => {
       cancelled = true;
     };
-  }, [farmId, session?.token, session?.user.role]);
+  }, [farmId, session?.token]);
 
-  const isOwner = session?.user.role === 'PROPRIETAIRE';
-  const ownerLabel =
-    ownerOptions.find((owner) => owner.id === farm?.ownerUserId)?.fullName ??
-    (farm?.ownerUserId ? 'Proprietaire assigne' : 'Aucun proprietaire');
-
-  function applyFarmUpdate(nextFarm: FarmSummary, message: string) {
-    setFarm(nextFarm);
-    setEditForm({
-      name: nextFarm.name,
-      description: nextFarm.description,
-      location: nextFarm.location,
-      surfaceArea: nextFarm.surfaceArea,
-      status: nextFarm.status,
-      activityType: nextFarm.activityType
-    });
-    setSelectedOwnerId(nextFarm.ownerUserId ?? '');
-    setSuccess(message);
-    setError(null);
-  }
-
-  function submitEdit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!session?.token || !farmId) {
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const updated = await updateFarm(farmId, editForm, session.token);
-        applyFarmUpdate(updated, 'Ferme mise a jour.');
-        setShowEdit(false);
-      } catch (submissionError) {
-        setError(submissionError instanceof Error ? submissionError.message : 'Mise a jour impossible');
-      }
-    });
-  }
-
-  function submitOwnerAssignment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!session?.token || !farmId) {
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const updated = await assignFarmOwner(farmId, selectedOwnerId || null, session.token);
-        applyFarmUpdate(updated, 'Proprietaire mis a jour.');
-        setShowOwnerAssignment(false);
-      } catch (submissionError) {
-        setError(submissionError instanceof Error ? submissionError.message : 'Assignation impossible');
-      }
-    });
-  }
-
-  function submitOwnerCreation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!session?.token || !farmId) {
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const response = await createOwnerAccount(
-          {
-            fullName: ownerForm.fullName,
-            email: ownerForm.email,
-            password: ownerForm.password,
-            farmId: ownerForm.assignToCurrentFarm ? farmId : undefined
-          },
-          session.token
-        );
-
-        setOwnerForm({
-          fullName: '',
-          email: '',
-          password: '',
-          assignToCurrentFarm: true
-        });
-        setShowOwnerCreation(false);
-
-        const [updatedFarm, refreshedOwners] = await Promise.all([
-          getFarm(farmId, session.token),
-          getFarmOwnerOptions(session.token)
-        ]);
-        setOwnerOptions(refreshedOwners.items);
-        applyFarmUpdate(updatedFarm, 'Proprietaire cree et disponible pour assignation.');
-        if (ownerForm.assignToCurrentFarm) {
-          setSelectedOwnerId(response.owner.id);
-        }
-
-        if (ownerForm.assignToCurrentFarm) {
-          setSuccess('Proprietaire cree et assigne a la ferme.');
-        } else {
-          setSuccess('Proprietaire cree. Vous pouvez maintenant l\'assigner.');
-        }
-      } catch (submissionError) {
-        setError(submissionError instanceof Error ? submissionError.message : 'Creation impossible');
-      }
-    });
-  }
-
-  function runFarmAction(
-    action: () => Promise<FarmSummary>,
-    message: string,
-    options?: { closeEdit?: boolean; closeOwner?: boolean }
-  ) {
-    startTransition(async () => {
-      try {
-        const updated = await action();
-        applyFarmUpdate(updated, message);
-        if (options?.closeEdit) {
-          setShowEdit(false);
-        }
-        if (options?.closeOwner) {
-          setShowOwnerAssignment(false);
-        }
-      } catch (actionError) {
-        setError(actionError instanceof Error ? actionError.message : 'Operation impossible');
-      }
-    });
-  }
+  const ownerLabel = farm?.ownerUserId ? 'Proprietaire assigne' : 'Aucun proprietaire';
 
   return (
-    <AppShell
-      title={farm ? farm.name : `Workspace ${farmId}`}
-      actions={
-        isOwner ? null : (
-          <>
-            <Button variant="secondary" type="button" onClick={() => setShowEdit((current) => !current)}>
-              Modifier
-            </Button>
-            <Button type="button" onClick={() => setShowOwnerAssignment((current) => !current)}>
-              Assigner un proprietaire
-            </Button>
-            <Button variant="secondary" type="button" onClick={() => setShowOwnerCreation((current) => !current)}>
-              Créer un propriétaire
-            </Button>
-          </>
-        )
-      }
-    >
+    <AppShell title={farm ? farm.name : `Workspace ${farmId}`}>
       {error ? <p className="error-text">{error}</p> : null}
-      {success ? <p className="muted">{success}</p> : null}
-
-      {!isOwner && showEdit ? (
-        <section className="panel create-panel farm-management-panel">
-          <div className="dashboard-inline-actions">
-            <div>
-              <p className="eyebrow">Modifier la ferme</p>
-              <h2 className="farms-section-title">Mettez a jour la fiche sans perdre l historique</h2>
-            </div>
-            <Badge variant="info">Edition securisee</Badge>
-          </div>
-          <form className="stack-form" onSubmit={submitEdit}>
-            <label className="field">
-              <span>Nom</span>
-              <input
-                value={editForm.name}
-                onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
-              />
-            </label>
-            <label className="field">
-              <span>Description</span>
-              <textarea
-                value={editForm.description}
-                onChange={(event) =>
-                  setEditForm((current) => ({ ...current, description: event.target.value }))
-                }
-              />
-            </label>
-            <div className="field-grid">
-              <label className="field">
-                <span>Localisation</span>
-                <input
-                  value={editForm.location}
-                  onChange={(event) =>
-                    setEditForm((current) => ({ ...current, location: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Superficie</span>
-                <input
-                  type="number"
-                  value={editForm.surfaceArea}
-                  onChange={(event) =>
-                    setEditForm((current) => ({
-                      ...current,
-                      surfaceArea: Number(event.target.value)
-                    }))
-                  }
-                />
-              </label>
-            </div>
-            <div className="field-grid">
-              <label className="field">
-                <span>Statut</span>
-                <select
-                  value={editForm.status}
-                  onChange={(event) =>
-                    setEditForm((current) => ({
-                      ...current,
-                      status: event.target.value as typeof current.status
-                    }))
-                  }
-                >
-                  <option value="ACTIVE">Active</option>
-                  <option value="EN_PREPARATION">En preparation</option>
-                  <option value="SUSPENDUE">Suspendue</option>
-                  <option value="FERMEE">Fermee</option>
-                </select>
-              </label>
-              <label className="field">
-                <span>Activite</span>
-                <select
-                  value={editForm.activityType}
-                  onChange={(event) =>
-                    setEditForm((current) => ({
-                      ...current,
-                      activityType: event.target.value as typeof current.activityType
-                    }))
-                  }
-                >
-                  <option value="ELEVAGE">Elevage</option>
-                  <option value="CULTURE">Culture</option>
-                  <option value="MIXTE">Mixte</option>
-                  <option value="PISCICULTURE">Pisciculture</option>
-                </select>
-              </label>
-            </div>
-            <div className="hero-actions">
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Enregistrement...' : 'Enregistrer'}
-              </Button>
-              <Button variant="secondary" type="button" onClick={() => setShowEdit(false)}>
-                Annuler
-              </Button>
-            </div>
-          </form>
-        </section>
-      ) : null}
-
-      {!isOwner && showOwnerAssignment ? (
-        <section className="panel create-panel farm-management-panel">
-          <div className="dashboard-inline-actions">
-            <div>
-              <p className="eyebrow">Assignation proprietaire</p>
-              <h2 className="farms-section-title">Reliez cette ferme a son responsable</h2>
-            </div>
-            <Badge variant="neutral">Workflow proprietaire</Badge>
-          </div>
-          <form className="stack-form" onSubmit={submitOwnerAssignment}>
-            <label className="field">
-              <span>Proprietaire assigne</span>
-              <select value={selectedOwnerId} onChange={(event) => setSelectedOwnerId(event.target.value)}>
-                <option value="">Aucun proprietaire</option>
-                {ownerOptions.map((owner) => (
-                  <option key={owner.id} value={owner.id}>
-                    {owner.fullName} ({owner.email})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="hero-actions">
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Affectation...' : 'Appliquer'}
-              </Button>
-              <Button variant="secondary" type="button" onClick={() => setShowOwnerAssignment(false)}>
-                Annuler
-              </Button>
-            </div>
-          </form>
-        </section>
-      ) : null}
-
-      {!isOwner && showOwnerCreation ? (
-        <section className="panel create-panel farm-management-panel">
-          <div className="dashboard-inline-actions">
-            <div>
-              <p className="eyebrow">Nouveau propriétaire</p>
-              <h2 className="farms-section-title">Créer un compte propriétaire prêt à l’emploi</h2>
-            </div>
-            <Badge variant="success">Admin uniquement</Badge>
-          </div>
-          <form className="stack-form" onSubmit={submitOwnerCreation}>
-            <div className="field-grid">
-              <label className="field">
-                <span>Nom complet</span>
-                <input
-                  value={ownerForm.fullName}
-                  onChange={(event) =>
-                    setOwnerForm((current) => ({ ...current, fullName: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Email</span>
-                <input
-                  type="email"
-                  value={ownerForm.email}
-                  onChange={(event) =>
-                    setOwnerForm((current) => ({ ...current, email: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Mot de passe initial</span>
-                <input
-                  type="password"
-                  value={ownerForm.password}
-                  onChange={(event) =>
-                    setOwnerForm((current) => ({ ...current, password: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Assignation immédiate</span>
-                <select
-                  value={ownerForm.assignToCurrentFarm ? 'YES' : 'NO'}
-                  onChange={(event) =>
-                    setOwnerForm((current) => ({
-                      ...current,
-                      assignToCurrentFarm: event.target.value === 'YES'
-                    }))
-                  }
-                >
-                  <option value="YES">Créer et assigner à cette ferme</option>
-                  <option value="NO">Créer sans assigner</option>
-                </select>
-              </label>
-            </div>
-            <div className="hero-actions">
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Création...' : 'Créer le propriétaire'}
-              </Button>
-              <Button variant="secondary" type="button" onClick={() => setShowOwnerCreation(false)}>
-                Annuler
-              </Button>
-            </div>
-          </form>
-        </section>
-      ) : null}
 
       <section className="farm-detail-hero">
         <article className="farm-detail-hero-card">
@@ -637,117 +256,18 @@ export default function FarmDetailPage({
             </article>
             <article className="farm-detail-kpi">
               <div className="metric-icon">
-                <BellRing className="h-5 w-5" />
-              </div>
-              <strong>{farm?.archivedAt || farm?.deactivatedAt ? 'Surveillee' : 'Stable'}</strong>
-              <span>niveau d attention</span>
-            </article>
-            <article className="farm-detail-kpi">
-              <div className="metric-icon">
                 <Sprout className="h-5 w-5" />
               </div>
               <strong>{formatActivityLabel(farm?.activityType ?? 'MIXTE')}</strong>
               <span>orientation principale</span>
             </article>
-          </div>
-        </article>
-
-        <article className="farm-admin-card">
-          <div className="dashboard-inline-actions">
-            <div>
-              <p className="eyebrow">Administration</p>
-              <h2 className="farms-section-title">Workflow de gestion</h2>
-            </div>
-            <div className="farm-admin-icon">
-              <Settings2 className="h-5 w-5" />
-            </div>
-          </div>
-          <p className="muted">
-            Change le statut, archive, desactive ou restaure cette ferme sans perdre l historique.
-          </p>
-          <div className="farm-admin-actions">
-            {!isOwner ? (
-              <>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  disabled={isPending}
-                  onClick={() =>
-                    runFarmAction(
-                      () => changeFarmStatus(farmId, 'ACTIVE', session!.token),
-                      'Statut passe a ACTIVE.'
-                    )
-                  }
-                >
-                  Activer
-                </Button>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  disabled={isPending}
-                  onClick={() =>
-                    runFarmAction(
-                      () => changeFarmStatus(farmId, 'SUSPENDUE', session!.token),
-                      'Statut passe a SUSPENDUE.'
-                    )
-                  }
-                >
-                  Suspendre
-                </Button>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  disabled={isPending}
-                  onClick={() =>
-                    runFarmAction(() => archiveFarm(farmId, session!.token), 'Ferme archivee.')
-                  }
-                >
-                  Archiver
-                </Button>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  disabled={isPending}
-                  onClick={() =>
-                    runFarmAction(() => deactivateFarm(farmId, session!.token), 'Ferme desactivee.')
-                  }
-                >
-                  Desactiver
-                </Button>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  disabled={isPending}
-                  onClick={() =>
-                    runFarmAction(() => restoreFarm(farmId, session!.token), 'Ferme restauree.')
-                  }
-                >
-                  Restaurer
-                </Button>
-                <Button
-                  variant="danger"
-                  type="button"
-                  disabled={isPending}
-                  onClick={() =>
-                    runFarmAction(
-                      () => softDeleteFarm(farmId, session!.token),
-                      'Suppression logique appliquee.'
-                    )
-                  }
-                >
-                  Supprimer
-                </Button>
-              </>
-            ) : (
-              <div className="farm-detail-readonly">
-                Les controles d action sont masques pour respecter le role lecture seule.
+            <article className="farm-detail-kpi">
+              <div className="metric-icon">
+                <ClipboardList className="h-5 w-5" />
               </div>
-            )}
-          </div>
-          <div className="farm-detail-flags">
-            {farm?.archivedAt ? <Badge variant="warning">Archivee</Badge> : null}
-            {farm?.deactivatedAt ? <Badge variant="warning">Desactivee</Badge> : null}
-            {farm?.deletedAt ? <Badge variant="critical">Supprimee logiquement</Badge> : null}
+              <strong>Vue separee</strong>
+              <span>reglages dans leur propre espace</span>
+            </article>
           </div>
         </article>
       </section>
@@ -781,22 +301,40 @@ export default function FarmDetailPage({
             </article>
           );
         })}
+      </section>
 
-        <article className="farm-module-card farm-module-card-accent">
+      <section className="farm-module-grid">
+        <article className="farm-module-card farm-module-card-spotlight">
           <div className="dashboard-inline-actions">
             <div>
-              <p className="eyebrow">Lecture</p>
-              <h2>{isOwner ? 'Mode proprietaire actif' : 'Mode administrateur actif'}</h2>
+              <p className="eyebrow">Flux admin</p>
+              <h2>Étapes de gouvernance</h2>
             </div>
-            <div className="farm-module-icon">
-              <BadgeCheck className="h-5 w-5" />
-            </div>
+            <Badge variant="info">ADMIN</Badge>
           </div>
           <p className="muted">
-            {isOwner
-              ? 'Vous consultez les donnees de la ferme dans un mode securise et centré sur la lecture.'
-              : 'Vous pouvez desormais administrer la ferme, son statut et son proprietaire depuis cet ecran.'}
+            Les écrans d administration sont reliés au cycle réel de la ferme pour garder la
+            configuration, les accès et la traçabilité au même niveau que les modules métier.
           </p>
+          <div className="farm-workflow-admin-grid">
+            {adminWorkflowCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <article key={card.title} className="farm-workflow-admin-card">
+                  <div className="farm-module-icon">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <p className="eyebrow">{card.eyebrow}</p>
+                  <h3>{card.title}</h3>
+                  <p className="muted">{card.description}</p>
+                  <Link href={`/farms/${farmId}/${card.href}`} className="inline-link">
+                    {card.linkLabel}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
         </article>
       </section>
     </AppShell>

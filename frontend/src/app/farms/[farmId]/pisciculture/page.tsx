@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
@@ -226,11 +226,11 @@ export default function PisciculturePage({
   }
 
   const workflowSteps = [
-    { title: 'Bassin', description: 'Initialiser le site et l’effectif de départ.', icon: Fish },
-    { title: 'Empoissonnement', description: 'Lier les alevins au bassin et à la date.', icon: Waves },
-    { title: 'Croissance', description: 'Contrôler biomasse, oxygène, pH et alimentation.', icon: Activity },
-    { title: 'Récolte', description: 'Relier la pêche, le stock poissons et les ventes.', icon: DollarSign },
-    { title: 'Rentabilité', description: 'Garder le résultat visible dans le même cockpit.', icon: TrendingUp }
+    { title: 'Bassin', icon: Fish },
+    { title: 'Empoissonnement', icon: Waves },
+    { title: 'Croissance', icon: Activity },
+    { title: 'Récolte', icon: DollarSign },
+    { title: 'Rentabilité', icon: TrendingUp }
   ] as const;
   const selectedStock = overview?.stocks.find((stock) => stock.id === saleForm.stockId) ?? null;
   const selectedSale = overview?.sales.find((sale) => sale.id === paymentForm.saleId) ?? null;
@@ -250,7 +250,7 @@ export default function PisciculturePage({
           </div>
           <p className="hero-copy module-hero-copy">
             Empoissonnement, suivi de croissance, qualité de l’eau, récolte, stock poissons, ventes et rentabilité
-            restent relies dans un flux unique.
+            restent reliés dans un flux unique.
           </p>
           <div className="module-pill-row">
             {workflowSteps.map((step) => (
@@ -261,7 +261,7 @@ export default function PisciculturePage({
           </div>
           <div className="module-inline-actions">
             <Button className="module-submit-button pisciculture-action-button pisciculture-action-button-primary" type="button" onClick={openAgendaComposer}>
-              Planifier une tache
+              Planifier une tâche
             </Button>
             <Button
               className="module-submit-button pisciculture-action-button pisciculture-action-button-secondary"
@@ -269,7 +269,7 @@ export default function PisciculturePage({
               variant="secondary"
               onClick={() => router.push(`/farms/${farmId}/agenda`)}
             >
-              Ouvrir l agenda
+              Ouvrir l’agenda
             </Button>
           </div>
           <div className="module-kpi-grid">
@@ -292,12 +292,12 @@ export default function PisciculturePage({
 
         <article className="module-spotlight-card pisciculture-spotlight-card pisciculture-spotlight-card-premium">
           <div className="module-card-top">
-            <p className="eyebrow">Sante du bassin</p>
+            <p className="eyebrow">Santé du bassin</p>
             <Badge variant={overview && (overview.breakdown.fish.averageOxygen < 4 || overview.breakdown.fish.averagePh < 5.5 || overview.breakdown.fish.averagePh > 9) ? 'critical' : 'success'}>
               {overview?.breakdown.fish.growthRecords ?? 0} suivis
             </Badge>
           </div>
-          <h2>Vue metier unifiee</h2>
+          <h2>Vue métier unifiée</h2>
           <div className="module-detail-list">
             <span>Biomasse estimée: {overview?.breakdown.fish.biomass.toFixed(2) ?? '0.00'} kg</span>
             <span>Croissance moyenne: {overview?.breakdown.fish.averageGrowthRate.toFixed(1) ?? '0.0'}%</span>
@@ -323,7 +323,6 @@ export default function PisciculturePage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -336,7 +335,7 @@ export default function PisciculturePage({
               <p className="eyebrow">Performance bassin</p>
               <h2>Indicateurs clefs pisciculture</h2>
             </div>
-            <Badge variant="info">{overview?.breakdown.fish.harvestRecords ?? 0} recolte(s)</Badge>
+            <Badge variant="info">{overview?.breakdown.fish.harvestRecords ?? 0} récolte(s)</Badge>
           </div>
           <div className="module-detail-list">
             <span>Biomasse: {overview?.breakdown.fish.biomass.toFixed(2) ?? '0.00'} kg</span>
@@ -358,8 +357,8 @@ export default function PisciculturePage({
             </Badge>
           </div>
           <div className="module-detail-list">
-            <span>Chiffre d affaires: {overview?.stats.salesRevenue.toFixed(2) ?? '0.00'} FCFA</span>
-            <span>Montant encaisse: {overview?.stats.salesPaid.toFixed(2) ?? '0.00'} FCFA</span>
+            <span>Chiffre d’affaires: {overview?.stats.salesRevenue.toFixed(2) ?? '0.00'} FCFA</span>
+            <span>Montant encaissé: {overview?.stats.salesPaid.toFixed(2) ?? '0.00'} FCFA</span>
             <span>Marge: {overview?.stats.margin.toFixed(2) ?? '0.00'} FCFA</span>
             <span>Stock poissons: {overview?.breakdown.fish.sellableHarvest.toFixed(2) ?? '0.00'} kg</span>
           </div>
@@ -390,7 +389,7 @@ export default function PisciculturePage({
           <div className="dashboard-inline-actions">
             <div>
               <p className="eyebrow">Nouvel enregistrement</p>
-              <h2>Saisie piscicole guidee</h2>
+              <h2>Saisie piscicole guidée</h2>
             </div>
             <div className="farm-module-icon">
               <Fish className="h-5 w-5" />
@@ -402,7 +401,7 @@ export default function PisciculturePage({
               Croissance
             </button>
             <button className="module-detail-chip pisciculture-mode-chip pisciculture-mode-chip-premium" type="button" onClick={() => setMode('HARVEST')}>
-              Recolte
+              Récolte
             </button>
             <button className="module-detail-chip pisciculture-mode-chip pisciculture-mode-chip-premium" type="button" onClick={() => setMode('SALE')}>
               Vente
@@ -422,8 +421,8 @@ export default function PisciculturePage({
                 }
                 void runAction(
                   () => createFishGrowthRecord(farmId, fishGrowthForm, session.token).then(() => undefined),
-                  'Suivi piscicole enregistre',
-                  'Le suivi de croissance et de biomasse a ete ajoute.'
+                  'Suivi piscicole enregistré',
+                  'Le suivi de croissance et de biomasse a été ajouté.'
                 );
               }}
             >
@@ -442,7 +441,7 @@ export default function PisciculturePage({
                   </select>
                 </label>
                 <label className="field">
-                  <span>Bassin bati</span>
+                  <span>Bassin bâti</span>
                   <select
                     value={fishGrowthForm.buildingId}
                     onChange={(event) => setFishGrowthForm((current) => ({ ...current, buildingId: event.target.value }))}
@@ -470,7 +469,7 @@ export default function PisciculturePage({
                   </select>
                 </label>
                 <label className="field">
-                  <span>Espece</span>
+                  <span>Espèce</span>
                   <input value={fishGrowthForm.species} onChange={(event) => setFishGrowthForm((current) => ({ ...current, species: event.target.value }))} />
                 </label>
                 <label className="field">
@@ -478,7 +477,7 @@ export default function PisciculturePage({
                   <input type="date" value={fishGrowthForm.stockingDate} onChange={(event) => setFishGrowthForm((current) => ({ ...current, stockingDate: event.target.value }))} />
                 </label>
                 <label className="field">
-                  <span>Date suivi</span>
+                  <span>Date de suivi</span>
                   <input type="date" value={fishGrowthForm.productionDate} onChange={(event) => setFishGrowthForm((current) => ({ ...current, productionDate: event.target.value }))} />
                 </label>
                 <label className="field">
@@ -494,27 +493,27 @@ export default function PisciculturePage({
                   <input type="number" value={fishGrowthForm.currentAverageWeight} onChange={(event) => setFishGrowthForm((current) => ({ ...current, currentAverageWeight: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
-                  <span>Mortalite</span>
+                  <span>Mortalité</span>
                   <input type="number" value={fishGrowthForm.mortality} onChange={(event) => setFishGrowthForm((current) => ({ ...current, mortality: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
-                  <span>Aliment distribue</span>
+                  <span>Aliment distribué</span>
                   <input type="number" value={fishGrowthForm.feedDistributed} onChange={(event) => setFishGrowthForm((current) => ({ ...current, feedDistributed: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
-                  <span>Cout aliment</span>
+                  <span>Coût aliment</span>
                   <input type="number" value={fishGrowthForm.feedCost} onChange={(event) => setFishGrowthForm((current) => ({ ...current, feedCost: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
-                  <span>Qualite eau</span>
+                  <span>Qualité eau</span>
                   <input value={fishGrowthForm.waterQuality} onChange={(event) => setFishGrowthForm((current) => ({ ...current, waterQuality: event.target.value }))} />
                 </label>
                 <label className="field">
-                  <span>Temperature</span>
+                  <span>Température</span>
                   <input type="number" value={fishGrowthForm.temperature} onChange={(event) => setFishGrowthForm((current) => ({ ...current, temperature: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
-                  <span>Oxygene</span>
+                  <span>Oxygène</span>
                   <input type="number" value={fishGrowthForm.oxygen} onChange={(event) => setFishGrowthForm((current) => ({ ...current, oxygen: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
@@ -545,8 +544,8 @@ export default function PisciculturePage({
                 }
                 void runAction(
                   () => createFishHarvestRecord(farmId, fishHarvestForm, session.token).then(() => undefined),
-                  'Recolte piscicole enregistree',
-                  'La recolte a alimente le stock de poissons recoltes.'
+                  'Récolte piscicole enregistrée',
+                  'La récolte a alimenté le stock de poissons récoltés.'
                 );
               }}
             >
@@ -562,11 +561,11 @@ export default function PisciculturePage({
                   </select>
                 </label>
                 <label className="field">
-                  <span>Date recolte</span>
+                  <span>Date de récolte</span>
                   <input type="date" value={fishHarvestForm.harvestedAt} onChange={(event) => setFishHarvestForm((current) => ({ ...current, harvestedAt: event.target.value }))} />
                 </label>
                 <label className="field">
-                  <span>Poids total recolte</span>
+                  <span>Poids total récolté</span>
                   <input type="number" value={fishHarvestForm.totalWeight} onChange={(event) => setFishHarvestForm((current) => ({ ...current, totalWeight: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
@@ -578,7 +577,7 @@ export default function PisciculturePage({
                   <input type="number" value={fishHarvestForm.losses} onChange={(event) => setFishHarvestForm((current) => ({ ...current, losses: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
-                  <span>Quantite vendable</span>
+                  <span>Quantité vendable</span>
                   <input type="number" value={fishHarvestForm.sellableQuantity} onChange={(event) => setFishHarvestForm((current) => ({ ...current, sellableQuantity: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
@@ -591,9 +590,9 @@ export default function PisciculturePage({
                 </label>
               </div>
               <div className="module-inline-note">
-                <span>Le stock poissons sera mis a jour automatiquement apres la recolte.</span>
+                <span>Le stock poissons sera mis à jour automatiquement après la récolte.</span>
                 <Button className="module-submit-button pisciculture-action-button pisciculture-action-button-primary" type="submit" disabled={isPending}>
-                  Recolter
+                  Récolter
                 </Button>
               </div>
             </form>
@@ -609,8 +608,8 @@ export default function PisciculturePage({
                 }
                 void runAction(
                   () => createProductSale(farmId, saleForm, session.token).then(() => undefined),
-                  'Vente enregistree',
-                  'La vente a ete ajoutee au suivi commercial.'
+                  'Vente enregistrée',
+                  'La vente a été ajoutée au suivi commercial.'
                 );
               }}
             >
@@ -626,7 +625,7 @@ export default function PisciculturePage({
                   </select>
                 </label>
                 <label className="field">
-                  <span>Quantite vendue</span>
+                  <span>Quantité vendue</span>
                   <input type="number" value={saleForm.quantitySold} onChange={(event) => setSaleForm((current) => ({ ...current, quantitySold: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
@@ -634,7 +633,7 @@ export default function PisciculturePage({
                   <input type="number" value={saleForm.unitPrice} onChange={(event) => setSaleForm((current) => ({ ...current, unitPrice: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
-                  <span>Montant paye</span>
+                  <span>Montant payé</span>
                   <input type="number" value={saleForm.amountPaid} onChange={(event) => setSaleForm((current) => ({ ...current, amountPaid: Number(event.target.value) }))} />
                 </label>
                 <label className="field">
@@ -642,7 +641,7 @@ export default function PisciculturePage({
                   <input value={saleForm.customerName} onChange={(event) => setSaleForm((current) => ({ ...current, customerName: event.target.value }))} />
                 </label>
                 <label className="field">
-                  <span>Date vente</span>
+                  <span>Date de vente</span>
                   <input type="date" value={saleForm.saleDate} onChange={(event) => setSaleForm((current) => ({ ...current, saleDate: event.target.value }))} />
                 </label>
                 <label className="field">
@@ -661,7 +660,7 @@ export default function PisciculturePage({
                 </label>
               </div>
               <div className="module-inline-note">
-                <span>{selectedStock ? `${selectedStock.productName} disponible: ${selectedStock.availableQuantity.toFixed(2)} ${selectedStock.unit}` : 'Choisis un stock pour vendre.'}</span>
+                <span>{selectedStock ? `${selectedStock.productName} disponible : ${selectedStock.availableQuantity.toFixed(2)} ${selectedStock.unit}` : 'Choisis un stock pour vendre.'}</span>
                 <Button className="module-submit-button pisciculture-action-button pisciculture-action-button-primary" type="submit" disabled={isPending}>
                   Enregistrer la vente
                 </Button>
@@ -679,8 +678,8 @@ export default function PisciculturePage({
                 }
                 void runAction(
                   () => addProductSalePayment(farmId, paymentForm.saleId, paymentForm, session.token).then(() => undefined),
-                  'Paiement enregistre',
-                  'Le paiement a ete rattache a la vente.'
+                  'Paiement enregistré',
+                  'Le paiement a été rattaché à la vente.'
                 );
               }}
             >
@@ -696,7 +695,7 @@ export default function PisciculturePage({
                   </select>
                 </label>
                 <label className="field">
-                  <span>Date paiement</span>
+                  <span>Date de paiement</span>
                   <input type="date" value={paymentForm.paymentDate} onChange={(event) => setPaymentForm((current) => ({ ...current, paymentDate: event.target.value }))} />
                 </label>
                 <label className="field">
@@ -741,7 +740,7 @@ export default function PisciculturePage({
             <input
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
-              placeholder="Rechercher un suivi, une recolte ou une vente..."
+              placeholder="Rechercher un suivi, une récolte ou une vente..."
             />
           </label>
 
@@ -770,3 +769,4 @@ export default function PisciculturePage({
     </AppShell>
   );
 }
+

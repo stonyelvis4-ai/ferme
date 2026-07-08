@@ -56,6 +56,16 @@ class CreateOwnerDto {
   farmId?: string;
 }
 
+class ChangePasswordDto {
+  @IsString()
+  @MinLength(6)
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(8)
+  newPassword!: string;
+}
+
 @Controller()
 export class AuthController {
   private readonly accessCookieName = 'ferm_plus_access_token';
@@ -88,12 +98,14 @@ export class AuthController {
   @Roles('ADMIN')
   async createOwner(
     @Body() body: CreateOwnerDto,
+    @CurrentUser() user?: SessionUser
   ) {
     const owner = await this.authService.createOwnerAccount(
       body.fullName,
       body.email,
       body.password,
-      body.farmId ?? null
+      body.farmId ?? null,
+      user ? { id: user.id, role: user.role } : null
     );
 
     return {
@@ -160,6 +172,21 @@ export class AuthController {
   ) {
     await this.authService.logout(this.readCookieFromRequest(request, this.refreshCookieName));
     this.clearAuthCookies(response);
+    return { success: true };
+  }
+
+  @Post('auth/me/password')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async changePassword(
+    @Body() body: ChangePasswordDto,
+    @CurrentUser() user?: SessionUser
+  ) {
+    if (!user) {
+      throw new UnauthorizedException('Session absente');
+    }
+
+    await this.authService.changeAdminPassword(user.id, body.currentPassword, body.newPassword);
     return { success: true };
   }
 

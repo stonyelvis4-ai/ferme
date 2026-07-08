@@ -1,7 +1,8 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
 import { Activity, HeartPulse, PawPrint, ShieldAlert, Stethoscope, Wheat } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { AppShell } from '../../../../components/app-shell';
 import { Badge } from '../../../../components/ui/badge';
@@ -62,6 +63,18 @@ const eventTypeOptions: Array<AnimalEventView['eventType']> = [
   'PESEE',
   'PRODUCTION'
 ];
+
+const eventTypeLabels: Record<AnimalEventView['eventType'], string> = {
+  NAISSANCE: 'Naissance',
+  ACHAT: 'Achat',
+  VENTE: 'Vente',
+  DECES: 'Décès',
+  REPRODUCTION: 'Reproduction',
+  VACCINATION: 'Vaccination',
+  TRAITEMENT: 'Traitement',
+  PESEE: 'Pesée',
+  PRODUCTION: 'Production'
+};
 
 const fishLotPreset: AnimalFormState = {
   trackingMode: 'LOT',
@@ -127,6 +140,7 @@ export default function LivestockPage({
   params: Promise<{ farmId: string }>;
 }) {
   const session = useSession();
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [farmId, setFarmId] = useState('');
   const [farmName, setFarmName] = useState('Ferme');
@@ -202,52 +216,30 @@ export default function LivestockPage({
   const workflowSteps = useMemo(() => {
     if (farmActivityType === 'PISCICULTURE') {
       return [
-        {
-          title: 'Bassin',
-          description: 'Créer le lot, suivre les effectifs et sécuriser l’amorçage.',
-          icon: PawPrint
-        },
-        {
-          title: 'Croissance',
-          description: 'Pesées, biomasse, alimentation et mortalité au même endroit.',
-          icon: Activity
-        },
-        {
-          title: 'Agenda',
-          description: 'Les soins, contrôles et rappels restent visibles tout de suite.',
-          icon: Stethoscope
-        },
-        {
-          title: 'Rentabilité',
-          description: 'Le stock, les ventes et la finance restent liés au suivi.',
-          icon: HeartPulse
-        }
+        { title: 'Bassin', icon: PawPrint },
+        { title: 'Croissance', icon: Activity },
+        { title: 'Agenda', icon: Stethoscope },
+        { title: 'Rentabilité', icon: HeartPulse }
       ];
     }
 
     return [
-      {
-        title: 'Lot',
-        description: 'Ouvrir ou retrouver un lot sans perdre la traçabilité.',
-        icon: PawPrint
-      },
-      {
-        title: 'Mouvement',
-        description: 'Consigner un soin, une pesée, une vente ou une alerte.',
-        icon: Stethoscope
-      },
-      {
-        title: 'Agenda',
-        description: 'Les rappels liés au module restent visibles dans le calendrier.',
-        icon: Activity
-      },
-      {
-        title: 'Suivi',
-        description: 'Le stock, le sanitaire et la rentabilité restent connectés.',
-        icon: HeartPulse
-      }
+      { title: 'Lot', icon: PawPrint },
+      { title: 'Mouvement', icon: Stethoscope },
+      { title: 'Agenda', icon: Activity },
+      { title: 'Suivi', icon: HeartPulse }
     ];
   }, [farmActivityType]);
+
+  function openAgendaComposer() {
+    if (!farmId) {
+      return;
+    }
+
+    router.push(
+      `/farms/${farmId}/agenda?compose=1&module=livestock&entityType=${farmActivityType === 'PISCICULTURE' ? 'BASSIN' : 'LOT'}`
+    );
+  }
 
   const metrics = useMemo(() => {
     const activeAnimals = animals.filter((animal) => animal.status === 'ACTIF');
@@ -293,10 +285,10 @@ export default function LivestockPage({
         });
       } catch (submissionError) {
         const message =
-          submissionError instanceof Error ? submissionError.message : 'Creation impossible';
+          submissionError instanceof Error ? submissionError.message : 'Création impossible';
         setError(message);
         pushToast({
-          title: 'Creation impossible',
+          title: 'Création impossible',
           description: message,
           variant: 'error'
         });
@@ -419,7 +411,7 @@ export default function LivestockPage({
                 <Badge variant="info">Historique</Badge>
               </div>
               <strong>{events.length}</strong>
-              <span>evenement(s) consigne(s) pour la traçabilite</span>
+              <span>Événement(s) consigné(s) pour la traçabilité</span>
             </article>
           </div>
         </article>
@@ -432,21 +424,38 @@ export default function LivestockPage({
           <h2>Saisie terrain rapide</h2>
           <p>
             {farmActivityType === 'PISCICULTURE'
-              ? "Les formulaires ci-dessous servent a ouvrir un nouveau lot de poissons, enregistrer un controle, une mortalite, une pesee ou une production sans quitter la page."
-              : 'Les formulaires ci-dessous servent a ouvrir un nouveau lot, enregistrer un soin, une pesee ou tout autre evenement sans quitter la page.'}
+              ? "Les formulaires ci-dessous servent à ouvrir un nouveau lot de poissons, enregistrer un contrôle, une mortalité, une pesée ou une production sans quitter la page."
+              : 'Les formulaires ci-dessous servent à ouvrir un nouveau lot, enregistrer un soin, une pesée ou tout autre événement sans quitter la page.'}
           </p>
           <div className="module-detail-list">
             <span>
               {farmActivityType === 'PISCICULTURE'
-                ? 'Selection intelligente du premier bassin ou lot disponible'
-                : 'Selection intelligente du premier lot disponible'}
+                ? 'Sélection intelligente du premier bassin ou lot disponible'
+                : 'Sélection intelligente du premier lot disponible'}
             </span>
-            <span>Historique recent visible en bas de page</span>
+            <span>Historique récent visible en bas de page</span>
             <span>
               {farmActivityType === 'PISCICULTURE'
-                ? "Structure prete pour l'alimentation, la biomasse et les mortalites"
-                : 'Structure prete pour sanitaire, production et vente'}
+                ? "Structure prête pour l’alimentation, la biomasse et les mortalités"
+                : 'Structure prête pour le sanitaire, la production et la vente'}
             </span>
+          </div>
+          <div className="module-inline-actions">
+            <Button
+              className="module-submit-button production-action-button production-action-button-primary"
+              type="button"
+              onClick={openAgendaComposer}
+            >
+              Planifier une tâche
+            </Button>
+            <Button
+              className="module-submit-button production-action-button production-action-button-secondary"
+              type="button"
+              variant="secondary"
+              onClick={() => router.push(`/farms/${farmId}/agenda`)}
+            >
+              Voir l’agenda
+            </Button>
           </div>
         </article>
       </section>
@@ -466,7 +475,6 @@ export default function LivestockPage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -482,7 +490,7 @@ export default function LivestockPage({
               <h2>
                 {farmActivityType === 'PISCICULTURE'
                   ? 'Ajouter un lot de poissons'
-                  : "Ajouter une unite d'elevage"}
+                  : 'Ajouter une unité d’élevage'}
               </h2>
             </div>
             <div className="farm-module-icon">
@@ -507,7 +515,7 @@ export default function LivestockPage({
                 </select>
               </label>
               <label className="field">
-                <span>Reference</span>
+                <span>Référence</span>
                 <input
                   value={animalForm.identificationNumber}
                   onChange={(input) =>
@@ -659,7 +667,7 @@ export default function LivestockPage({
               <label className="field">
                 <span>Animal / lot</span>
                 <select value={selectedAnimalId} onChange={(input) => setSelectedAnimalId(input.target.value)}>
-                  <option value="">Selectionner</option>
+                  <option value="">Sélectionner</option>
                   {animals.map((animal) => (
                     <option key={animal.id} value={animal.id}>
                       {animal.identificationNumber} - {animal.species}
@@ -686,7 +694,7 @@ export default function LivestockPage({
                           }))
                         }
                       >
-                        {eventType}
+                        {eventTypeLabels[eventType]}
                       </button>
                     );
                   })}
@@ -726,7 +734,7 @@ export default function LivestockPage({
             </div>
             <div className="module-detail-list event-type-summary">
               {eventForm.eventTypes.map((eventType) => (
-                <span key={eventType}>{eventType}</span>
+                <span key={eventType}>{eventTypeLabels[eventType]}</span>
               ))}
             </div>
             <div className="module-inline-note">
@@ -738,7 +746,7 @@ export default function LivestockPage({
                   type="submit"
                   disabled={isPending || !selectedAnimalId}
                 >
-                  Enregistrer l'evenement
+                  Enregistrer l’événement
                 </Button>
               ) : (
                 <Badge variant="warning">Lecture seule</Badge>
@@ -751,8 +759,8 @@ export default function LivestockPage({
       <section className="module-list-card livestock-tasks-card">
         <div className="dashboard-inline-actions">
           <div>
-            <p className="eyebrow">Taches liees</p>
-            <h2>Actions operationnelles du module</h2>
+            <p className="eyebrow">Tâches liées</p>
+            <h2>Actions opérationnelles du module</h2>
           </div>
           <Badge variant={linkedTasks.length ? 'info' : 'neutral'}>{linkedTasks.length}</Badge>
         </div>
@@ -763,7 +771,7 @@ export default function LivestockPage({
                 <div>
                   <strong>{task.title}</strong>
                   <span>
-                    {task.linkedEntityLabel ?? task.linkedModule ?? 'Module elevage'} · {task.category}
+                    {task.linkedEntityLabel ?? task.linkedModule ?? 'Module élevage'} - {task.category}
                   </span>
                 </div>
                 <span>{task.scheduledLabel}</span>
@@ -772,7 +780,7 @@ export default function LivestockPage({
             ))}
           </div>
         ) : (
-          <p className="muted">Aucune tache liee a ce module pour le moment.</p>
+          <p className="muted">Aucune tâche liée à ce module pour le moment.</p>
         )}
       </section>
 
@@ -788,28 +796,28 @@ export default function LivestockPage({
             >
               <div className="module-card-top">
                 <p className="eyebrow">
-                  {animal.species} · {animal.trackingMode}
+                  {animal.species} - {animal.trackingMode}
                 </p>
                 <Badge variant={animalStatusBadge(animal.status)}>{animal.status}</Badge>
               </div>
               <h2>{animal.name || animal.identificationNumber}</h2>
               <p>
-                {animal.subtype} · {animal.breed} · {animal.sex}
+                {animal.subtype} - {animal.breed} - {animal.sex}
               </p>
               <div className="module-detail-list">
-                <span>Age: {animal.currentAgeDays} jours</span>
-                <span>Poids: {animal.currentWeight ?? '-'} kg</span>
-                <span>Effectif: {animal.currentCount ?? 1}</span>
-                <span>Reference: {animal.identificationNumber || 'Non renseignee'}</span>
+                <span>Âge : {animal.currentAgeDays} jours</span>
+                <span>Poids : {animal.currentWeight ?? '-'} kg</span>
+                <span>Effectif : {animal.currentCount ?? 1}</span>
+                <span>Référence : {animal.identificationNumber || 'Non renseignée'}</span>
               </div>
             </motion.article>
           ))
         ) : (
           <article className="module-catalog-card module-empty-card">
             <div>
-              <p className="eyebrow">Demarrage</p>
-              <h2>Aucun animal ou lot enregistre</h2>
-              <p>Cree un premier lot pour activer le suivi sanitaire, la production et la traçabilite.</p>
+              <p className="eyebrow">Démarrage</p>
+              <h2>Aucun animal ou lot enregistré</h2>
+              <p>Créez un premier lot pour activer le suivi sanitaire, la production et la traçabilité.</p>
             </div>
           </article>
         )}
@@ -818,8 +826,8 @@ export default function LivestockPage({
       <section className="module-list-card livestock-history-card">
         <div className="dashboard-inline-actions">
           <div>
-            <p className="eyebrow">Historique recent</p>
-            <h2>Journal des evenements</h2>
+            <p className="eyebrow">Historique récent</p>
+            <h2>Journal des événements</h2>
           </div>
           <Badge variant="info">{events.length} entree(s)</Badge>
         </div>
@@ -829,17 +837,18 @@ export default function LivestockPage({
               <article key={event.id} className="table-row livestock-event-row">
                 <Badge variant={eventBadge(event.eventType)}>{event.eventType}</Badge>
                 <strong>{new Date(event.eventDate).toLocaleDateString('fr-FR')}</strong>
-                <span>Quantite: {event.quantity ?? '-'}</span>
-                <span>Poids: {event.weight ?? '-'}</span>
+                <span>Quantité : {event.quantity ?? '-'}</span>
+                <span>Poids : {event.weight ?? '-'}</span>
                 <span>{event.notes || 'Sans note'}</span>
                 <span>Par {event.recordedByUserName}</span>
               </article>
             ))}
           </div>
         ) : (
-          <p>Aucun evenement enregistre pour le moment.</p>
+          <p>Aucun événement enregistré pour le moment.</p>
         )}
       </section>
     </AppShell>
   );
 }
+

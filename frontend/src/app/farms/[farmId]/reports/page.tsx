@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -33,26 +33,10 @@ function formatBadge(format: GeneratedReportView['format']) {
 }
 
 const reportWorkflowSteps = [
-  {
-    title: 'Source',
-    description: 'Choisir le périmètre et le type de rapport.',
-    icon: FileText
-  },
-  {
-    title: 'Génération',
-    description: 'Composer le document et ses sections.',
-    icon: Sparkles
-  },
-  {
-    title: 'Export',
-    description: 'Télécharger le fichier PDF ou Excel.',
-    icon: Download
-  },
-  {
-    title: 'Historique',
-    description: 'Conserver les rapports pour audit et consultation.',
-    icon: FileSpreadsheet
-  }
+  { title: 'Source', icon: FileText },
+  { title: 'Génération', icon: Sparkles },
+  { title: 'Export', icon: Download },
+  { title: 'Historique', icon: FileSpreadsheet }
 ] as const;
 
 export default function FarmReportsPage({
@@ -325,7 +309,6 @@ export default function FarmReportsPage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -525,3 +508,4 @@ export default function FarmReportsPage({
     </AppShell>
   );
 }
+

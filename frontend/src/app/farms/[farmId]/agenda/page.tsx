@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -31,8 +31,29 @@ import {
   createAgendaTask,
   getFarm,
   getFarmAgenda,
+  getFarmAnimalGroups,
+  getFarmAlerts,
+  getFarmCrops,
+  getFarmFacilities,
+  getFarmFinanceTransactions,
+  getFarmPlots,
+  getFarmProductionOverview,
+  getFarmReports,
+  getFarmSanitaryEvents,
+  getFarmStockItems,
+  type AlertView,
   type AgendaTaskView,
   type AgendaViewResponse,
+  type AnimalGroupView,
+  type BuildingView,
+  type CropView,
+  type EnclosureView,
+  type FinancialTransactionView,
+  type PlotView,
+  type ProductionRecordView,
+  type ReportHistoryView,
+  type SanitaryEventView,
+  type StockItemView,
   updateAgendaTaskStatus
 } from '../../../../services/farm-client';
 
@@ -75,32 +96,30 @@ const taskModules = [
   'alerts',
   'reports'
 ] as const;
-
-const entityTypes = [
-  'FARM',
-  'ANIMAL',
-  'LOT',
-  'BASSIN',
-  'PARCELLE',
-  'CULTURE',
-  'BATIMENT',
-  'ENCLOS',
-  'STOCK',
-  'PRODUCTION',
-  'VENTE',
-  'DEPENSE',
-  'SANITARY_EVENT',
-  'RECOLTE',
-  'ALERTE',
-  'RAPPORT'
-] as const;
+type EntityType =
+  | 'FARM'
+  | 'ANIMAL'
+  | 'LOT'
+  | 'BASSIN'
+  | 'PARCELLE'
+  | 'CULTURE'
+  | 'BATIMENT'
+  | 'ENCLOS'
+  | 'STOCK'
+  | 'PRODUCTION'
+  | 'VENTE'
+  | 'DEPENSE'
+  | 'SANITARY_EVENT'
+  | 'RECOLTE'
+  | 'ALERTE'
+  | 'RAPPORT';
 
 const statusLabels: Record<(typeof taskStatuses)[number], string> = {
-  A_FAIRE: 'A faire',
+  A_FAIRE: 'À faire',
   EN_COURS: 'En cours',
-  TERMINEE: 'Terminee',
+  TERMINEE: 'Terminée',
   EN_RETARD: 'En retard',
-  ANNULEE: 'Annulee'
+  ANNULEE: 'Annulée'
 };
 
 const reminderLabels: Record<(typeof taskReminderPresets)[number], string> = {
@@ -108,7 +127,7 @@ const reminderLabels: Record<(typeof taskReminderPresets)[number], string> = {
   '24H': '24 h avant',
   '6H': '6 h avant',
   '1H': '1 h avant',
-  AT_TIME: 'A l heure',
+  AT_TIME: "À l'heure exacte",
   OVERDUE: 'En retard'
 };
 
@@ -117,13 +136,13 @@ const repeatLabels: Record<(typeof taskRepeatRules)[number], string> = {
   DAILY: 'Quotidienne',
   WEEKLY: 'Hebdomadaire',
   MONTHLY: 'Mensuelle',
-  CUSTOM: 'Personnalisee'
+  CUSTOM: 'Personnalisée'
 };
 
 const moduleLabels: Record<(typeof taskModules)[number], string> = {
   farm: 'Ferme',
-  dashboard: 'Dashboard',
-  livestock: 'Elevage',
+  dashboard: 'Tableau de bord',
+  livestock: 'Élevage',
   'layers/production': 'Pondeuses',
   pisciculture: 'Pisciculture',
   production: 'Production',
@@ -141,7 +160,7 @@ const categoryLabels: Record<(typeof taskCategories)[number], string> = {
   ALIMENTATION: 'Alimentation',
   SANITAIRE: 'Sanitaire',
   PRODUCTION: 'Production',
-  RECOLTE: 'Recolte',
+  RECOLTE: 'Récolte',
   VENTE: 'Vente',
   STOCK: 'Stock',
   FINANCE: 'Finance',
@@ -149,9 +168,144 @@ const categoryLabels: Record<(typeof taskCategories)[number], string> = {
   CULTURE: 'Culture',
   REPRODUCTION: 'Reproduction',
   NETTOYAGE: 'Nettoyage',
-  CONTROLE: 'Controle',
+  CONTROLE: 'Contrôle',
   ADMINISTRATIF: 'Administratif'
 };
+
+const priorityLabels: Record<AgendaTaskView['priority'], string> = {
+  HIGH: 'Haute',
+  MEDIUM: 'Moyenne',
+  LOW: 'Basse'
+};
+
+const entityTypeLabels: Record<EntityType, string> = {
+  FARM: 'Ferme',
+  ANIMAL: 'Animal',
+  LOT: 'Lot',
+  BASSIN: 'Bassin',
+  PARCELLE: 'Parcelle',
+  CULTURE: 'Culture',
+  BATIMENT: 'Bâtiment',
+  ENCLOS: 'Enclos',
+  STOCK: 'Stock',
+  PRODUCTION: 'Production',
+  VENTE: 'Vente',
+  DEPENSE: 'Dépense',
+  SANITARY_EVENT: 'Événement sanitaire',
+  RECOLTE: 'Récolte',
+  ALERTE: 'Alerte',
+  RAPPORT: 'Rapport'
+};
+
+type LinkedEntityOption = {
+  id: string;
+  label: string;
+  type: EntityType;
+  module: (typeof taskModules)[number] | string;
+};
+
+function animalGroupToOption(group: AnimalGroupView): LinkedEntityOption {
+  const label = group.name?.trim()
+    ? `${group.name} - ${group.identificationNumber}`
+    : `${group.identificationNumber} - ${group.species}`;
+
+  return {
+    id: group.id,
+    label,
+    type: group.trackingMode === 'LOT' ? 'LOT' : 'ANIMAL',
+    module: 'livestock'
+  };
+}
+
+function plotToOption(plot: PlotView): LinkedEntityOption {
+  return {
+    id: plot.id,
+    label: `${plot.name} - ${plot.surfaceArea} ha`,
+    type: 'PARCELLE',
+    module: 'plots'
+  };
+}
+
+function cropToOption(crop: CropView): LinkedEntityOption {
+  return {
+    id: crop.id,
+    label: `${crop.name} - ${crop.plotName}`,
+    type: 'CULTURE',
+    module: 'crops'
+  };
+}
+
+function buildingToOption(building: BuildingView): LinkedEntityOption {
+  return {
+    id: building.id,
+    label: `${building.name} - ${building.buildingType}`,
+    type: building.buildingType === 'BASSIN' ? 'BASSIN' : 'BATIMENT',
+    module: 'facilities'
+  };
+}
+
+function enclosureToOption(enclosure: EnclosureView): LinkedEntityOption {
+  return {
+    id: enclosure.id,
+    label: `${enclosure.name} - ${enclosure.enclosureType}`,
+    type: enclosure.enclosureType === 'BASSIN_OUVERT' ? 'BASSIN' : 'ENCLOS',
+    module: 'facilities'
+  };
+}
+
+function stockItemToOption(stockItem: StockItemView): LinkedEntityOption {
+  return {
+    id: stockItem.id,
+    label: `${stockItem.name} - ${stockItem.currentQuantity} ${stockItem.unit}`,
+    type: 'STOCK',
+    module: 'inventory'
+  };
+}
+
+function transactionToOption(transaction: FinancialTransactionView): LinkedEntityOption {
+  return {
+    id: transaction.id,
+    label: `${transaction.transactionType} - ${transaction.category} - ${transaction.amount.toFixed(0)}`,
+    type: transaction.transactionType === 'DEPENSE' ? 'DEPENSE' : 'VENTE',
+    module: 'finance'
+  };
+}
+
+function sanitaryEventToOption(event: SanitaryEventView): LinkedEntityOption {
+  return {
+    id: event.id,
+    label: `${event.eventType} - ${event.animalLabel ?? 'Sans animal'}`,
+    type: 'SANITARY_EVENT',
+    module: 'sanitary'
+  };
+}
+
+function reportToOption(report: ReportHistoryView): LinkedEntityOption {
+  return {
+    id: report.id,
+    label: `${report.reportType} - ${report.format}`,
+    type: 'RAPPORT',
+    module: 'reports'
+  };
+}
+
+function alertToOption(alert: AlertView): LinkedEntityOption {
+  return {
+    id: alert.id,
+    label: `${alert.title} - ${alert.severity}`,
+    type: 'ALERTE',
+    module: 'alerts'
+  };
+}
+
+function productionRecordToOption(record: ProductionRecordView): LinkedEntityOption {
+  return {
+    id: record.id,
+    label: `${record.productionLabel} - ${record.productionDate.slice(0, 10)}`,
+    type: 'PRODUCTION',
+    module: 'production'
+  };
+}
 
 function taskTone(task: AgendaTaskView) {
   if (task.status === 'EN_RETARD') {
@@ -217,6 +371,20 @@ export default function FarmAgendaPage({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [moduleFilter, setModuleFilter] = useState<ModuleFilter>('ALL');
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
+  const [referenceDataLoaded, setReferenceDataLoaded] = useState(false);
+  const [referenceData, setReferenceData] = useState({
+    animalGroups: [] as AnimalGroupView[],
+    plots: [] as PlotView[],
+    crops: [] as CropView[],
+    buildings: [] as BuildingView[],
+    enclosures: [] as EnclosureView[],
+    stockItems: [] as StockItemView[],
+    transactions: [] as FinancialTransactionView[],
+    sanitaryEvents: [] as SanitaryEventView[],
+    reports: [] as ReportHistoryView[],
+    alerts: [] as AlertView[],
+    productionRecords: [] as ProductionRecordView[]
+  });
   const [taskForm, setTaskForm] = useState({
     title: '',
     description: '',
@@ -271,11 +439,76 @@ export default function FarmAgendaPage({
       return;
     }
 
+    let cancelled = false;
+
     getFarm(farmId, session.token)
-      .then((farm) => setFarmName(farm.name))
-      .catch(() => setFarmName(`Ferme ${farmId}`));
+      .then((farm) => {
+        if (!cancelled) {
+          setFarmName(farm.name);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFarmName(`Ferme ${farmId}`);
+        }
+      });
 
     refreshAgenda(farmId, session.token);
+
+    Promise.all([
+      getFarmAnimalGroups(farmId, session.token),
+      getFarmPlots(farmId, session.token),
+      getFarmCrops(farmId, session.token),
+      getFarmFacilities(farmId, session.token),
+      getFarmStockItems(farmId, session.token),
+      getFarmFinanceTransactions(farmId, session.token),
+      getFarmSanitaryEvents(farmId, session.token),
+      getFarmReports(farmId, session.token),
+      getFarmAlerts(farmId, session.token),
+      getFarmProductionOverview(farmId, session.token)
+    ])
+      .then(([animalGroups, plots, crops, facilities, stockItems, transactions, sanitaryEvents, reports, alerts, production]) => {
+        if (cancelled) {
+          return;
+        }
+
+        setReferenceData({
+          animalGroups: animalGroups.items,
+          plots: plots.items,
+          crops: crops.items,
+          buildings: facilities.buildings,
+          enclosures: facilities.enclosures,
+          stockItems: stockItems.items,
+          transactions: transactions.items,
+          sanitaryEvents: sanitaryEvents.items,
+          reports: reports.items,
+          alerts: alerts.items,
+          productionRecords: production.records
+        });
+        setReferenceDataLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setReferenceData({
+            animalGroups: [],
+            plots: [],
+            crops: [],
+            buildings: [],
+            enclosures: [],
+            stockItems: [],
+            transactions: [],
+            sanitaryEvents: [],
+            reports: [],
+            alerts: [],
+            productionRecords: []
+          });
+          setReferenceDataLoaded(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [farmId, session?.token]);
 
   const allTasks = useMemo(() => {
@@ -328,6 +561,111 @@ export default function FarmAgendaPage({
     filteredTasks.find((task) => task.id === selectedTaskId) ??
     allTasks.find((task) => task.id === selectedTaskId) ??
     null;
+
+  const linkedEntityOptions = useMemo<LinkedEntityOption[]>(() => {
+    const farmOption: LinkedEntityOption = {
+      id: farmId || 'farm',
+      label: farmName ? `Ferme - ${farmName}` : 'Ferme',
+      type: 'FARM',
+      module: 'farm'
+    };
+
+    if (!referenceDataLoaded && taskForm.linkedModule && taskForm.linkedModule !== 'farm' && taskForm.linkedModule !== 'dashboard') {
+      return [];
+    }
+
+    switch (taskForm.linkedModule) {
+      case 'dashboard':
+      case 'farm':
+      case '':
+        return [farmOption];
+      case 'livestock':
+      case 'layers/production':
+        return referenceData.animalGroups.map(animalGroupToOption).concat(
+          referenceData.animalGroups.length ? [] : [farmOption]
+        );
+      case 'pisciculture':
+        return [
+          ...referenceData.buildings.filter((building) => building.buildingType === 'BASSIN').map(buildingToOption),
+          ...referenceData.enclosures
+            .filter((enclosure) => enclosure.enclosureType === 'BASSIN_OUVERT')
+            .map(enclosureToOption),
+          ...(referenceData.buildings.some((building) => building.buildingType === 'BASSIN') ||
+          referenceData.enclosures.some((enclosure) => enclosure.enclosureType === 'BASSIN_OUVERT')
+            ? []
+            : [farmOption])
+        ];
+      case 'production':
+        return referenceData.productionRecords.map(productionRecordToOption).concat(
+          referenceData.productionRecords.length ? [] : [farmOption]
+        );
+      case 'crops':
+        return referenceData.crops.map(cropToOption).concat(referenceData.crops.length ? [] : [farmOption]);
+      case 'plots':
+        return referenceData.plots.map(plotToOption).concat(referenceData.plots.length ? [] : [farmOption]);
+      case 'facilities':
+        return [
+          ...referenceData.buildings.map(buildingToOption),
+          ...referenceData.enclosures.map(enclosureToOption),
+          ...(referenceData.buildings.length || referenceData.enclosures.length ? [] : [farmOption])
+        ];
+      case 'inventory':
+        return referenceData.stockItems.map(stockItemToOption).concat(
+          referenceData.stockItems.length ? [] : [farmOption]
+        );
+      case 'finance':
+        return referenceData.transactions.map(transactionToOption).concat(
+          referenceData.transactions.length ? [] : [farmOption]
+        );
+      case 'sanitary':
+        return referenceData.sanitaryEvents.map(sanitaryEventToOption).concat(
+          referenceData.sanitaryEvents.length ? [] : [farmOption]
+        );
+      case 'alerts':
+        return referenceData.alerts.map(alertToOption).concat(referenceData.alerts.length ? [] : [farmOption]);
+      case 'reports':
+        return referenceData.reports.map(reportToOption).concat(referenceData.reports.length ? [] : [farmOption]);
+      default:
+        return [farmOption];
+    }
+  }, [farmId, farmName, referenceData, referenceDataLoaded, taskForm.linkedModule]);
+
+  useEffect(() => {
+    if (!linkedEntityOptions.length) {
+      return;
+    }
+
+    setTaskForm((current) => {
+      const currentOption = linkedEntityOptions.find((option) => option.id === current.linkedEntityId);
+      if (currentOption) {
+        const nextModule = current.linkedModule || currentOption.module;
+        if (
+          current.linkedEntityType === currentOption.type &&
+          current.linkedEntityLabel === currentOption.label &&
+          current.linkedModule === nextModule
+        ) {
+          return current;
+        }
+
+        return {
+          ...current,
+          linkedModule: nextModule,
+          linkedEntityType: currentOption.type,
+          linkedEntityId: currentOption.id,
+          linkedEntityLabel: currentOption.label
+        };
+      }
+
+      const nextOption = linkedEntityOptions[0];
+      return {
+        ...current,
+        linkedModule: current.linkedModule || nextOption.module,
+        linkedEntityType: nextOption.type,
+        linkedEntityId: nextOption.id,
+        linkedEntityLabel: nextOption.label
+      };
+    });
+  }, [linkedEntityOptions]);
 
   async function patchTask(taskId: string, input: { status?: AgendaTaskView['status']; scheduledFor?: string }) {
     if (!session?.token) {
@@ -385,14 +723,14 @@ export default function FarmAgendaPage({
         await refreshAgenda(farmId, session.token);
         setSelectedTaskId(created.id);
         pushToast({
-          title: 'Tache creee',
-          description: `${created.title} a ete ajoutee a l'agenda.`,
+          title: 'Tâche créée',
+          description: `${created.title} a été ajoutée à l’agenda.`,
           variant: 'success'
         });
       } catch (creationError) {
         pushToast({
-          title: 'Creation impossible',
-          description: creationError instanceof Error ? creationError.message : 'La tache na pas pu etre creee.',
+          title: 'Création impossible',
+          description: creationError instanceof Error ? creationError.message : 'La tâche n’a pas pu être créée.',
           variant: 'error'
         });
       }
@@ -444,28 +782,38 @@ export default function FarmAgendaPage({
   const cancelledCount = allTasks.filter((task) => task.status === 'ANNULEE').length;
   const activeCount = allTasks.filter((task) => task.status === 'EN_COURS').length;
   const manualCount = allTasks.filter((task) => !task.sourceModule).length;
+  const alertMeta = (severity: string) => {
+    const normalized = severity.toUpperCase();
+    if (normalized.includes('CRIT') || normalized.includes('DANGER')) {
+      return { label: 'Critique', variant: 'critical' as const, tone: 'critical' };
+    }
+    if (normalized.includes('WARN') || normalized.includes('ATTEN')) {
+      return { label: 'Attention', variant: 'warning' as const, tone: 'warning' };
+    }
+    return { label: 'Info', variant: 'info' as const, tone: 'info' };
+  };
 
   return (
-    <AppShell title={`Agenda avance - ${farmName}`}>
+    <AppShell title={`Agenda avancé - ${farmName}`}>
       <section className="agenda-hero-grid agenda-hero-grid-premium">
         <article className="agenda-hero-card agenda-hero-card-premium">
           <div className="dashboard-inline-actions">
             <div>
               <p className="eyebrow">Planification intelligente</p>
-              <h2 className="farms-section-title">Un agenda vivant, centre sur l execution</h2>
+              <h2 className="farms-section-title agenda-section-title">Un agenda vivant, centré sur l’exécution</h2>
             </div>
             <Badge variant={overdueCount > 0 ? 'warning' : 'success'}>
               {overdueCount > 0 ? `${overdueCount} retard(s)` : 'Flux stable'}
             </Badge>
           </div>
           <p className="hero-copy">
-            Visualisez les operations du jour, replanifiez par glisser-deposer et gardez une
-            lecture claire des priorites agricoles et sanitaires.
+            Visualisez les opérations du jour, replanifiez par glisser-déposer et gardez une
+            lecture claire des priorités agricoles et sanitaires.
           </p>
           <div className="agenda-hero-pills">
             <span className="dashboard-hero-pill">
               <Clock3 className="h-4 w-4" />
-              {todayCount} tache(s) aujourd hui
+              {todayCount} tâche(s) aujourd’hui
             </span>
             <span className="dashboard-hero-pill">
               <Workflow className="h-4 w-4" />
@@ -473,29 +821,29 @@ export default function FarmAgendaPage({
             </span>
             <span className="dashboard-hero-pill">
               <Target className="h-4 w-4" />
-              {completedCount} terminee(s)
+              {completedCount} terminée(s)
             </span>
           </div>
           <div className="agenda-hero-metrics">
             <article className="agenda-hero-metric">
               <span className="agenda-metric-label">Jour</span>
               <strong>{todayCount}</strong>
-              <span className="agenda-metric-note">Taches a traiter maintenant</span>
+              <span className="agenda-metric-note">Tâches à traiter maintenant</span>
             </article>
             <article className="agenda-hero-metric">
               <span className="agenda-metric-label">Retards</span>
               <strong>{overdueCount}</strong>
-              <span className="agenda-metric-note">Points d attention prioritaires</span>
+              <span className="agenda-metric-note">Points d’attention prioritaires</span>
             </article>
             <article className="agenda-hero-metric">
               <span className="agenda-metric-label">En cours</span>
               <strong>{activeCount}</strong>
-              <span className="agenda-metric-note">Execution operationnelle active</span>
+              <span className="agenda-metric-note">Exécution opérationnelle active</span>
             </article>
             <article className="agenda-hero-metric">
               <span className="agenda-metric-label">Manuelles</span>
               <strong>{manualCount}</strong>
-              <span className="agenda-metric-note">Taches creees par l administrateur</span>
+              <span className="agenda-metric-note">Tâches créées par l’administrateur</span>
             </article>
           </div>
         </article>
@@ -504,7 +852,7 @@ export default function FarmAgendaPage({
           <div className="dashboard-inline-actions">
             <div>
               <p className="eyebrow">Focus</p>
-              <h2>{selectedTask?.title ?? 'Selectionne une tache'}</h2>
+              <h2>{selectedTask?.title ?? 'Sélectionnez une tâche'}</h2>
             </div>
             <div className="farm-module-icon">
               <Waves className="h-5 w-5" />
@@ -527,25 +875,25 @@ export default function FarmAgendaPage({
                   {statusLabels[selectedTask.status]}
                 </Badge>
                 <Badge variant={selectedTask.priority === 'HIGH' ? 'warning' : selectedTask.priority === 'MEDIUM' ? 'info' : 'success'}>
-                  Priorite {selectedTask.priority}
+                  Priorité {priorityLabels[selectedTask.priority]}
                 </Badge>
               </div>
               <div className="metric-list agenda-metadata-list">
-                <span>Date: {new Date(selectedTask.scheduledFor).toLocaleDateString('fr-FR')}</span>
-                <span>Categorie: {categoryLabels[selectedTask.category as keyof typeof categoryLabels] ?? selectedTask.category}</span>
+                <span>Date : {new Date(selectedTask.scheduledFor).toLocaleDateString('fr-FR')}</span>
+                <span>Catégorie : {categoryLabels[selectedTask.category as keyof typeof categoryLabels] ?? selectedTask.category}</span>
                 <span>
-                  Module: {moduleLabels[(selectedTask.linkedModule ?? selectedTask.sourceModule ?? 'dashboard') as keyof typeof moduleLabels] ?? selectedTask.linkedModule ?? selectedTask.sourceModule ?? 'MANUELLE'}
+                  Module : {moduleLabels[(selectedTask.linkedModule ?? selectedTask.sourceModule ?? 'dashboard') as keyof typeof moduleLabels] ?? selectedTask.linkedModule ?? selectedTask.sourceModule ?? 'Manuelle'}
                 </span>
-                <span>Element: {selectedTask.linkedEntityLabel ?? selectedTask.linkedEntityId ?? 'Aucun'}</span>
+                <span>Élément : {selectedTask.linkedEntityLabel ?? selectedTask.linkedEntityId ?? 'Aucun'}</span>
                 <span>
-                  Rappel: {reminderLabels[(selectedTask.reminderPreset as keyof typeof reminderLabels) ?? 'AUTO'] ?? selectedTask.reminderPreset ?? 'AUTO'}
+                  Rappel : {reminderLabels[(selectedTask.reminderPreset as keyof typeof reminderLabels) ?? 'AUTO'] ?? selectedTask.reminderPreset ?? 'Automatique'}
                 </span>
-                <span>Repetition: {repeatLabels[selectedTask.repeatRule as keyof typeof repeatLabels] ?? selectedTask.repeatRule}</span>
+                <span>Répétition : {repeatLabels[selectedTask.repeatRule as keyof typeof repeatLabels] ?? selectedTask.repeatRule}</span>
               </div>
               <p className="muted">{selectedTask.description}</p>
             </div>
           ) : (
-            <p className="muted">Choisissez un element du planning pour afficher son detail.</p>
+            <p className="muted">Choisissez un élément du planning pour afficher son détail.</p>
           )}
         </article>
       </section>
@@ -556,11 +904,11 @@ export default function FarmAgendaPage({
             <div className="metric-icon">
               <Clock3 className="h-5 w-5" />
             </div>
-            <Badge variant="info">Aujourd hui</Badge>
+            <Badge variant="info">Aujourd’hui</Badge>
           </div>
           <p className="eyebrow">Charge du jour</p>
           <strong className="metric-number">{todayCount}</strong>
-          <span className="metric-delta">Vue jour, semaine, mois et liste activees</span>
+            <span className="metric-delta">Vue jour, semaine, mois et liste activées</span>
         </article>
         <article className="metric-tile dashboard-kpi-tile">
           <div className="metric-header">
@@ -569,31 +917,31 @@ export default function FarmAgendaPage({
             </div>
             <Badge variant={overdueCount ? 'warning' : 'success'}>Retards</Badge>
           </div>
-          <p className="eyebrow">A regulariser</p>
+          <p className="eyebrow">À régulariser</p>
           <strong className="metric-number">{overdueCount}</strong>
-          <span className="metric-delta">Drag-and-drop disponible pour replanifier</span>
+          <span className="metric-delta">Glisser-déposer disponible pour replanifier</span>
         </article>
         <article className="metric-tile dashboard-kpi-tile">
           <div className="metric-header">
             <div className="metric-icon">
               <CheckCircle2 className="h-5 w-5" />
             </div>
-            <Badge variant="success">Execution</Badge>
+            <Badge variant="success">Exécution</Badge>
           </div>
-          <p className="eyebrow">Taches terminees</p>
+          <p className="eyebrow">Tâches terminées</p>
           <strong className="metric-number">{completedCount}</strong>
-          <span className="metric-delta">Planning dynamique synchronise</span>
+          <span className="metric-delta">Planning dynamique synchronisé</span>
         </article>
         <article className="metric-tile dashboard-kpi-tile">
           <div className="metric-header">
             <div className="metric-icon">
               <AlertTriangle className="h-5 w-5" />
             </div>
-            <Badge variant="neutral">Annulees</Badge>
+            <Badge variant="neutral">Annulées</Badge>
           </div>
-          <p className="eyebrow">Taches annulees</p>
+          <p className="eyebrow">Tâches annulées</p>
           <strong className="metric-number">{cancelledCount}</strong>
-          <span className="metric-delta">Historique conserve dans l agenda</span>
+          <span className="metric-delta">Historique conservé dans l’agenda</span>
         </article>
       </section>
 
@@ -601,7 +949,7 @@ export default function FarmAgendaPage({
         <div className="dashboard-inline-actions">
           <div>
             <p className="eyebrow">Filtres intelligents</p>
-            <h2>Recherche, couleurs et edition rapide</h2>
+            <h2>Recherche, couleurs et édition rapide</h2>
           </div>
           <Badge variant="success">FullCalendar actif</Badge>
         </div>
@@ -611,7 +959,7 @@ export default function FarmAgendaPage({
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Rechercher une tache, un protocole ou une description..."
+              placeholder="Rechercher une tâche, un protocole ou une description..."
             />
           </label>
           <div className="agenda-filter-row">
@@ -620,26 +968,26 @@ export default function FarmAgendaPage({
               Filtres
             </span>
             <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}>
-              <option value="ALL">Tous modules</option>
+              <option value="ALL">Tous les modules</option>
               {taskModules.map((module) => (
                 <option key={module} value={module}>
-                  {module}
+                  {moduleLabels[module]}
                 </option>
               ))}
             </select>
             <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as PriorityFilter)}>
-              <option value="ALL">Toutes priorites</option>
-              <option value="HIGH">Haute</option>
-              <option value="MEDIUM">Moyenne</option>
-              <option value="LOW">Basse</option>
+              <option value="ALL">Toutes les priorités</option>
+              <option value="HIGH">{priorityLabels.HIGH}</option>
+              <option value="MEDIUM">{priorityLabels.MEDIUM}</option>
+              <option value="LOW">{priorityLabels.LOW}</option>
             </select>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-              <option value="ALL">Tous statuts</option>
-              <option value="A_FAIRE">A faire</option>
+              <option value="ALL">Tous les statuts</option>
+              <option value="A_FAIRE">À faire</option>
               <option value="EN_COURS">En cours</option>
-              <option value="TERMINEE">Terminee</option>
+              <option value="TERMINEE">Terminée</option>
               <option value="EN_RETARD">En retard</option>
-              <option value="ANNULEE">Annulee</option>
+              <option value="ANNULEE">Annulée</option>
             </select>
           </div>
         </div>
@@ -650,8 +998,8 @@ export default function FarmAgendaPage({
           <article className="module-form-card agenda-form-card">
             <div className="dashboard-inline-actions">
               <div>
-                <p className="eyebrow">Nouvelle tache</p>
-                <h2>Creer une tache manuelle dans l agenda</h2>
+                <p className="eyebrow">Nouvelle tâche</p>
+                <h2>Créer une tâche dans l’agenda</h2>
               </div>
               <div className="farm-module-icon">
                 <CalendarPlus2 className="h-5 w-5" />
@@ -664,7 +1012,7 @@ export default function FarmAgendaPage({
                   <input
                     value={taskForm.title}
                     onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))}
-                    placeholder="Ex: Controle du bassin nord"
+                    placeholder="Ex. : Contrôle du bassin nord"
                   />
                 </label>
                 <label className="field">
@@ -672,55 +1020,64 @@ export default function FarmAgendaPage({
                   <input
                     value={taskForm.description}
                     onChange={(event) => setTaskForm((current) => ({ ...current, description: event.target.value }))}
-                    placeholder="Detaille ce qui doit etre fait sur le terrain"
+                    placeholder="Détaillez ce qui doit être fait sur le terrain"
                   />
                 </label>
-                <label className="field">
+                                <label className="field">
                   <span>Module lié</span>
                   <select
                     value={taskForm.linkedModule}
-                    onChange={(event) => setTaskForm((current) => ({ ...current, linkedModule: event.target.value }))}
+                    onChange={(event) =>
+                      setTaskForm((current) => ({
+                        ...current,
+                        linkedModule: event.target.value,
+                        linkedEntityType: '',
+                        linkedEntityId: '',
+                        linkedEntityLabel: ''
+                      }))
+                    }
                   >
-                    <option value="">Aucun</option>
+                    <option value="">Choisir un module</option>
                     {taskModules.map((module) => (
                       <option key={module} value={module}>
-                        {module}
+                        {moduleLabels[module]}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="field">
-                  <span>Élément lié</span>
-                  <input
-                    value={taskForm.linkedEntityId}
-                    onChange={(event) => setTaskForm((current) => ({ ...current, linkedEntityId: event.target.value }))}
-                    placeholder="Id ou code de l'élément"
-                  />
-                </label>
-                <label className="field">
-                  <span>Type d'élément</span>
+                  <span>Élément concerné</span>
                   <select
-                    value={taskForm.linkedEntityType}
-                    onChange={(event) => setTaskForm((current) => ({ ...current, linkedEntityType: event.target.value }))}
+                    value={taskForm.linkedEntityId}
+                    onChange={(event) => {
+                      const nextOption = linkedEntityOptions.find((option) => option.id === event.target.value);
+                      setTaskForm((current) => ({
+                        ...current,
+                        linkedEntityId: event.target.value,
+                        linkedEntityType: nextOption?.type ?? current.linkedEntityType,
+                        linkedEntityLabel: nextOption?.label ?? current.linkedEntityLabel,
+                        linkedModule: nextOption?.module ?? current.linkedModule
+                      }));
+                    }}
+                    disabled={!taskForm.linkedModule && linkedEntityOptions.length === 0}
                   >
-                    <option value="">Aucun</option>
-                    {entityTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
+                    <option value="">{taskForm.linkedModule ? 'Sélectionner un élément' : 'Choisissez d’abord un module'}</option>
+                    {linkedEntityOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
                       </option>
                     ))}
                   </select>
                 </label>
-                <label className="field">
-                  <span>Libellé élément</span>
-                  <input
-                    value={taskForm.linkedEntityLabel}
-                    onChange={(event) =>
-                      setTaskForm((current) => ({ ...current, linkedEntityLabel: event.target.value }))
-                    }
-                    placeholder="Nom lisible de l'élément"
-                  />
-                </label>
+                <div className="field">
+                  <span>Type lié</span>
+                  <div className="metric-list" style={{ paddingTop: 8 }}>
+                    <Badge variant="neutral">{taskForm.linkedEntityType ? entityTypeLabels[taskForm.linkedEntityType as EntityType] : 'Automatique'}</Badge>
+                    <span className="muted">
+                      {taskForm.linkedEntityLabel || 'Le type se remplit automatiquement selon l’élément choisi.'}
+                    </span>
+                  </div>
+                </div>
                 <label className="field">
                   <span>Catégorie</span>
                   <select
@@ -729,22 +1086,22 @@ export default function FarmAgendaPage({
                   >
                     {taskCategories.map((category) => (
                       <option key={category} value={category}>
-                        {category}
+                        {categoryLabels[category]}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="field">
-                  <span>Priorite</span>
+                  <span>Priorité</span>
                   <select
                     value={taskForm.priority}
                     onChange={(event) =>
                       setTaskForm((current) => ({ ...current, priority: event.target.value as AgendaTaskView['priority'] }))
                     }
                   >
-                    <option value="HIGH">Haute</option>
-                    <option value="MEDIUM">Moyenne</option>
-                    <option value="LOW">Basse</option>
+                    <option value="HIGH">{priorityLabels.HIGH}</option>
+                    <option value="MEDIUM">{priorityLabels.MEDIUM}</option>
+                    <option value="LOW">{priorityLabels.LOW}</option>
                   </select>
                 </label>
                 <label className="field">
@@ -755,7 +1112,7 @@ export default function FarmAgendaPage({
                   >
                     {taskStatuses.map((status) => (
                       <option key={status} value={status}>
-                        {status}
+                        {statusLabels[status]}
                       </option>
                     ))}
                   </select>
@@ -776,7 +1133,7 @@ export default function FarmAgendaPage({
                   >
                     {taskReminderPresets.map((preset) => (
                       <option key={preset} value={preset}>
-                        {preset}
+                        {reminderLabels[preset]}
                       </option>
                     ))}
                   </select>
@@ -789,7 +1146,7 @@ export default function FarmAgendaPage({
                   >
                     {taskRepeatRules.map((rule) => (
                       <option key={rule} value={rule}>
-                        {rule}
+                        {repeatLabels[rule]}
                       </option>
                     ))}
                   </select>
@@ -815,7 +1172,7 @@ export default function FarmAgendaPage({
                 </label>
               </div>
               <div className="module-inline-note">
-                <span>La tache sera ajoutee au calendrier, au centre d execution, aux alarmes et à la traçabilité.</span>
+                <span>La tâche sera ajoutée au calendrier, au centre d’exécution, aux alarmes et à la traçabilité.</span>
                 <Button className="module-submit-button"
                   type="submit"
                   disabled={
@@ -825,7 +1182,7 @@ export default function FarmAgendaPage({
                     !taskForm.scheduledFor
                   }
                 >
-                  Ajouter la tache
+                  Ajouter la tâche
                 </Button>
               </div>
             </form>
@@ -834,15 +1191,15 @@ export default function FarmAgendaPage({
           <article className="module-list-card agenda-summary-card">
             <div className="dashboard-inline-actions">
               <div>
-                <p className="eyebrow">Creation manuelle</p>
+                <p className="eyebrow">Création guidée</p>
                 <h2>Nouveau workflow agenda</h2>
               </div>
               <Badge variant="success">Actif</Badge>
             </div>
             <div className="metric-list">
-              <span>Taches libres en plus des taches automatiques</span>
-              <span>Priorite, date et rappel integres</span>
-              <span>Replanification toujours possible en glisser-deposer</span>
+              <span>Tâches libres en plus des tâches automatiques</span>
+              <span>Priorité, date et rappel intégrés</span>
+              <span>Replanification toujours possible en glisser-déposer</span>
             </div>
           </article>
         </section>
@@ -862,27 +1219,35 @@ export default function FarmAgendaPage({
             initialView="dayGridMonth"
             locale="fr"
             height="auto"
+            dayMaxEvents={3}
             editable={session?.user.role === 'ADMIN'}
             droppable={session?.user.role === 'ADMIN'}
             eventDrop={handleEventDrop}
             events={calendarEvents}
+            displayEventTime={false}
             headerToolbar={{
               left: 'prev,next today',
               center: 'title',
               right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
             }}
             buttonText={{
-              today: 'Aujourd hui',
+              today: "Aujourd’hui",
               month: 'Mois',
               week: 'Semaine',
               day: 'Jour',
               list: 'Liste'
             }}
+            moreLinkContent={(args) => `+${args.num} autres`}
+            eventClassNames={(arg) => [
+              'agenda-calendar-event',
+              `agenda-calendar-event-${String(arg.event.extendedProps.priority ?? 'LOW').toLowerCase()}`,
+              `agenda-calendar-event-${String(arg.event.extendedProps.status ?? 'A_FAIRE').toLowerCase()}`
+            ]}
             eventClick={(info) => setSelectedTaskId(info.event.id)}
             eventContent={(eventInfo) => (
               <div className="agenda-event-chip">
                 <strong>{eventInfo.event.title}</strong>
-                <span>{eventInfo.event.extendedProps.priority}</span>
+                <span>{priorityLabels[eventInfo.event.extendedProps.priority as keyof typeof priorityLabels] ?? eventInfo.event.extendedProps.priority}</span>
               </div>
             )}
           />
@@ -891,8 +1256,8 @@ export default function FarmAgendaPage({
         <article className="panel agenda-side-panel agenda-focus-panel agenda-side-panel-premium">
           <div className="dashboard-inline-actions">
             <div>
-              <p className="eyebrow">Edition rapide</p>
-              <h2>{selectedTask?.title ?? 'Selectionne une tache'}</h2>
+              <p className="eyebrow">Édition rapide</p>
+              <h2>{selectedTask?.title ?? 'Sélectionnez une tâche'}</h2>
             </div>
             {selectedTask ? (
               <Badge
@@ -916,13 +1281,13 @@ export default function FarmAgendaPage({
           {selectedTask ? (
             <div className="stack-form">
               <div className="metric-list">
-                <span>Priorite: {selectedTask.priority}</span>
-                <span>Date: {new Date(selectedTask.scheduledFor).toLocaleDateString('fr-FR')}</span>
-                <span>Categorie: {selectedTask.category}</span>
-                <span>Module: {selectedTask.linkedModule ?? selectedTask.sourceModule ?? 'MANUELLE'}</span>
-                <span>Element: {selectedTask.linkedEntityLabel ?? selectedTask.linkedEntityId ?? 'Aucun'}</span>
-                <span>Rappel: {selectedTask.reminderPreset ?? 'AUTO'}</span>
-                <span>Répétition: {selectedTask.repeatRule}</span>
+                <span>Priorité : {priorityLabels[selectedTask.priority]}</span>
+                <span>Date : {new Date(selectedTask.scheduledFor).toLocaleDateString('fr-FR')}</span>
+                <span>Catégorie : {categoryLabels[selectedTask.category as keyof typeof categoryLabels] ?? selectedTask.category}</span>
+                <span>Module : {moduleLabels[(selectedTask.linkedModule ?? selectedTask.sourceModule ?? 'dashboard') as keyof typeof moduleLabels] ?? selectedTask.linkedModule ?? selectedTask.sourceModule ?? 'Manuelle'}</span>
+                <span>Élément : {selectedTask.linkedEntityLabel ?? selectedTask.linkedEntityId ?? 'Aucun'}</span>
+                <span>Rappel : {reminderLabels[(selectedTask.reminderPreset as keyof typeof reminderLabels) ?? 'AUTO'] ?? selectedTask.reminderPreset ?? 'Automatique'}</span>
+                <span>Répétition : {repeatLabels[selectedTask.repeatRule as keyof typeof repeatLabels] ?? selectedTask.repeatRule}</span>
               </div>
               <p className="muted">{selectedTask.description}</p>
               {session?.user.role === 'ADMIN' ? (
@@ -935,7 +1300,7 @@ export default function FarmAgendaPage({
                     onClick={() => updateStatus(selectedTask, 'EN_COURS')}
                   >
                     <PlayCircle className="h-4 w-4" />
-                    Demarrer
+                    Démarrer
                   </Button>
                   <Button className="agenda-action-button"
                     size="md"
@@ -953,7 +1318,7 @@ export default function FarmAgendaPage({
                     disabled={isPending}
                     onClick={() => updateStatus(selectedTask, 'A_FAIRE')}
                   >
-                    Reinitialiser
+                    Réinitialiser
                   </Button>
                   <Button className="agenda-action-button"
                     variant="secondary"
@@ -968,7 +1333,7 @@ export default function FarmAgendaPage({
               ) : null}
             </div>
           ) : (
-            <p className="muted">Aucune tache ne correspond aux filtres actuels.</p>
+            <p className="muted">Aucune tâche ne correspond aux filtres actuels.</p>
           )}
 
           <div className="agenda-quick-list">
@@ -1005,7 +1370,7 @@ export default function FarmAgendaPage({
                 </motion.button>
               ))
             ) : (
-              <p className="muted">Aucune tache visible avec les filtres selectionnes.</p>
+              <p className="muted">Aucune tâche visible avec les filtres sélectionnés.</p>
             )}
           </div>
         </article>
@@ -1015,42 +1380,50 @@ export default function FarmAgendaPage({
         <article className="panel dashboard-summary-card">
           <div className="dashboard-inline-actions">
             <div>
-              <p className="eyebrow">Signaux planning</p>
-              <h2>Centre d alertes lie a l agenda</h2>
+              <p className="eyebrow">Signaux de planning</p>
+              <h2>Centre d’alertes lié à l’agenda</h2>
             </div>
             <Badge variant={alerts.length ? 'warning' : 'success'}>{alerts.length}</Badge>
           </div>
           {alerts.length ? (
             alerts.map((alert) => (
-              <div key={alert.id} className={`agenda-snippet agenda-alert-card alert-${alert.severity.toLowerCase()}`}>
-                <div className="agenda-snippet-topline">
-                  <strong>{alert.title}</strong>
-                  <span className="status-chip">{alert.severity}</span>
+              <article
+                key={alert.id}
+                className={`agenda-alert-card agenda-alert-card-premium alert-${alert.severity.toLowerCase()}`}
+              >
+                <div className="agenda-snippet-topline agenda-alert-topline">
+                  <div className="agenda-alert-heading">
+                    <AlertTriangle className="h-4 w-4" />
+                    <strong>{alert.title}</strong>
+                  </div>
+                  <Badge variant={alertMeta(alert.severity).variant}>{alertMeta(alert.severity).label}</Badge>
                 </div>
-                <span>{alert.message}</span>
-              </div>
+                <p className="agenda-alert-message">{alert.message}</p>
+              </article>
             ))
           ) : (
-            <p className="muted">Aucun signal d agenda actuellement.</p>
+            <p className="muted">Aucun signal d’agenda actuellement.</p>
           )}
         </article>
 
         <article className="panel dashboard-summary-card">
           <div className="dashboard-inline-actions">
             <div>
-              <p className="eyebrow">Resume filtre</p>
-              <h2>Resultats courants</h2>
+              <p className="eyebrow">Résumé des filtres</p>
+              <h2>Résultats courants</h2>
             </div>
             <Badge variant="info">{filteredTasks.length}</Badge>
           </div>
           <div className="metric-list">
-            <span>Taches affichees: {filteredTasks.length}</span>
-            <span>En retard: {filteredTasks.filter((task) => task.status === 'EN_RETARD').length}</span>
-            <span>Automatiques: {filteredTasks.filter((task) => task.sourceModule !== null).length}</span>
-            <span>Recherche: {search || 'Aucune'}</span>
+            <span>Tâches affichées : {filteredTasks.length}</span>
+            <span>En retard : {filteredTasks.filter((task) => task.status === 'EN_RETARD').length}</span>
+            <span>Automatiques : {filteredTasks.filter((task) => task.sourceModule !== null).length}</span>
+            <span>Recherche : {search || 'Aucune'}</span>
           </div>
         </article>
       </section>
     </AppShell>
   );
 }
+
+

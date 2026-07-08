@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
 import { Building2, Fence, ShieldCheck, Wrench } from 'lucide-react';
@@ -94,26 +94,10 @@ function facilityBadge(status: BuildingView['status'] | EnclosureView['status'])
 }
 
 const facilityWorkflowSteps = [
-  {
-    title: 'Bâtiment',
-    description: 'Créer le point d’accueil ou l’infrastructure technique.',
-    icon: Building2
-  },
-  {
-    title: 'Enclos',
-    description: 'Rattacher la zone de vie, la capacité et l’état.',
-    icon: Fence
-  },
-  {
-    title: 'Maintenance',
-    description: 'Planifier l’entretien et les corrections d’usage.',
-    icon: Wrench
-  },
-  {
-    title: 'Sécurité',
-    description: 'Suivre la disponibilité opérationnelle au quotidien.',
-    icon: ShieldCheck
-  }
+  { title: 'Bâtiment', icon: Building2 },
+  { title: 'Enclos', icon: Fence },
+  { title: 'Maintenance', icon: Wrench },
+  { title: 'Sécurité', icon: ShieldCheck }
 ] as const;
 
 export default function FarmFacilitiesPage({
@@ -462,7 +446,7 @@ export default function FarmFacilitiesPage({
                 : 'Batiments et enclos sur une meme logique de gestion'}
             </span>
             <span>Lecture immediate des actifs critiques ou satures</span>
-            <span>Prêt pour la suite elevage et stocks</span>
+            <span>PrÃªt pour la suite elevage et stocks</span>
           </div>
         </article>
       </section>
@@ -482,7 +466,6 @@ export default function FarmFacilitiesPage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -797,3 +780,4 @@ export default function FarmFacilitiesPage({
     </AppShell>
   );
 }
+

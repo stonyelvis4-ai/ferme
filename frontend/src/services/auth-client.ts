@@ -35,6 +35,15 @@ export interface LogoutResponse {
   success: boolean;
 }
 
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordResponse {
+  success: boolean;
+}
+
 export function login(email: string, password: string) {
   return apiFetch<SessionResponse>('/auth/session', {
     method: 'POST',
@@ -70,6 +79,17 @@ export function logout() {
   return apiFetch<LogoutResponse>('/auth/logout', {
     method: 'POST'
   });
+}
+
+export function changeAdminPassword(payload: ChangePasswordPayload, token?: string) {
+  return apiFetch<ChangePasswordResponse>(
+    '/auth/me/password',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    },
+    token
+  );
 }
 
 export function getCurrentUser(token?: string) {

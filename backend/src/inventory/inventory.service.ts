@@ -4,9 +4,25 @@ import { FarmsService } from '../farms/farms.service.js';
 import { ReminderService } from '../notifications/reminder.service.js';
 import { PrismaService } from '../shared/database/prisma.service.js';
 
+type StockFamily = 'CONSOMMATION' | 'PRODUCTION' | 'SUPPORT';
+
 export interface StockItemView {
   id: string;
-  category: 'ALIMENTS' | 'MEDICAMENTS' | 'SEMENCES' | 'ENGRAIS' | 'EQUIPEMENTS' | 'MATERIELS';
+  category:
+    | 'ALIMENTS'
+    | 'MEDICAMENTS'
+    | 'SEMENCES'
+    | 'ENGRAIS'
+    | 'EQUIPEMENTS'
+    | 'MATERIELS'
+    | 'VACCINS'
+    | 'CARBURANT'
+    | 'PRODUITS_VETERINAIRES'
+    | 'PRODUITS_ELEVAGE'
+    | 'PRODUITS_PISCICOLES'
+    | 'PRODUITS_AGRICOLES';
+  family: StockFamily;
+  categoryLabel: string;
   name: string;
   unit: string;
   currentQuantity: number;
@@ -14,7 +30,60 @@ export interface StockItemView {
   stockStatus: 'AVAILABLE' | 'LOW' | 'OUT_OF_STOCK';
   quantityGapToThreshold: number;
   recommendedReorderQuantity: number;
+  averageDailyConsumption: number;
+  daysOfAutonomy: number | null;
+  estimatedStockoutAt: string | null;
+  lastMovementAt: string | null;
+  movementCount30d: number;
 }
+
+export interface StockMovementView {
+  id: string;
+  movementType: 'ENTREE' | 'SORTIE' | 'INVENTAIRE' | 'AJUSTEMENT';
+  quantity: number;
+  note: string | null;
+  movementDate: string;
+  sourceModule: string | null;
+  sourceEntityType: string | null;
+  sourceEntityId: string | null;
+  sourceEntityLabel: string | null;
+  relatedLotId: string | null;
+  relatedPlotId: string | null;
+  relatedProductionRecordId: string | null;
+  relatedSaleId: string | null;
+  relatedTaskId: string | null;
+  recordedByUserName: string | null;
+}
+
+const stockCategoryLabels: Record<StockItemView['category'], string> = {
+  ALIMENTS: 'Aliments',
+  MEDICAMENTS: 'Medicaments',
+  SEMENCES: 'Semences',
+  ENGRAIS: 'Engrais',
+  EQUIPEMENTS: 'Equipements',
+  MATERIELS: 'Materiels',
+  VACCINS: 'Vaccins',
+  CARBURANT: 'Carburant',
+  PRODUITS_VETERINAIRES: 'Produits veterinaire',
+  PRODUITS_ELEVAGE: "Produits d'elevage",
+  PRODUITS_PISCICOLES: 'Produits piscicoles',
+  PRODUITS_AGRICOLES: 'Produits agricoles'
+};
+
+const stockFamilyByCategory: Record<StockItemView['category'], StockFamily> = {
+  ALIMENTS: 'CONSOMMATION',
+  MEDICAMENTS: 'CONSOMMATION',
+  SEMENCES: 'CONSOMMATION',
+  ENGRAIS: 'CONSOMMATION',
+  EQUIPEMENTS: 'SUPPORT',
+  MATERIELS: 'SUPPORT',
+  VACCINS: 'CONSOMMATION',
+  CARBURANT: 'CONSOMMATION',
+  PRODUITS_VETERINAIRES: 'CONSOMMATION',
+  PRODUITS_ELEVAGE: 'PRODUCTION',
+  PRODUITS_PISCICOLES: 'PRODUCTION',
+  PRODUITS_AGRICOLES: 'PRODUCTION'
+};
 
 @Injectable()
 export class InventoryService {
@@ -26,20 +95,56 @@ export class InventoryService {
 
   async listStockItems(user: SessionUser, farmId: string) {
     const farm = await this.farmsService.getFarm(user, farmId);
-    const items = await this.prisma.stockItem.findMany({
-      where: { farmId: farm.id },
-      orderBy: { createdAt: 'desc' }
-    });
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    const [items, movements] = await Promise.all([
+      this.prisma.stockItem.findMany({
+        where: { farmId: farm.id },
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.prisma.stockMovement.findMany({
+        where: { farmId: farm.id },
+        include: {
+          recordedByUser: { select: { fullName: true } }
+        },
+        orderBy: [{ movementDate: 'desc' }, { createdAt: 'desc' }],
+        take: 120
+      })
+    ]);
+
+    const movementByItem = new Map<string, typeof movements>();
+    for (const movement of movements) {
+      const current = movementByItem.get(movement.stockItemId) ?? [];
+      current.push(movement);
+      movementByItem.set(movement.stockItemId, current);
+    }
+
+    const enrichedItems = items.map((item) => this.toStockItemView(item, movementByItem.get(item.id) ?? []));
     return {
-      items: items.map((item) => ({
-        ...this.toStockItemView(item)
-      })),
+      items: enrichedItems,
+      movements: movements.map((movement) => this.toMovementView(movement)),
       stats: {
         totalItems: items.length,
-        lowStockCount: items.filter((item) => item.currentQuantity > 0 && item.currentQuantity <= item.lowStockThreshold)
-          .length,
-        outOfStockCount: items.filter((item) => item.currentQuantity <= 0).length
+        lowStockCount: enrichedItems.filter((item) => item.stockStatus === 'LOW').length,
+        outOfStockCount: enrichedItems.filter((item) => item.stockStatus === 'OUT_OF_STOCK').length,
+        criticalItemsCount: enrichedItems.filter((item) => item.stockStatus !== 'AVAILABLE').length,
+        averageAutonomyDays:
+          (() => {
+            const autonomyValues = enrichedItems
+              .map((item) => item.daysOfAutonomy)
+              .filter((value): value is number => value !== null && Number.isFinite(value));
+            return autonomyValues.length > 0
+              ? autonomyValues.reduce((sum, value) => sum + value, 0) / autonomyValues.length
+              : 0;
+          })(),
+        recentMovementsCount: movements.filter((movement) => movement.movementDate >= thirtyDaysAgo).length,
+        outgoingQuantity30d: movements
+          .filter((movement) => movement.movementDate >= thirtyDaysAgo && movement.movementType === 'SORTIE')
+          .reduce((sum, movement) => sum + movement.quantity, 0),
+        incomingQuantity30d: movements
+          .filter((movement) => movement.movementDate >= thirtyDaysAgo && movement.movementType === 'ENTREE')
+          .reduce((sum, movement) => sum + movement.quantity, 0)
       }
     };
   }
@@ -81,6 +186,16 @@ export class InventoryService {
       movementType: 'ENTREE' | 'SORTIE' | 'INVENTAIRE' | 'AJUSTEMENT';
       quantity: number;
       note?: string;
+      sourceModule?: string;
+      sourceEntityType?: string;
+      sourceEntityId?: string;
+      sourceEntityLabel?: string;
+      relatedLotId?: string;
+      relatedPlotId?: string;
+      relatedProductionRecordId?: string;
+      relatedSaleId?: string;
+      relatedTaskId?: string;
+      movementDate?: string;
     }
   ) {
     const farm = await this.farmsService.getFarm(user, farmId);
@@ -93,6 +208,11 @@ export class InventoryService {
 
     if (input.quantity <= 0) {
       throw new BadRequestException('La quantite doit etre strictement positive');
+    }
+
+    const movementDate = input.movementDate ? new Date(input.movementDate) : new Date();
+    if (Number.isNaN(movementDate.getTime())) {
+      throw new BadRequestException('Date de mouvement invalide');
     }
 
     const nextQuantity =
@@ -109,7 +229,18 @@ export class InventoryService {
           stockItemId: item.id,
           movementType: input.movementType,
           quantity: input.quantity,
-          note: input.note
+          movementDate,
+          note: input.note?.trim() || null,
+          sourceModule: input.sourceModule?.trim() || null,
+          sourceEntityType: input.sourceEntityType?.trim() || null,
+          sourceEntityId: input.sourceEntityId?.trim() || null,
+          sourceEntityLabel: input.sourceEntityLabel?.trim() || null,
+          relatedLotId: input.relatedLotId?.trim() || null,
+          relatedPlotId: input.relatedPlotId?.trim() || null,
+          relatedProductionRecordId: input.relatedProductionRecordId?.trim() || null,
+          relatedSaleId: input.relatedSaleId?.trim() || null,
+          relatedTaskId: input.relatedTaskId?.trim() || null,
+          recordedByUserId: user.id
         }
       }),
       this.prisma.stockItem.update({
@@ -122,7 +253,15 @@ export class InventoryService {
 
     await this.syncStockSignals(farm.id, updatedItem);
 
-    return movement;
+    const recordedByUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { fullName: true }
+    });
+
+    return this.toMovementView({
+      ...movement,
+      recordedByUser: recordedByUser ?? null
+    });
   }
 
   private toStockItemView(item: {
@@ -132,7 +271,11 @@ export class InventoryService {
     unit: string;
     currentQuantity: number;
     lowStockThreshold: number;
-  }): StockItemView {
+  }, movements: Array<{
+    movementType: 'ENTREE' | 'SORTIE' | 'INVENTAIRE' | 'AJUSTEMENT';
+    quantity: number;
+    movementDate: Date;
+  }> = []): StockItemView {
     const stockStatus =
       item.currentQuantity <= 0
         ? 'OUT_OF_STOCK'
@@ -148,16 +291,77 @@ export class InventoryService {
           ? Math.max(quantityGapToThreshold, 1)
           : 0;
 
+    const thirtyDayMovements = movements.filter((movement) => {
+      const deltaDays = (Date.now() - movement.movementDate.getTime()) / (1000 * 60 * 60 * 24);
+      return deltaDays <= 30;
+    });
+    const outgoingQuantity = thirtyDayMovements
+      .filter((movement) => movement.movementType === 'SORTIE')
+      .reduce((sum, movement) => sum + movement.quantity, 0);
+    const averageDailyConsumption = outgoingQuantity / 30;
+    const daysOfAutonomy = averageDailyConsumption > 0 ? item.currentQuantity / averageDailyConsumption : null;
+    const estimatedStockoutAt =
+      daysOfAutonomy !== null && Number.isFinite(daysOfAutonomy)
+        ? new Date(Date.now() + daysOfAutonomy * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+    const lastMovementAt =
+      movements.length > 0 ? movements[0].movementDate.toISOString() : null;
+
     return {
       id: item.id,
       category: item.category,
+      family: stockFamilyByCategory[item.category],
+      categoryLabel: stockCategoryLabels[item.category],
       name: item.name,
       unit: item.unit,
       currentQuantity: item.currentQuantity,
       lowStockThreshold: item.lowStockThreshold,
       stockStatus,
       quantityGapToThreshold,
-      recommendedReorderQuantity
+      recommendedReorderQuantity,
+      averageDailyConsumption,
+      daysOfAutonomy: daysOfAutonomy !== null && Number.isFinite(daysOfAutonomy) ? daysOfAutonomy : null,
+      estimatedStockoutAt,
+      lastMovementAt,
+      movementCount30d: thirtyDayMovements.length
+    };
+  }
+
+  private toMovementView(
+    movement: {
+      id: string;
+      movementType: 'ENTREE' | 'SORTIE' | 'INVENTAIRE' | 'AJUSTEMENT';
+      quantity: number;
+      note: string | null;
+      movementDate: Date;
+      sourceModule: string | null;
+      sourceEntityType: string | null;
+      sourceEntityId: string | null;
+      sourceEntityLabel: string | null;
+      relatedLotId: string | null;
+      relatedPlotId: string | null;
+      relatedProductionRecordId: string | null;
+      relatedSaleId: string | null;
+      relatedTaskId: string | null;
+      recordedByUser?: { fullName: string } | null;
+    }
+  ): StockMovementView {
+    return {
+      id: movement.id,
+      movementType: movement.movementType,
+      quantity: movement.quantity,
+      note: movement.note,
+      movementDate: movement.movementDate.toISOString(),
+      sourceModule: movement.sourceModule,
+      sourceEntityType: movement.sourceEntityType,
+      sourceEntityId: movement.sourceEntityId,
+      sourceEntityLabel: movement.sourceEntityLabel,
+      relatedLotId: movement.relatedLotId,
+      relatedPlotId: movement.relatedPlotId,
+      relatedProductionRecordId: movement.relatedProductionRecordId,
+      relatedSaleId: movement.relatedSaleId,
+      relatedTaskId: movement.relatedTaskId,
+      recordedByUserName: movement.recordedByUser?.fullName ?? null
     };
   }
 

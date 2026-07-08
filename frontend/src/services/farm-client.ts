@@ -111,7 +111,21 @@ export interface AlertView {
 
 export interface StockItemView {
   id: string;
-  category: 'ALIMENTS' | 'MEDICAMENTS' | 'SEMENCES' | 'ENGRAIS' | 'EQUIPEMENTS' | 'MATERIELS';
+  category:
+    | 'ALIMENTS'
+    | 'MEDICAMENTS'
+    | 'SEMENCES'
+    | 'ENGRAIS'
+    | 'EQUIPEMENTS'
+    | 'MATERIELS'
+    | 'VACCINS'
+    | 'CARBURANT'
+    | 'PRODUITS_VETERINAIRES'
+    | 'PRODUITS_ELEVAGE'
+    | 'PRODUITS_PISCICOLES'
+    | 'PRODUITS_AGRICOLES';
+  family: 'CONSOMMATION' | 'PRODUCTION' | 'SUPPORT';
+  categoryLabel: string;
   name: string;
   unit: string;
   currentQuantity: number;
@@ -119,6 +133,29 @@ export interface StockItemView {
   stockStatus: 'AVAILABLE' | 'LOW' | 'OUT_OF_STOCK';
   quantityGapToThreshold: number;
   recommendedReorderQuantity: number;
+  averageDailyConsumption: number;
+  daysOfAutonomy: number | null;
+  estimatedStockoutAt: string | null;
+  lastMovementAt: string | null;
+  movementCount30d: number;
+}
+
+export interface StockMovementView {
+  id: string;
+  movementType: 'ENTREE' | 'SORTIE' | 'INVENTAIRE' | 'AJUSTEMENT';
+  quantity: number;
+  note: string | null;
+  movementDate: string;
+  sourceModule: string | null;
+  sourceEntityType: string | null;
+  sourceEntityId: string | null;
+  sourceEntityLabel: string | null;
+  relatedLotId: string | null;
+  relatedPlotId: string | null;
+  relatedProductionRecordId: string | null;
+  relatedSaleId: string | null;
+  relatedTaskId: string | null;
+  recordedByUserName: string | null;
 }
 
 export interface AnimalGroupView {
@@ -673,17 +710,23 @@ export async function ignoreAlert(farmId: string, alertId: string, token: string
 export async function getFarmStockItems(farmId: string, token: string) {
   return apiFetch<{
     items: StockItemView[];
+    movements: StockMovementView[];
     stats: {
       totalItems: number;
       lowStockCount: number;
       outOfStockCount: number;
+      criticalItemsCount: number;
+      averageAutonomyDays: number;
+      recentMovementsCount: number;
+      outgoingQuantity30d: number;
+      incomingQuantity30d: number;
     };
   }>(`/farms/${farmId}/inventory/items`, undefined, token);
 }
 
 export async function createStockItem(
   farmId: string,
-  input: Omit<StockItemView, 'id' | 'stockStatus' | 'quantityGapToThreshold' | 'recommendedReorderQuantity'>,
+  input: Pick<StockItemView, 'category' | 'name' | 'unit' | 'currentQuantity' | 'lowStockThreshold'>,
   token: string
 ) {
   return apiFetch<StockItemView>(
@@ -703,6 +746,16 @@ export async function createStockMovement(
     movementType: 'ENTREE' | 'SORTIE' | 'INVENTAIRE' | 'AJUSTEMENT';
     quantity: number;
     note?: string;
+    sourceModule?: string;
+    sourceEntityType?: string;
+    sourceEntityId?: string;
+    sourceEntityLabel?: string;
+    relatedLotId?: string;
+    relatedPlotId?: string;
+    relatedProductionRecordId?: string;
+    relatedSaleId?: string;
+    relatedTaskId?: string;
+    movementDate?: string;
   },
   token: string
 ) {

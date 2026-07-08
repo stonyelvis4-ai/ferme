@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { motion } from 'framer-motion';
 import {
@@ -70,26 +70,10 @@ const defaultFilters: FinanceTransactionFilters = {
 };
 
   const financeWorkflowSteps = [
-  {
-    title: 'Revenu',
-    description: 'Relier les ventes et les rentrées à la ferme.',
-    icon: ArrowUpRight
-  },
-  {
-    title: 'Dépense',
-    description: 'Qualifier chaque sortie avec son poste de charge.',
-    icon: ArrowDownRight
-  },
-  {
-    title: 'Solde',
-    description: 'Lire immédiatement l’équilibre du compte ferme.',
-    icon: Landmark
-  },
-  {
-    title: 'Marge',
-    description: 'Contrôler la rentabilité et la tendance mensuelle.',
-    icon: Sparkles
-  }
+  { title: 'Revenu', icon: ArrowUpRight },
+  { title: 'Dépense', icon: ArrowDownRight },
+  { title: 'Solde', icon: Landmark },
+  { title: 'Marge', icon: Sparkles }
   ] as const;
 
 const formatMoney = (value: number) => `${value.toFixed(2)}`;
@@ -281,7 +265,7 @@ export default function FarmFinancePage({
             <article className="dashboard-hero-stat dashboard-hero-stat-accent">
               <span className="dashboard-hero-stat-label">Solde</span>
               <strong>{formatMoney(summary.balance)}</strong>
-              <span>{summary.balance >= 0 ? 'Trésorerie positive' : 'Alerte équilibre'}</span>
+              <span>{summary.balance >= 0 ? 'TrÃ©sorerie positive' : 'Alerte Ã©quilibre'}</span>
             </article>
             <article className="dashboard-hero-stat">
               <span className="dashboard-hero-stat-label">Ticket moyen revenu</span>
@@ -289,9 +273,9 @@ export default function FarmFinancePage({
               <span>Lecture utile pour les ventes</span>
             </article>
             <article className="dashboard-hero-stat dashboard-hero-stat-muted">
-              <span className="dashboard-hero-stat-label">Ticket moyen dépense</span>
+              <span className="dashboard-hero-stat-label">Ticket moyen dÃ©pense</span>
               <strong>{formatMoney(summary.averageExpenseTicket)}</strong>
-              <span>Sorties moyennes par écriture</span>
+              <span>Sorties moyennes par Ã©criture</span>
             </article>
           </div>
         </article>
@@ -337,7 +321,6 @@ export default function FarmFinancePage({
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              <span>{step.description}</span>
             </article>
           );
         })}
@@ -591,7 +574,7 @@ export default function FarmFinancePage({
                 <div className="finance-ledger-top">
                   <div>
                     <strong>{item.category}</strong>
-                    <p className="finance-ledger-meta">{new Date(item.transactionDate).toLocaleDateString('fr-FR')} • {item.referenceModule || 'MANUEL'}</p>
+                    <p className="finance-ledger-meta">{new Date(item.transactionDate).toLocaleDateString('fr-FR')} â€¢ {item.referenceModule || 'MANUEL'}</p>
                   </div>
                   <Badge variant={item.transactionType === 'DEPENSE' ? 'warning' : 'success'}>
                     {item.transactionType}
@@ -632,3 +615,4 @@ export default function FarmFinancePage({
     </AppShell>
   );
 }
+

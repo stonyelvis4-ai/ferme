@@ -8,8 +8,33 @@ import { RolesGuard } from '../auth/roles.guard.js';
 import { InventoryService } from './inventory.service.js';
 
 class CreateStockItemDto {
-  @IsIn(['ALIMENTS', 'MEDICAMENTS', 'SEMENCES', 'ENGRAIS', 'EQUIPEMENTS', 'MATERIELS'])
-  category!: 'ALIMENTS' | 'MEDICAMENTS' | 'SEMENCES' | 'ENGRAIS' | 'EQUIPEMENTS' | 'MATERIELS';
+  @IsIn([
+    'ALIMENTS',
+    'MEDICAMENTS',
+    'SEMENCES',
+    'ENGRAIS',
+    'EQUIPEMENTS',
+    'MATERIELS',
+    'VACCINS',
+    'CARBURANT',
+    'PRODUITS_VETERINAIRES',
+    'PRODUITS_ELEVAGE',
+    'PRODUITS_PISCICOLES',
+    'PRODUITS_AGRICOLES'
+  ])
+  category!:
+    | 'ALIMENTS'
+    | 'MEDICAMENTS'
+    | 'SEMENCES'
+    | 'ENGRAIS'
+    | 'EQUIPEMENTS'
+    | 'MATERIELS'
+    | 'VACCINS'
+    | 'CARBURANT'
+    | 'PRODUITS_VETERINAIRES'
+    | 'PRODUITS_ELEVAGE'
+    | 'PRODUITS_PISCICOLES'
+    | 'PRODUITS_AGRICOLES';
 
   @IsString()
   name!: string;
@@ -40,6 +65,46 @@ class CreateStockMovementDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceModule?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceEntityType?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceEntityId?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceEntityLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  relatedLotId?: string;
+
+  @IsOptional()
+  @IsString()
+  relatedPlotId?: string;
+
+  @IsOptional()
+  @IsString()
+  relatedProductionRecordId?: string;
+
+  @IsOptional()
+  @IsString()
+  relatedSaleId?: string;
+
+  @IsOptional()
+  @IsString()
+  relatedTaskId?: string;
+
+  @IsOptional()
+  @IsString()
+  movementDate?: string;
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard)

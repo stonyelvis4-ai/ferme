@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { mortalityAlert } from '@ferm-plus/domain-rules';
 import { type SessionUser } from '../auth/auth.service.js';
 import { FarmsService } from '../farms/farms.service.js';
+import { ReminderService } from '../notifications/reminder.service.js';
 import { SanitaryService } from '../sanitary/sanitary.service.js';
 import { PrismaService } from '../shared/database/prisma.service.js';
 
@@ -60,7 +61,8 @@ export class LivestockService {
   constructor(
     private readonly farmsService: FarmsService,
     private readonly prisma: PrismaService,
-    private readonly sanitaryService: SanitaryService
+    private readonly sanitaryService: SanitaryService,
+    private readonly reminderService: ReminderService
   ) {}
 
   async listAnimalGroups(user: SessionUser, farmId: string) {
@@ -133,6 +135,24 @@ export class LivestockService {
       },
       user.id
     );
+
+    await this.createLivestockFollowUpTask(farm.id, {
+      title:
+        farm.activityType === 'PISCICULTURE'
+          ? `Contrôle post-empoissonnement - ${created.identificationNumber}`
+          : `Contrôle post-entrée - ${created.identificationNumber}`,
+      description:
+        farm.activityType === 'PISCICULTURE'
+          ? 'Vérifier la reprise du lot, la survie, l’alimentation et la qualité de l’eau.'
+          : 'Vérifier l’état du lot, l’eau, l’alimentation et le sanitaire après l’entrée.',
+      scheduledFor: this.offsetDays(created.birthDate, 3),
+      sourceModule: farm.activityType === 'PISCICULTURE' ? 'pisciculture' : 'livestock',
+      sourceRecordId: created.id,
+      linkedModule: farm.activityType === 'PISCICULTURE' ? 'pisciculture' : 'livestock',
+      linkedEntityType: farm.activityType === 'PISCICULTURE' ? 'BASSIN' : 'LOT',
+      linkedEntityId: created.id,
+      linkedEntityLabel: created.identificationNumber
+    });
 
     return mapAnimalGroup(created);
   }
@@ -240,6 +260,28 @@ export class LivestockService {
 
     const [event] = events;
 
+    await this.createLivestockFollowUpTask(farm.id, {
+      title:
+        input.eventTypes.includes('VACCINATION')
+          ? `Vérifier le rappel sanitaire - ${animalGroup.identificationNumber}`
+          : input.eventTypes.includes('DECES')
+            ? `Analyser la perte - ${animalGroup.identificationNumber}`
+            : `Suivre l’événement - ${animalGroup.identificationNumber}`,
+      description:
+        input.eventTypes.includes('VACCINATION')
+          ? 'Contrôler le lot et préparer le rappel ou le prochain contrôle sanitaire.'
+          : input.eventTypes.includes('DECES')
+            ? 'Évaluer l’impact sur le lot et ajuster le suivi sanitaire ou de production.'
+            : 'Vérifier l’impact de l’événement et consolider le suivi du lot.',
+      scheduledFor: this.offsetDays(eventDate, input.eventTypes.includes('DECES') ? 1 : 7),
+      sourceModule: farm.activityType === 'PISCICULTURE' ? 'pisciculture' : 'livestock',
+      sourceRecordId: event.id,
+      linkedModule: farm.activityType === 'PISCICULTURE' ? 'pisciculture' : 'livestock',
+      linkedEntityType: farm.activityType === 'PISCICULTURE' ? 'BASSIN' : 'LOT',
+      linkedEntityId: animalGroup.id,
+      linkedEntityLabel: animalGroup.identificationNumber
+    });
+
     if (input.eventTypes.includes('DECES')) {
       const alertProfile = mortalityAlert({
         species: animalGroup.species,
@@ -308,5 +350,47 @@ export class LivestockService {
     }
 
     return currentStatus;
+  }
+
+  private offsetDays(base: Date, days: number) {
+    const next = new Date(base);
+    next.setDate(next.getDate() + days);
+    return next;
+  }
+
+  private async createLivestockFollowUpTask(
+    farmId: string,
+    input: {
+      title: string;
+      description: string;
+      scheduledFor: Date;
+      sourceModule: string;
+      sourceRecordId: string;
+      linkedModule: string;
+      linkedEntityType: string;
+      linkedEntityId: string;
+      linkedEntityLabel: string;
+    }
+  ) {
+    const task = await this.prisma.agendaTask.create({
+      data: {
+        farmId,
+        title: input.title,
+        description: input.description,
+        priority: 'MEDIUM',
+        status: input.scheduledFor.getTime() < Date.now() ? 'EN_RETARD' : 'A_FAIRE',
+        scheduledFor: input.scheduledFor,
+        scheduledLabel: input.scheduledFor.toISOString().slice(0, 10),
+        sourceModule: input.sourceModule,
+        sourceRecordId: input.sourceRecordId,
+        linkedModule: input.linkedModule,
+        linkedEntityType: input.linkedEntityType,
+        linkedEntityId: input.linkedEntityId,
+        linkedEntityLabel: input.linkedEntityLabel
+      }
+    });
+
+    await this.reminderService.syncTaskReminders(task);
+    return task;
   }
 }

@@ -12,6 +12,12 @@ enum UserRole {
   PROPRIETAIRE
 }
 
+enum UserStatus {
+  PENDING
+  ACTIVE
+  DISABLED
+}
+
 enum FarmStatus {
   ACTIVE
   EN_PREPARATION
@@ -123,6 +129,12 @@ enum StockCategory {
   ENGRAIS
   EQUIPEMENTS
   MATERIELS
+  VACCINS
+  CARBURANT
+  PRODUITS_VETERINAIRES
+  PRODUITS_ELEVAGE
+  PRODUITS_PISCICOLES
+  PRODUITS_AGRICOLES
 }
 
 enum StockMovementType {
@@ -253,6 +265,33 @@ enum ReportType {
   RENTABILITE
 }
 
+enum AuditActionType {
+  CREATION
+  MODIFICATION
+  SUPPRESSION
+  ARCHIVAGE
+  CONNEXION
+  DECONNEXION
+  VENTE
+  PAIEMENT
+  TACHE
+  ALERTE
+  SYNC
+}
+
+enum AuditSource {
+  WEB
+  MOBILE
+  SYNCHRONISATION_HORS_LIGNE
+  SYSTEME
+}
+
+enum SyncActionStatus {
+  PENDING
+  APPLIED
+  FAILED
+}
+
 enum ReportFileFormat {
   PDF
   XLSX
@@ -297,6 +336,13 @@ model User {
   passwordHash   String
   role           UserRole
   isActive       Boolean  @default(true)
+  status         UserStatus @default(PENDING)
+  lastLoginAt    DateTime?
+  lastActivityAt DateTime?
+  disabledAt     DateTime?
+  disabledReason String?
+  passwordChangedAt DateTime?
+  forcePasswordReset Boolean @default(false)
   assignedFarms  Farm[]   @relation("FarmOwner")
   animalEvents   AnimalEvent[]
   financialTransactions FinancialTransaction[]
@@ -307,7 +353,12 @@ model User {
   productionRecords ProductionRecord[]
   productSales   ProductSale[]
   traceabilityEvents TraceabilityEvent[]
+  stockMovements StockMovement[]
   refreshSessions RefreshSession[]
+  auditLogs      AuditLog[]
+  loginEvents    UserConnectionEvent[]
+  updatedBusinessSettings FarmBusinessSettings[]
+  createdSyncActions OfflineSyncAction[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -362,6 +413,10 @@ model Farm {
   productStocks ProductStock[]
   productSales ProductSale[]
   traceabilityEvents TraceabilityEvent[]
+  businessSettings FarmBusinessSettings?
+  auditLogs    AuditLog[]
+  syncActions  OfflineSyncAction[]
+  userConnectionEvents UserConnectionEvent[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 }
@@ -572,15 +627,30 @@ model StockItem {
 }
 
 model StockMovement {
-  id           String            @id @default(cuid())
-  farmId       String
-  farm         Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  stockItemId  String
-  stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
-  movementType StockMovementType
-  quantity     Float
-  note         String?
-  createdAt    DateTime          @default(now())
+  id                    String      @id @default(cuid())
+  farmId                String
+  farm                  Farm        @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  stockItemId           String
+  stockItem             StockItem   @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  movementType          StockMovementType
+  quantity              Float
+  movementDate          DateTime    @default(now())
+  note                  String?
+  sourceModule          String?
+  sourceEntityType      String?
+  sourceEntityId        String?
+  sourceEntityLabel     String?
+  relatedLotId          String?
+  relatedPlotId         String?
+  relatedProductionRecordId String?
+  relatedSaleId         String?
+  relatedTaskId         String?
+  recordedByUserId      String?
+  recordedByUser        User?       @relation(fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  createdAt             DateTime    @default(now())
+
+  @@index([farmId, movementDate])
+  @@index([farmId, sourceModule, sourceEntityId])
 }
 
 model AnimalGroup {
@@ -863,4 +933,87 @@ model TraceabilityEvent {
   createdAt          DateTime          @default(now())
 
   @@index([farmId, eventDate])
+}
+
+model UserConnectionEvent {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farmId       String?
+  farm         Farm?     @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  actionType   AuditActionType @default(CONNEXION)
+  source       AuditSource @default(WEB)
+  userRole     UserRole
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([farmId, createdAt])
+}
+
+model AuditLog {
+  id           String    @id @default(cuid())
+  farmId       String?
+  farm         Farm?     @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userRole     UserRole?
+  module       String
+  entityType   String
+  entityId     String?
+  entityLabel  String?
+  actionType   AuditActionType
+  source       AuditSource @default(WEB)
+  oldValue     Json?
+  newValue     Json?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+
+  @@index([farmId, createdAt])
+  @@index([module, createdAt])
+  @@index([userId, createdAt])
+}
+
+model FarmBusinessSettings {
+  id                String    @id @default(cuid())
+  farmId            String    @unique
+  farm              Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  stockRules        Json?
+  livestockRules    Json?
+  fishRules         Json?
+  cropRules         Json?
+  reminderDefaults  Json?
+  units             Json?
+  defaultPrices     Json?
+  taskCatalog       Json?
+  alertRules        Json?
+  currency          String    @default("FCFA")
+  updatedByUserId   String?
+  updatedByUser     User?     @relation(fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model OfflineSyncAction {
+  id                String             @id @default(cuid())
+  farmId            String?
+  farm              Farm?              @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  userId            String?
+  user              User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  module            String
+  entityType        String
+  entityId          String?
+  actionType        AuditActionType
+  source            AuditSource        @default(MOBILE)
+  clientMutationId   String             @unique
+  payload           Json
+  status            SyncActionStatus    @default(PENDING)
+  errorMessage      String?
+  appliedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([farmId, status, createdAt])
+  @@index([userId, status, createdAt])
 }
