@@ -1,20 +1,43 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# FERM+
 
-# Run and deploy your AI Studio app
+FERM+ est une application de gestion agricole et d'elevage avec:
+- un frontend React + TypeScript + Vite
+- une API Laravel 13 dans `backend-laravel13-git`
+- des modules metier pour fermes, taches, alertes, stocks, finances, sanitaire, cultures, pisciculture, pondeuses et rapports
 
-This contains everything you need to run your app locally.
+## Structure retenue
 
-View your app in AI Studio: https://ai.studio/apps/89d42b30-12a7-4532-9050-8aafc1b6ffa5
+- `src/` : interface web
+- `public/` : assets publics, dont les sons d'alerte
+- `backend-laravel13-git/` : backend Laravel principal
+- `docs/` : documents fonctionnels et backlog MVP
 
-## Run Locally
+Le dossier `laravel13/` de prototype et les outils PHP embarques ont ete retires pour alleger le depot.
 
-**Prerequisites:**  Node.js
+## Frontend
 
+```bash
+npm install
+npm run dev
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Le frontend tourne par defaut sur `http://localhost:3000`.
+
+## Backend Laravel
+
+Depuis `backend-laravel13-git/`:
+
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+php artisan serve
+```
+
+L'API expose ses routes sur `/api/v1`.
+
+## Notes
+
+- Le frontend attend une API Laravel accessible via `VITE_FERM_API_URL` si elle n'est pas servie sur le meme domaine.
+- Les dossiers generes (`node_modules`, `dist`, `vendor`) et les artefacts locaux ne sont pas versionnes.

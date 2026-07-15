@@ -8,7 +8,11 @@ coverage/
 !.env.example
 .codex-remote-attachments/
 .git.broken
+assets/
+tools/
+laravel13/
 backend-laravel13-git/vendor/
 backend-laravel13-git/.git.backend/
 backend-laravel13-git/.env
 backend-laravel13-git/.phpunit.result.cache
+backend-laravel13-git/bootstrap/cache/*.php
