@@ -1,58 +1,102 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# FERM+ Backend Laravel
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API Laravel 13 du projet FERM+.
 
-## About Laravel
+## Role du backend
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Ce backend expose l'API metier consommee par le frontend React:
+- authentification administrateur / proprietaire
+- fermes, utilisateurs, taches, alertes, agenda
+- stocks, finances, sanitaire, cultures, pisciculture, pondeuses
+- audit et rapports
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Base d'URL API:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```text
+/api/v1
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Endpoint de sante:
 
-## Contributing
+```text
+GET /api/v1/health
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Prerequis production
 
-## Code of Conduct
+- PHP 8.3+
+- Composer
+- PostgreSQL recommande
+- extension OpenSSL
+- extension PDO correspondant a la base
+- serveur web Nginx ou Apache, ou plateforme type Railway / Render / VPS
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Installation locale
 
-## Security Vulnerabilities
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --force
+php artisan serve
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Variables importantes
 
-## License
+Exemple minimal pour la production:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```env
+APP_NAME="FERM+ API"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://api.ton-domaine.com
+APP_FRONTEND_URL=https://app.ton-domaine.com
+CORS_ALLOWED_ORIGINS=https://app.ton-domaine.com
+
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=ferm_plus
+DB_USERNAME=postgres
+DB_PASSWORD=secret
+DB_SSLMODE=prefer
+```
+
+## Deploiement
+
+Apres configuration des variables d'environnement:
+
+```bash
+composer install --no-dev --optimize-autoloader
+php artisan key:generate --force
+php artisan migrate --force
+php artisan optimize
+```
+
+Ou via le script:
+
+```bash
+composer deploy
+```
+
+## Frontend separe
+
+Si le frontend est deploye sur un autre domaine:
+- renseigner `APP_FRONTEND_URL`
+- renseigner `CORS_ALLOWED_ORIGINS`
+- configurer dans le frontend `VITE_FERM_API_URL`
+
+Exemple:
+
+```env
+VITE_FERM_API_URL=https://api.ton-domaine.com/api/v1
+```
+
+## Verification avant mise en ligne
+
+- `APP_DEBUG=false`
+- `APP_KEY` defini
+- migrations executees
+- dossier `storage/` accessible en ecriture
+- file de queue configuree si necessaire
+- `GET /api/v1/health` repond `ok`

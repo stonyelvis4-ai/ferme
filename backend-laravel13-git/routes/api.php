@@ -23,6 +23,17 @@ use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::get('/health', function () {
+        return response()->json([
+            'data' => [
+                'status' => 'ok',
+                'service' => 'ferm-plus-api',
+                'timestamp' => now()->toIso8601String(),
+                'environment' => app()->environment(),
+            ],
+        ]);
+    });
+
     Route::get('/auth/bootstrap-status', [AuthController::class, 'bootstrapStatus']);
     Route::post('/auth/register-admin', [AuthController::class, 'registerAdmin']);
     Route::post('/auth/login', [AuthController::class, 'login']);
