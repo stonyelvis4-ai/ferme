@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.codex-remote-attachments/
+.git.broken
+backend-laravel13-git/vendor/
+backend-laravel13-git/.git.backend/
+backend-laravel13-git/.env
+backend-laravel13-git/.phpunit.result.cache

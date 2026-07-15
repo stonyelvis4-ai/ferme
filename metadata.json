@@ -1,0 +1,6 @@
+{
+  "name": "Fermé+",
+  "description": "Application de gestion agricole et d’élevage centralisée, interconnectée et sécurisée.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
