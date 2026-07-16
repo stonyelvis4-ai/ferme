@@ -52,6 +52,12 @@ class FinanceController extends Controller
 
     public function destroy(FinancialTransaction $financialTransaction): JsonResponse
     {
+        abort_if(
+            $financialTransaction->source_module !== 'Finances',
+            422,
+            'Only manual finance transactions can be deleted here.'
+        );
+
         $financialTransaction->delete();
 
         return response()->json(['message' => 'Transaction deleted.']);

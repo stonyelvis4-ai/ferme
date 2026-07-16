@@ -11,70 +11,81 @@ use App\Models\User;
 use App\Models\UserLoginHistory;
 use App\Services\AuditService;
 use App\Services\FarmService;
+use Illuminate\Contracts\Cookie\QueueingFactory as CookieFactory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Symfony\Component\HttpFoundation\Cookie;
 
 class AuthController extends Controller
 {
     public function __construct(
         private readonly AuditService $auditService,
-        private readonly FarmService $farmService
-    )
-    {
-    }
-
-    public function bootstrapStatus(): JsonResponse
-    {
-        return response()->json([
-            'data' => [
-                'has_admin' => User::where('role', Role::Admin)->exists(),
-            ],
-        ]);
+        private readonly FarmService $farmService,
+        private readonly CookieFactory $cookies
+    ) {
     }
 
     public function registerAdmin(RegisterAdminRequest $request): JsonResponse
     {
-        if (User::where('role', Role::Admin)->exists()) {
-            return response()->json([
-                'message' => 'L’inscription administrateur est verrouillée. Connectez-vous avec un compte existant.',
-            ], 403);
-        }
-
         $data = $request->validated();
 
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'role' => Role::Admin,
-            'account_status' => 'active',
-            'is_active' => true,
-        ]);
+        $user = DB::transaction(function () use ($data) {
+            $existingAdmin = User::query()
+                ->where('role', Role::Admin)
+                ->lockForUpdate()
+                ->exists();
 
-        $this->farmService->createForAdministrator($user, [
-            'name' => 'FERM+',
-            'slug' => 'ferm-plus',
-            'manager_name' => $user->name,
-            'contact_email' => $user->email,
-            'currency' => 'FCFA',
-            'area_unit' => 'ha',
-        ]);
+            if ($existingAdmin) {
+                abort(response()->json([
+                    'message' => 'L’inscription administrateur est verrouillée. Connectez-vous avec un compte existant.',
+                ], 403));
+            }
 
-        $user->refresh();
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => Role::Admin,
+                'account_status' => 'active',
+                'is_active' => true,
+            ]);
 
-        $this->auditService->record([
-            'farm_id' => $user->farm_id,
-            'user_id' => $user->id,
-            'module' => 'auth',
-            'entity_type' => 'user',
-            'entity_id' => (string) $user->id,
-            'action' => 'admin_registered',
-            'source' => 'web',
-        ]);
+            $this->farmService->createForAdministrator($user, [
+                'name' => 'FERM+',
+                'slug' => 'ferm-plus',
+                'manager_name' => $user->name,
+                'contact_email' => $user->email,
+                'currency' => 'FCFA',
+                'area_unit' => 'ha',
+            ]);
 
-        return response()->json(['message' => 'Compte administrateur créé.', 'user' => $user], 201);
+            $user->refresh();
+
+            $this->auditService->record([
+                'farm_id' => $user->farm_id,
+                'user_id' => $user->id,
+                'module' => 'auth',
+                'entity_type' => 'user',
+                'entity_id' => (string) $user->id,
+                'action' => 'admin_registered',
+                'source' => 'web',
+            ]);
+
+            return $user;
+        });
+
+        $token = $user->createToken('ferm-plus')->plainTextToken;
+
+        return response()
+            ->json([
+                'message' => 'Compte administrateur créé.',
+                'token' => 'cookie-session',
+                'user' => $user,
+            ], 201)
+            ->cookie($this->makeApiTokenCookie($token));
     }
 
     public function login(LoginRequest $request): JsonResponse
@@ -125,14 +136,26 @@ class AuthController extends Controller
             'source' => 'web',
         ]);
 
-        return response()->json(['message' => 'Connexion réussie.', 'token' => $token, 'user' => $user]);
+        return response()
+            ->json([
+                'message' => 'Connexion réussie.',
+                'token' => 'cookie-session',
+                'user' => $user,
+            ])
+            ->cookie($this->makeApiTokenCookie($token));
     }
 
     public function logout(Request $request): JsonResponse
     {
         $request->user()?->currentAccessToken()?->delete();
 
-        return response()->json(['message' => 'Déconnexion réussie.']);
+        return response()
+            ->json(['message' => 'Déconnexion réussie.'])
+            ->withoutCookie(
+                $this->apiTokenCookieName(),
+                config('session.path', '/'),
+                config('session.domain')
+            );
     }
 
     public function changePassword(ChangePasswordRequest $request): JsonResponse
@@ -147,6 +170,9 @@ class AuthController extends Controller
             'password' => Hash::make($request->validated('password')),
         ])->save();
 
+        // Invalidate every existing token so no old session survives the rotation.
+        $user->tokens()->delete();
+
         $this->auditService->record([
             'farm_id' => $user->farm_id,
             'user_id' => $user->id,
@@ -157,6 +183,32 @@ class AuthController extends Controller
             'source' => 'web',
         ]);
 
-        return response()->json(['message' => 'Mot de passe mis à jour avec succès.']);
+        return response()
+            ->json(['message' => 'Mot de passe mis à jour avec succès.'])
+            ->withoutCookie(
+                $this->apiTokenCookieName(),
+                config('session.path', '/'),
+                config('session.domain')
+            );
+    }
+
+    private function makeApiTokenCookie(string $token): Cookie
+    {
+        return $this->cookies->make(
+            $this->apiTokenCookieName(),
+            $token,
+            (int) config('session.lifetime', 120),
+            config('session.path', '/'),
+            config('session.domain'),
+            (bool) config('session.secure', false),
+            true,
+            false,
+            (string) config('session.api_token_cookie_same_site', config('session.same_site', 'lax'))
+        );
+    }
+
+    private function apiTokenCookieName(): string
+    {
+        return (string) config('session.api_token_cookie', 'fermplus_api_token');
     }
 }

@@ -6,6 +6,7 @@ use App\Models\EggProduction;
 use App\Models\EggSale;
 use App\Models\FarmSetting;
 use App\Models\LayerBatch;
+use App\Models\LayerFeeding;
 use App\Models\StockItem;
 use Illuminate\Support\Facades\DB;
 
@@ -124,7 +125,7 @@ class LayerService
             $stockItem = StockItem::firstOrCreate(
                 [
                     'farm_id' => $data['farm_id'],
-                    'name' => 'Œufs',
+                    'name' => 'Oeufs',
                 ],
                 [
                     'category' => 'production',
@@ -173,7 +174,7 @@ class LayerService
                 ->findOrFail($data['layer_batch_id']);
             $stockItem = StockItem::query()
                 ->where('farm_id', $data['farm_id'])
-                ->where('name', 'Œufs')
+                ->where('name', 'Oeufs')
                 ->firstOrFail();
 
             $trays = $data['trays_sold'];
@@ -199,8 +200,8 @@ class LayerService
                 'farm_id' => $data['farm_id'],
                 'type' => 'income',
                 'amount' => $amountPaid,
-                'category' => 'vente œufs',
-                'description' => sprintf('Vente de %d plateaux à %s', $trays, $data['customer_name']),
+                'category' => 'vente oeufs',
+                'description' => sprintf('Vente de %d plateaux a %s', $trays, $data['customer_name']),
                 'source_module' => 'pondeuses',
                 'source_entity_type' => 'egg_sale',
                 'source_entity_id' => null,
@@ -251,10 +252,100 @@ class LayerService
         });
     }
 
+    public function recordFeeding(array $data): LayerFeeding
+    {
+        return DB::transaction(function () use ($data) {
+            $batch = LayerBatch::query()
+                ->where('farm_id', $data['farm_id'])
+                ->findOrFail($data['layer_batch_id']);
+
+            $stockItem = StockItem::query()
+                ->where('farm_id', $data['farm_id'])
+                ->findOrFail($data['stock_item_id']);
+
+            $quantity = (float) $data['quantity'];
+            $unitCost = (float) ($stockItem->unit_cost ?? 0);
+            $totalCost = round($quantity * $unitCost, 2);
+
+            $movement = $this->stockService->recordMovement([
+                'farm_id' => $data['farm_id'],
+                'stock_item_id' => $stockItem->id,
+                'type' => 'out',
+                'quantity' => $quantity,
+                'unit_cost' => $unitCost,
+                'source_module' => 'elevage',
+                'source_entity_type' => 'layer_feeding',
+                'source_entity_id' => null,
+                'operation_id' => null,
+            ]);
+
+            $transaction = $totalCost > 0
+                ? $this->financeService->createTransaction([
+                    'farm_id' => $data['farm_id'],
+                    'type' => 'expense',
+                    'amount' => $totalCost,
+                    'category' => 'Alimentation animale',
+                    'description' => sprintf('Distribution de %s %s de %s au lot %s', $quantity, $stockItem->unit, $stockItem->name, $batch->name),
+                    'source_module' => 'elevage',
+                    'source_entity_type' => 'layer_feeding',
+                    'source_entity_id' => null,
+                    'operation_id' => null,
+                    'occurred_at' => $data['feeding_date'],
+                ])
+                : null;
+
+            $feeding = LayerFeeding::create([
+                'farm_id' => $data['farm_id'],
+                'layer_batch_id' => $batch->id,
+                'stock_item_id' => $stockItem->id,
+                'feeding_date' => $data['feeding_date'],
+                'feeding_time' => $data['feeding_time'] ?? null,
+                'quantity' => $quantity,
+                'unit' => $stockItem->unit,
+                'unit_cost' => $unitCost,
+                'total_cost' => $totalCost,
+                'notes' => $data['notes'] ?? null,
+                'stock_movement_id' => $movement->id,
+                'financial_transaction_id' => $transaction?->id,
+            ]);
+
+            $movement->forceFill([
+                'source_entity_id' => (string) $feeding->id,
+                'operation_id' => 'feeding-' . $feeding->id,
+            ])->save();
+
+            if ($transaction) {
+                $transaction->forceFill([
+                    'source_entity_id' => (string) $feeding->id,
+                    'operation_id' => 'feeding-' . $feeding->id,
+                ])->save();
+            }
+
+            $this->auditService->record([
+                'farm_id' => $data['farm_id'],
+                'user_id' => request()->user()?->id,
+                'module' => 'elevage',
+                'entity_type' => 'layer_feeding',
+                'entity_id' => (string) $feeding->id,
+                'action' => 'feeding_recorded',
+                'new_value' => json_encode([
+                    'layer_batch_id' => $batch->id,
+                    'stock_item_id' => $stockItem->id,
+                    'quantity' => $quantity,
+                    'total_cost' => $totalCost,
+                ]),
+                'source' => 'web',
+            ]);
+
+            return $feeding->load(['batch:id,name', 'stockItem:id,name,unit']);
+        });
+    }
+
     public function summaryForFarm(int $farmId): array
     {
         $productions = EggProduction::query()->where('farm_id', $farmId);
         $sales = EggSale::query()->where('farm_id', $farmId);
+        $feedings = LayerFeeding::query()->where('farm_id', $farmId);
 
         return [
             'batches' => LayerBatch::query()->where('farm_id', $farmId)->count(),
@@ -266,7 +357,11 @@ class LayerService
             'remaining_due_total' => (float) (clone $sales)->sum('remaining_due'),
             'mortalite_total' => (int) (clone $productions)->sum('mortality'),
             'broken_total' => (int) (clone $productions)->sum('broken_eggs'),
-            'stock_oeufs' => (int) (StockItem::query()->where('farm_id', $farmId)->where('name', 'Œufs')->value('current_quantity') ?? 0),
+            'feeding_quantity_total' => (float) (clone $feedings)->sum('quantity'),
+            'feeding_cost_total' => (float) (clone $feedings)->sum('total_cost'),
+            'feeding_cost_last_7_days' => (float) (clone $feedings)->whereDate('feeding_date', '>=', now()->subDays(6)->toDateString())->sum('total_cost'),
+            'feeding_quantity_today' => (float) (clone $feedings)->whereDate('feeding_date', now()->toDateString())->sum('quantity'),
+            'stock_oeufs' => (int) (StockItem::query()->where('farm_id', $farmId)->where('name', 'Oeufs')->value('current_quantity') ?? 0),
         ];
     }
 }

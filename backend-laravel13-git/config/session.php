@@ -201,6 +201,10 @@ return [
 
     'same_site' => env('SESSION_SAME_SITE', 'lax'),
 
+    'api_token_cookie' => env('API_TOKEN_COOKIE', 'fermplus_api_token'),
+
+    'api_token_cookie_same_site' => env('API_TOKEN_COOKIE_SAME_SITE', env('SESSION_SAME_SITE', 'lax')),
+
     /*
     |--------------------------------------------------------------------------
     | Partitioned Cookies

@@ -42,6 +42,21 @@ export interface EggProduction {
   stockCount: number;
 }
 
+export interface AnimalFeeding {
+  id: string;
+  lotId: string;
+  lotName?: string;
+  articleId: string;
+  articleName: string;
+  date: string;
+  time?: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  totalCost: number;
+  notes?: string;
+}
+
 export interface FishBassin {
   id: string;
   name: string;

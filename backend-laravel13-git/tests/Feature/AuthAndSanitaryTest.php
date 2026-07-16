@@ -16,15 +16,6 @@ class AuthAndSanitaryTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_bootstrap_status_reports_when_no_admin_exists(): void
-    {
-        $response = $this->getJson('/api/v1/auth/bootstrap-status');
-
-        $response
-            ->assertOk()
-            ->assertJsonPath('data.has_admin', false);
-    }
-
     public function test_register_admin_is_locked_when_an_admin_already_exists(): void
     {
         User::factory()->create([
@@ -40,6 +31,42 @@ class AuthAndSanitaryTest extends TestCase
         ]);
 
         $response->assertStatus(403);
+    }
+
+    public function test_password_change_revokes_all_tokens(): void
+    {
+        $admin = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+
+        $farm = Farm::create([
+            'name' => 'Ferme Securite',
+            'slug' => 'ferme-securite',
+            'administrator_id' => $admin->id,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => $admin->name,
+            'contact_email' => $admin->email,
+        ]);
+
+        $admin->forceFill(['farm_id' => $farm->id])->save();
+
+        $admin->createToken('ancienne-session-1');
+        $admin->createToken('ancienne-session-2');
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/v1/auth/password', [
+            'current_password' => 'password',
+            'password' => 'Admin@12345',
+            'password_confirmation' => 'Admin@12345',
+        ]);
+
+        $response->assertOk();
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
     public function test_authenticated_user_can_list_sanitary_treatments_for_own_farm(): void
@@ -84,7 +111,7 @@ class AuthAndSanitaryTest extends TestCase
             ->assertJsonPath('data.0.name', 'Vitamine croissance');
     }
 
-    public function test_user_assignment_is_limited_to_a_single_farm(): void
+    public function test_user_assignment_rejects_other_farms(): void
     {
         $admin = User::factory()->create([
             'role' => Role::Admin,
@@ -135,17 +162,16 @@ class AuthAndSanitaryTest extends TestCase
         ]);
 
         $response
-            ->assertOk()
-            ->assertJsonPath('data.farm_id', $secondFarm->id)
-            ->assertJsonCount(1, 'data.assigned_farms');
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['farm_ids.0']);
 
         $this->assertDatabaseHas('farm_user_assignments', [
-            'farm_id' => $secondFarm->id,
+            'farm_id' => $firstFarm->id,
             'user_id' => $owner->id,
         ]);
 
         $this->assertDatabaseMissing('farm_user_assignments', [
-            'farm_id' => $firstFarm->id,
+            'farm_id' => $secondFarm->id,
             'user_id' => $owner->id,
         ]);
     }

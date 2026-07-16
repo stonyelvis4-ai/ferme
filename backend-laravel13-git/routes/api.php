@@ -24,21 +24,25 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::get('/health', function () {
+        $data = [
+            'status' => 'ok',
+            'service' => 'ferm-plus-api',
+            'timestamp' => now()->toIso8601String(),
+        ];
+
+        if (app()->environment(['local', 'testing'])) {
+            $data['environment'] = app()->environment();
+        }
+
         return response()->json([
-            'data' => [
-                'status' => 'ok',
-                'service' => 'ferm-plus-api',
-                'timestamp' => now()->toIso8601String(),
-                'environment' => app()->environment(),
-            ],
+            'data' => $data,
         ]);
     });
 
-    Route::get('/auth/bootstrap-status', [AuthController::class, 'bootstrapStatus']);
     Route::post('/auth/register-admin', [AuthController::class, 'registerAdmin']);
-    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
 
-    Route::middleware(['auth:sanctum'])->group(function () {
+    Route::middleware(['api.cookie.token', 'auth:sanctum'])->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::post('/auth/password', [AuthController::class, 'changePassword']);
 
@@ -102,6 +106,7 @@ Route::prefix('v1')->group(function () {
                 Route::delete('/pondeuses/{pondeuse}', [PondeusesController::class, 'destroy']);
                 Route::post('/pondeuses/productions', [PondeusesController::class, 'production']);
                 Route::post('/pondeuses/sales', [PondeusesController::class, 'sale']);
+                Route::post('/pondeuses/feedings', [PondeusesController::class, 'feeding']);
                 Route::post('/cultures', [CulturesController::class, 'store']);
                 Route::patch('/cultures/{culture}', [CulturesController::class, 'update']);
                 Route::delete('/cultures/{culture}', [CulturesController::class, 'destroy']);

@@ -10,6 +10,7 @@ import {
   Campaign,
   CultureParcelle,
   EggProduction,
+  AnimalFeeding,
   FarmSettings,
   FinanceTransaction,
   FishBassin,
@@ -171,6 +172,29 @@ export function mapEggProductions(data: unknown[]): EggProduction[] {
         stockCount: stock,
       };
     });
+}
+
+export function mapAnimalFeedings(data: unknown[]): AnimalFeeding[] {
+  return data.map((item, index) => {
+    const feeding = item as Record<string, unknown>;
+    const stockItem = (feeding.stock_item ?? feeding.stockItem ?? {}) as Record<string, unknown>;
+    const batch = (feeding.batch ?? {}) as Record<string, unknown>;
+
+    return {
+      id: toText(feeding.id, `feed-${index + 1}`),
+      lotId: toText(feeding.layer_batch_id ?? feeding.lotId, ''),
+      lotName: toText(batch.name ?? feeding.lot_name ?? feeding.lotName, ''),
+      articleId: toText(feeding.stock_item_id ?? feeding.articleId, ''),
+      articleName: labelOrFallback(stockItem.name ?? feeding.article_name ?? feeding.articleName, 'Aliment'),
+      date: toDate(feeding.feeding_date ?? feeding.date),
+      time: toText(feeding.feeding_time ?? feeding.time, ''),
+      quantity: toNumber(feeding.quantity, 0),
+      unit: labelOrFallback(feeding.unit ?? stockItem.unit, 'kg'),
+      unitCost: toNumber(feeding.unit_cost ?? feeding.unitCost, 0),
+      totalCost: toNumber(feeding.total_cost ?? feeding.totalCost, 0),
+      notes: toText(feeding.notes, ''),
+    };
+  });
 }
 
 export function mapFishBassins(data: unknown[]): FishBassin[] {

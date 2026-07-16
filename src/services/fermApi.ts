@@ -4,6 +4,21 @@
  */
 
 const DEFAULT_API_BASE_URL = '/api/v1';
+const AUTH_TOKEN_KEY = 'fermplus_token';
+const AUTH_USER_KEY = 'fermplus_user';
+const COOKIE_AUTH_MARKER = 'cookie-session';
+
+function readSessionValue(key: string) {
+  return sessionStorage.getItem(key);
+}
+
+function writeSessionValue(key: string, value: string) {
+  sessionStorage.setItem(key, value);
+}
+
+function removeSessionValue(key: string) {
+  sessionStorage.removeItem(key);
+}
 
 export function getApiBaseUrl() {
   return (
@@ -14,30 +29,52 @@ export function getApiBaseUrl() {
 }
 
 export function getStoredAuthToken() {
-  return localStorage.getItem('fermplus_token') ?? '';
+  const sessionToken = readSessionValue(AUTH_TOKEN_KEY);
+  if (sessionToken) return sessionToken;
+
+  const legacyToken = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (legacyToken) {
+    writeSessionValue(AUTH_TOKEN_KEY, legacyToken);
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+  }
+
+  return legacyToken ?? '';
 }
 
 export function setStoredAuthToken(token: string) {
-  localStorage.setItem('fermplus_token', token);
+  writeSessionValue(AUTH_TOKEN_KEY, token || COOKIE_AUTH_MARKER);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
 export function clearStoredAuthToken() {
-  localStorage.removeItem('fermplus_token');
-  localStorage.removeItem('fermplus_user');
+  removeSessionValue(AUTH_TOKEN_KEY);
+  removeSessionValue(AUTH_USER_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+}
+
+function shouldSendBearerToken(token?: string) {
+  return Boolean(token && token !== COOKIE_AUTH_MARKER);
 }
 
 export function getStoredAuthUser<T = AuthUser>() {
-  const raw = localStorage.getItem('fermplus_user');
+  const raw = readSessionValue(AUTH_USER_KEY) ?? localStorage.getItem(AUTH_USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as T;
+    const user = JSON.parse(raw) as T;
+    if (!readSessionValue(AUTH_USER_KEY)) {
+      writeSessionValue(AUTH_USER_KEY, raw);
+      localStorage.removeItem(AUTH_USER_KEY);
+    }
+    return user;
   } catch {
     return null;
   }
 }
 
 export function setStoredAuthUser(user: AuthUser) {
-  localStorage.setItem('fermplus_user', JSON.stringify(user));
+  writeSessionValue(AUTH_USER_KEY, JSON.stringify(user));
+  localStorage.removeItem(AUTH_USER_KEY);
 }
 
 async function requestJson<T>(
@@ -50,10 +87,11 @@ async function requestJson<T>(
   try {
     response = await fetch(`${getApiBaseUrl()}${path}`, {
       ...options,
+      credentials: 'include',
       headers: {
         Accept: 'application/json',
         ...(!(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(shouldSendBearerToken(token) ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers ?? {}),
       },
     });
@@ -110,15 +148,12 @@ export type WorkspaceSnapshot = {
   stocks: unknown;
   finances: unknown;
   sanitary: unknown;
+  layers: unknown;
   ponds: unknown;
   cultures: unknown;
   infrastructures: unknown;
   reports: unknown;
   sync: unknown;
-};
-
-export type BootstrapStatus = {
-  has_admin: boolean;
 };
 
 export async function login(payload: { email: string; password: string }) {
@@ -133,10 +168,6 @@ export async function registerAdmin(payload: { name: string; email: string; pass
     method: 'POST',
     body: JSON.stringify(payload),
   }, '');
-}
-
-export async function getBootstrapStatus() {
-  return requestJson<ApiResponse<BootstrapStatus>>('/auth/bootstrap-status', {}, '');
 }
 
 export async function logout(token?: string) {
@@ -165,6 +196,7 @@ export async function loadWorkspaceSnapshot(token: string): Promise<WorkspaceSna
     stocks,
     finances,
     sanitary,
+    layers,
     ponds,
     cultures,
     infrastructures,
@@ -181,6 +213,7 @@ export async function loadWorkspaceSnapshot(token: string): Promise<WorkspaceSna
     requestJson<ApiResponse<{ items?: unknown[]; movements?: unknown[] }>>('/stocks', {}, token),
     requestJson<ApiResponse<unknown[]>>('/finances', {}, token),
     requestJson<ApiResponse<unknown[]>>('/sanitary', {}, token),
+    requestJson<ApiResponse<unknown>>('/pondeuses', {}, token),
     requestJson<ApiResponse<unknown>>('/pisciculture', {}, token),
     requestJson<ApiResponse<unknown[]>>('/cultures', {}, token),
     requestJson<ApiResponse<Record<string, unknown[]>>>('/infrastructures', {}, token),
@@ -202,6 +235,7 @@ export async function loadWorkspaceSnapshot(token: string): Promise<WorkspaceSna
     stocks: unwrap(stocks),
     finances: unwrap(finances),
     sanitary: unwrap(sanitary),
+    layers: unwrap(layers),
     ponds: unwrap(ponds),
     cultures: unwrap(cultures),
     infrastructures: unwrap(infrastructures),

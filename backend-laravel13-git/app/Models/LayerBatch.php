@@ -50,4 +50,9 @@ class LayerBatch extends Model
     {
         return $this->hasMany(EggSale::class, 'layer_batch_id');
     }
+
+    public function feedings(): HasMany
+    {
+        return $this->hasMany(LayerFeeding::class, 'layer_batch_id');
+    }
 }

@@ -35,6 +35,7 @@ import {
 import {
   Lot,
   EggProduction,
+  AnimalFeeding,
   FishBassin,
   CultureParcelle,
   Campaign,
@@ -77,7 +78,6 @@ import AuditView from './components/AuditView';
 import SettingsView from './components/SettingsView';
 import AuthGate from './components/AuthGate';
 import {
-  getBootstrapStatus,
   changePassword,
   clearStoredAuthToken,
   getStoredAuthToken,
@@ -98,6 +98,7 @@ import {
 } from './services/fermApi';
 import {
   mapAlerts,
+  mapAnimalFeedings,
   mapAuditLogs,
   mapArticles,
   mapAuthUser,
@@ -130,6 +131,7 @@ type WorkspaceLocalCache = {
   buildings: Building[];
   lots: Lot[];
   eggProductions: EggProduction[];
+  animalFeedings: AnimalFeeding[];
   fishBassins: FishBassin[];
   parcelles: CultureParcelle[];
   campaigns: Campaign[];
@@ -258,6 +260,22 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
     synced = true;
   }
 
+  for (const feeding of localCache.animalFeedings.filter((item) => !isBackendId(item.id))) {
+    const backendLotId = localToBackendIds.get(feeding.lotId) ?? feeding.lotId;
+    const backendArticleId = localToBackendIds.get(feeding.articleId) ?? feeding.articleId;
+    if (!isBackendId(backendLotId) || !isBackendId(backendArticleId) || feeding.quantity <= 0) continue;
+    await postJson('/pondeuses/feedings', {
+      farm_id: numericFarmId,
+      layer_batch_id: Number(backendLotId),
+      stock_item_id: Number(backendArticleId),
+      feeding_date: feeding.date,
+      feeding_time: feeding.time || null,
+      quantity: feeding.quantity,
+      notes: feeding.notes ?? '',
+    }, token);
+    synced = true;
+  }
+
   for (const bassin of localCache.fishBassins.filter((item) => !isBackendId(item.id))) {
     const response = await postJson('/pisciculture', {
       farm_id: numericFarmId,
@@ -369,7 +387,7 @@ export default function App() {
   const [authToken, setAuthTokenState] = useState<string>(() => getStoredAuthToken());
   const [authReady, setAuthReady] = useState<boolean>(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [allowRegisterAdmin, setAllowRegisterAdmin] = useState<boolean>(false);
+  const [allowRegisterAdmin, setAllowRegisterAdmin] = useState<boolean>(true);
   const [authBusy, setAuthBusy] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -398,6 +416,7 @@ export default function App() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
   const [eggProductions, setEggProductions] = useState<EggProduction[]>([]);
+  const [animalFeedings, setAnimalFeedings] = useState<AnimalFeeding[]>([]);
   const [fishBassins, setFishBassins] = useState<FishBassin[]>([]);
   const [parcelles, setParcelles] = useState<CultureParcelle[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -462,12 +481,14 @@ export default function App() {
       const stocksData = getData(snapshot.stocks);
       const financesData = getData(snapshot.finances);
       const sanitaryData = getData(snapshot.sanitary);
+      const layersData = getData(snapshot.layers);
       const pondsData = getData(snapshot.ponds);
       const culturesData = getData(snapshot.cultures);
       const infraData = getData(snapshot.infrastructures);
       const reportsData = getData(snapshot.reports);
       const syncData = getData(snapshot.sync);
 
+      const layersObject = (layersData && typeof layersData === 'object' && !Array.isArray(layersData)) ? (layersData as Record<string, unknown>) : {};
       const pondObject = (pondsData && typeof pondsData === 'object' && !Array.isArray(pondsData)) ? (pondsData as Record<string, unknown>) : {};
       const culturesObject = (culturesData && typeof culturesData === 'object' && !Array.isArray(culturesData)) ? (culturesData as Record<string, unknown>) : {};
       const stocksObject = (stocksData && typeof stocksData === 'object' && !Array.isArray(stocksData)) ? (stocksData as Record<string, unknown>) : {};
@@ -485,8 +506,9 @@ export default function App() {
         setAuthUser(currentBackendUser);
       }
 
-      const mappedLots = mapLots(((pondObject.batches ?? []) as unknown[]) ?? []);
-      const mappedEggProductions = mapEggProductions(((pondObject.productions ?? []) as unknown[]) ?? []);
+      const mappedLots = mapLots(((layersObject.batches ?? []) as unknown[]) ?? []);
+      const mappedEggProductions = mapEggProductions(((layersObject.productions ?? []) as unknown[]) ?? []);
+      const mappedAnimalFeedings = mapAnimalFeedings(((layersObject.feedings ?? []) as unknown[]) ?? []);
       const mappedBassins = mapFishBassins(((pondObject.ponds ?? pondObject.data ?? []) as unknown[]) ?? []);
       const rawPlots = ((culturesObject.plots ?? culturesObject.data ?? []) as unknown[]) ?? [];
       const rawCrops = ((culturesObject.crops ?? culturesObject.data ?? []) as unknown[]) ?? [];
@@ -537,8 +559,9 @@ export default function App() {
       setUsers(pickMapped(usersData, apiUsers, localCache?.users ?? apiUsers));
       setSettings(pickValue(settingsData ? farmSetting : undefined, localCache?.settings ?? farmSetting));
       setBuildings(pickMapped(infraObject.buildings, mappedBuildings, localCache?.buildings ?? mappedBuildings));
-      setLots(pickMapped(pondObject.batches, mappedLots, localCache?.lots ?? mappedLots));
-      setEggProductions(pickMapped(pondObject.productions, mappedEggProductions, localCache?.eggProductions ?? mappedEggProductions));
+      setLots(pickMapped(layersObject.batches, mappedLots, localCache?.lots ?? mappedLots));
+      setEggProductions(pickMapped(layersObject.productions, mappedEggProductions, localCache?.eggProductions ?? mappedEggProductions));
+      setAnimalFeedings(pickMapped(layersObject.feedings, mappedAnimalFeedings, localCache?.animalFeedings ?? mappedAnimalFeedings));
       setFishBassins(pickMapped(pondObject.ponds ?? pondObject.data, mappedBassins, localCache?.fishBassins ?? mappedBassins));
       setParcelles(pickMapped(culturesObject.plots ?? culturesObject.data, mappedParcelles, localCache?.parcelles ?? mappedParcelles));
       setCampaigns(pickMapped(culturesObject.crops ?? culturesObject.data, mappedCampaigns, localCache?.campaigns ?? mappedCampaigns));
@@ -568,6 +591,16 @@ export default function App() {
       console.error('Workspace hydration failed:', error);
       const fallbackUser = getStoredAuthUser<AuthUser>() ?? authUser;
       const localCache = readWorkspaceCache(fallbackUser?.id);
+      const normalizedMessage = error instanceof Error ? error.message.toLowerCase() : '';
+
+      if (
+        normalizedMessage.includes('unauthenticated') ||
+        normalizedMessage.includes('unauthorized') ||
+        normalizedMessage.includes('forbidden')
+      ) {
+        resetToLogin(error instanceof Error ? error.message : 'Session expirÃ©e.');
+        return;
+      }
 
       if (localCache) {
         setFarms(localCache.farms);
@@ -576,6 +609,7 @@ export default function App() {
         setBuildings(localCache.buildings);
         setLots(localCache.lots);
         setEggProductions(localCache.eggProductions);
+        setAnimalFeedings(localCache.animalFeedings);
         setFishBassins(localCache.fishBassins);
         setParcelles(localCache.parcelles);
         setCampaigns(localCache.campaigns);
@@ -603,13 +637,6 @@ export default function App() {
 
   useEffect(() => {
     const boot = async () => {
-      try {
-        const response = await getBootstrapStatus();
-        setAllowRegisterAdmin(!(response.data?.has_admin ?? response.has_admin ?? false));
-      } catch {
-        setAllowRegisterAdmin(false);
-      }
-
       const token = getStoredAuthToken();
       const storedUser = getStoredAuthUser<AuthUser>();
 
@@ -686,6 +713,7 @@ export default function App() {
       buildings,
       lots,
       eggProductions,
+      animalFeedings,
       fishBassins,
       parcelles,
       campaigns,
@@ -702,6 +730,7 @@ export default function App() {
     auditLogs,
     authReady,
     authToken,
+    animalFeedings,
     authUser?.id,
     buildings,
     campaigns,
@@ -739,10 +768,10 @@ export default function App() {
       const response = await login({ email: loginEmail, password: loginPassword });
       const user = (response.user ?? response.data?.user) as AuthUser | undefined;
       const token = (response.token ?? response.data?.token) as string | undefined;
-      if (!user || !token) {
+      if (!user) {
         throw new Error('Réponse d’authentification invalide.');
       }
-      handleAuthSuccess(token, user);
+      handleAuthSuccess(token ?? 'cookie-session', user);
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Connexion impossible.');
     } finally {
@@ -752,11 +781,6 @@ export default function App() {
 
   const handleRegisterAdmin = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!allowRegisterAdmin) {
-      setAuthMode('login');
-      setAuthError('L’inscription administrateur est déjà verrouillée pour cette plateforme.');
-      return;
-    }
     if (registerPassword !== registerConfirmPassword) {
       setAuthError('Les mots de passe ne correspondent pas.');
       return;
@@ -773,12 +797,10 @@ export default function App() {
       });
       const user = (response.user ?? response.data?.user) as AuthUser | undefined;
       const token = (response.token ?? response.data?.token) as string | undefined;
-      if (user && token) {
-        handleAuthSuccess(token, user);
-      } else {
-        setAuthMode('login');
-        setAuthError('Compte administrateur créé. Vous pouvez maintenant vous connecter.');
+      if (!user) {
+        throw new Error('Réponse de création de compte invalide.');
       }
+      handleAuthSuccess(token ?? 'cookie-session', user);
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Création du compte impossible.');
     } finally {
@@ -1186,7 +1208,139 @@ export default function App() {
     );
   };
 
-  // 4. Sell Eggs
+  // 4. Feed Livestock from Stock
+  const handleRecordFeeding = async (lotId: string, articleId: string, quantity: number, feedingDate: string, feedingTime?: string, notes?: string) => {
+    const targetLot = lots.find((lot) => lot.id === lotId);
+    const targetArticle = articles.find((article) => article.id === articleId);
+
+    if (!targetLot || !targetArticle || quantity <= 0) return;
+    if (targetArticle.quantity < quantity) {
+      alert(`Stock insuffisant pour ${targetArticle.name}. Disponible : ${targetArticle.quantity} ${targetArticle.unit}.`);
+      return;
+    }
+
+    const unitCost = targetArticle.unitCost ?? 0;
+    const totalCost = quantity * unitCost;
+    const feedingId = generateId('feed');
+    const movementId = generateId('mov');
+    const normalizedTime = feedingTime?.trim() || undefined;
+
+    const newFeeding: AnimalFeeding = {
+      id: feedingId,
+      lotId,
+      lotName: targetLot.name,
+      articleId,
+      articleName: targetArticle.name,
+      date: feedingDate,
+      time: normalizedTime,
+      quantity,
+      unit: targetArticle.unit,
+      unitCost,
+      totalCost,
+      notes: notes?.trim() || '',
+    };
+
+    setAnimalFeedings((prev) =>
+      [newFeeding, ...prev].sort((left, right) => {
+        const leftStamp = new Date(`${left.date}T${left.time || '00:00'}:00`).getTime();
+        const rightStamp = new Date(`${right.date}T${right.time || '00:00'}:00`).getTime();
+        return rightStamp - leftStamp;
+      })
+    );
+
+    setArticles((prev) =>
+      prev.map((article) => {
+        if (article.id !== articleId) return article;
+        const nextQuantity = Math.max(article.quantity - quantity, 0);
+
+        if (nextQuantity <= article.minThreshold) {
+          const alt: Alert = {
+            id: generateId('alt'),
+            title: `Stock faible : ${article.name}`,
+            description: `Le stock de ${article.name} est descendu à ${nextQuantity} ${article.unit}. Le seuil minimum est ${article.minThreshold} ${article.unit}.`,
+            severity: nextQuantity === 0 ? 'critical' : 'warning',
+            date: new Date().toISOString(),
+            read: false,
+            sourceModule: 'Stocks',
+            sourceElementId: articleId
+          };
+          setAlerts((prevAlerts) => [alt, ...prevAlerts]);
+        }
+
+        return {
+          ...article,
+          quantity: nextQuantity,
+          totalPurchasePrice: nextQuantity * (article.unitCost ?? 0),
+        };
+      })
+    );
+
+    const newMovement: StockMovement = {
+      id: movementId,
+      articleId,
+      type: 'out',
+      quantity,
+      date: feedingDate,
+      reason: `Distribution de ${targetArticle.name} au lot ${targetLot.name}`,
+      sourceModule: 'Élevage',
+      sourceElementId: lotId,
+      unitCost,
+    };
+    setMovements((prev) => [newMovement, ...prev]);
+
+    if (totalCost > 0) {
+      const newTransaction: FinanceTransaction = {
+        id: generateId('tx'),
+        type: 'expense',
+        category: 'Alimentation animale',
+        amount: totalCost,
+        date: feedingDate,
+        description: `${targetArticle.name} distribué au lot ${targetLot.name} (${quantity} ${targetArticle.unit})`,
+        sourceModule: 'Élevage',
+        sourceElementId: lotId,
+      };
+      setTransactions((prev) => [newTransaction, ...prev]);
+    }
+
+    addAuditLog(
+      'Élevage',
+      `Distribution d'aliment au lot ${targetLot.name}`,
+      `${quantity} ${targetArticle.unit} de ${targetArticle.name} pour ${totalCost.toLocaleString('fr-FR')} ${settings.currency}`
+    );
+
+    if (authToken && activeFarmId) {
+      const backendLotId = Number(lotId);
+      const backendArticleId = Number(articleId);
+
+      if (!Number.isFinite(backendLotId) || backendLotId <= 0 || !Number.isFinite(backendArticleId) || backendArticleId <= 0) {
+        console.warn('Livestock feeding sync skipped: invalid backend ids', { lotId, articleId });
+      } else {
+        try {
+          const response = await postJson(
+            '/pondeuses/feedings',
+            {
+              farm_id: Number(activeFarmId),
+              layer_batch_id: backendLotId,
+              stock_item_id: backendArticleId,
+              feeding_date: feedingDate,
+              feeding_time: normalizedTime ?? null,
+              quantity,
+              notes: notes?.trim() || '',
+            },
+            authToken
+          );
+          const backendId = response.data && typeof response.data === 'object' ? String((response.data as Record<string, unknown>).id ?? '') : '';
+          if (backendId) {
+            setAnimalFeedings((prev) => prev.map((feeding) => (feeding.id === feedingId ? { ...feeding, id: backendId } : feeding)));
+          }
+        } catch (error) {
+          console.error('Livestock feeding sync failed:', error);
+        }
+      }
+    }
+  };
+
+  // 5. Sell Eggs
   const handleSellEggs = async (count: number, unitPrice: number, description: string) => {
     const latestProd = eggProductions[eggProductions.length - 1];
     const prevStock = latestProd ? latestProd.stockCount : 0;
@@ -1268,7 +1422,7 @@ export default function App() {
     );
   };
 
-  // 5. Feed Fish (distribute pellets from stock)
+  // 6. Feed Fish (distribute pellets from stock)
   const handleFeedFish = async (bassinId: string, articleId: string, quantity: number) => {
     // Subtract from Stocks
     setArticles((prev) =>
@@ -1355,7 +1509,7 @@ export default function App() {
     alert("Nourriture distribuée avec succès ! Le stock d'intrants a été déduit en temps réel.");
   };
 
-  // 6. Harvest & Sell Fish
+  // 7. Harvest & Sell Fish
   const handleHarvestFish = async (bassinId: string, harvestWeightKg: number, revenueAmount: number) => {
     setFishBassins((prev) =>
       prev.map((b) => {
@@ -3315,8 +3469,11 @@ export default function App() {
                 role={role}
                 lots={lots}
                 buildings={buildings}
+                articles={articles}
+                feedings={animalFeedings}
                 currency={settings.currency}
                 onAddLot={handleAddLot}
+                onRecordFeeding={handleRecordFeeding}
                 onReportMortality={handleReportMortality}
                 onUpdateLot={handleUpdateLot}
                 onDeleteLot={handleDeleteLot}

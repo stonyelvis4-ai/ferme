@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Layers\StoreEggProductionRequest;
 use App\Http\Requests\Layers\StoreEggSaleRequest;
 use App\Http\Requests\Layers\StoreLayerBatchRequest;
+use App\Http\Requests\Layers\StoreLayerFeedingRequest;
 use App\Http\Requests\Layers\UpdateLayerBatchRequest;
 use App\Models\EggProduction;
 use App\Models\EggSale;
 use App\Models\LayerBatch;
+use App\Models\LayerFeeding;
 use App\Services\LayerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,16 +28,35 @@ class PondeusesController extends Controller
 
         return response()->json([
             'summary' => $farmId ? $this->layerService->summaryForFarm($farmId) : [],
-            'batches' => LayerBatch::query()->when($farmId, fn ($q) => $q->where('farm_id', $farmId))->withCount(['productions', 'sales'])->latest()->get(),
-            'productions' => EggProduction::query()->when($farmId, fn ($q) => $q->where('farm_id', $farmId))->latest()->limit(100)->get(),
-            'sales' => EggSale::query()->when($farmId, fn ($q) => $q->where('farm_id', $farmId))->latest()->limit(100)->get(),
+            'batches' => LayerBatch::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->withCount(['productions', 'sales', 'feedings'])
+                ->latest()
+                ->get(),
+            'productions' => EggProduction::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->latest()
+                ->limit(100)
+                ->get(),
+            'sales' => EggSale::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->latest()
+                ->limit(100)
+                ->get(),
+            'feedings' => LayerFeeding::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->with(['batch:id,name', 'stockItem:id,name,unit'])
+                ->latest('feeding_date')
+                ->latest()
+                ->limit(100)
+                ->get(),
         ]);
     }
 
     public function show(LayerBatch $pondeuse): JsonResponse
     {
         return response()->json([
-            'data' => $pondeuse->load(['productions', 'sales']),
+            'data' => $pondeuse->load(['productions', 'sales', 'feedings']),
         ]);
     }
 
@@ -73,5 +94,11 @@ class PondeusesController extends Controller
 
         return response()->json(['data' => $sale], 201);
     }
-}
 
+    public function feeding(StoreLayerFeedingRequest $request): JsonResponse
+    {
+        $feeding = $this->layerService->recordFeeding($request->validated());
+
+        return response()->json(['data' => $feeding], 201);
+    }
+}

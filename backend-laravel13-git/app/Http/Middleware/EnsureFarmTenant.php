@@ -13,7 +13,23 @@ class EnsureFarmTenant
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        $farmId = $request->route('farm')?->id ?? $request->integer('farm_id') ?? null;
+        $farmIds = collect();
+
+        if ($request->route('farm')?->id) {
+            $farmIds->push((int) $request->route('farm')->id);
+        }
+
+        if ($request->filled('farm_id')) {
+            $farmIds->push((int) $request->integer('farm_id'));
+        }
+
+        if (is_array($request->input('farm_ids'))) {
+            $farmIds = $farmIds->merge(
+                collect($request->input('farm_ids'))
+                    ->filter(fn ($value) => is_numeric($value))
+                    ->map(fn ($value) => (int) $value)
+            );
+        }
 
         if ($user && $user->farm_id) {
             foreach ($request->route()?->parameters() ?? [] as $parameter) {
@@ -22,17 +38,19 @@ class EnsureFarmTenant
                 }
 
                 if ($parameter instanceof Farm) {
-                    $farmId = $farmId ?? (int) $parameter->getKey();
+                    $farmIds->push((int) $parameter->getKey());
                     continue;
                 }
 
                 if (isset($parameter->farm_id)) {
-                    $farmId = $farmId ?? (int) $parameter->farm_id;
+                    $farmIds->push((int) $parameter->farm_id);
                 }
             }
         }
 
-        if ($user && $farmId && $user->farm_id && (int) $user->farm_id !== (int) $farmId) {
+        $farmIds = $farmIds->filter()->unique()->values();
+
+        if ($user && $user->farm_id && $farmIds->contains(fn (int $farmId) => (int) $user->farm_id !== $farmId)) {
             abort(403, 'Farm tenant mismatch.');
         }
 

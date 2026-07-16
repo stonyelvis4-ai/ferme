@@ -23,6 +23,8 @@ npm run dev
 
 Le frontend tourne par defaut sur `http://localhost:3000`.
 
+Pour une mise en production, voir aussi [docs/o2switch-deploiement.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-deploiement.md).
+
 ## Backend Laravel
 
 Depuis `backend-laravel13-git/`:
@@ -40,4 +42,5 @@ L'API expose ses routes sur `/api/v1`.
 ## Notes
 
 - Le frontend attend une API Laravel accessible via `VITE_FERM_API_URL` si elle n'est pas servie sur le meme domaine.
+- Un exemple de variable frontend de production est fourni dans [.env.production.example](/C:/MES%20PROJETS/FERM+/.env.production.example).
 - Les dossiers generes (`node_modules`, `dist`, `vendor`) et les artefacts locaux ne sont pas versionnes.

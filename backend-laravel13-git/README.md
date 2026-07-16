@@ -62,6 +62,8 @@ DB_PASSWORD=secret
 DB_SSLMODE=prefer
 ```
 
+Pour un hebergement mutualise O2switch, voir aussi [docs/o2switch-deploiement.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-deploiement.md).
+
 ## Deploiement
 
 Apres configuration des variables d'environnement:
