@@ -66,20 +66,18 @@ class UserController extends Controller
     public function assignFarms(AssignUserFarmsRequest $request, User $user): JsonResponse
     {
         $farmIds = $request->validated('farm_ids');
-        $user->assignedFarms()->sync($farmIds);
-
-        if ($user->farm_id === null && ! empty($farmIds)) {
-            $user->forceFill(['farm_id' => $farmIds[0]])->save();
-        }
+        $farmId = (int) $farmIds[0];
+        $user->assignedFarms()->sync([$farmId]);
+        $user->forceFill(['farm_id' => $farmId])->save();
 
         $this->auditService->record([
-            'farm_id' => $user->farm_id,
+            'farm_id' => $farmId,
             'user_id' => $request->user()?->id,
             'module' => 'users',
             'entity_type' => 'user',
             'entity_id' => (string) $user->id,
-            'action' => 'farms_assigned',
-            'new_value' => json_encode(['farm_ids' => $farmIds]),
+            'action' => 'farm_assigned',
+            'new_value' => json_encode(['farm_id' => $farmId]),
             'source' => 'web',
         ]);
 

@@ -98,7 +98,7 @@ export default function ReportsView({ role }: ReportsViewProps) {
               id="report-type-select"
               value={reportType}
               onChange={(e) => setReportType(e.target.value)}
-              className="w-full text-xs p-2.5 border border-slate-200 rounded-2xl focus:outline-none bg-white text-slate-700 shadow-sm"
+              className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
             >
               <option value="global">Consolidé de l'Exploitation (Global)</option>
               <option value="finances">Finances : Compte de Résultat Simplifié</option>
@@ -108,6 +108,7 @@ export default function ReportsView({ role }: ReportsViewProps) {
               <option value="stocks">Logistique : Mouvements des intrants</option>
               <option value="sanitary">Sanitaire : Couverture vaccinale</option>
             </select>
+            <p className="mt-1 text-[10px] text-slate-500">Choisir le rapport à afficher et exporter.</p>
           </div>
 
           {/* Connected parameters warning */}

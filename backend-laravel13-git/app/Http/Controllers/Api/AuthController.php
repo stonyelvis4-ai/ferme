@@ -10,6 +10,7 @@ use App\Http\Requests\Auth\RegisterAdminRequest;
 use App\Models\User;
 use App\Models\UserLoginHistory;
 use App\Services\AuditService;
+use App\Services\FarmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +18,10 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly AuditService $auditService)
+    public function __construct(
+        private readonly AuditService $auditService,
+        private readonly FarmService $farmService
+    )
     {
     }
 
@@ -49,7 +53,19 @@ class AuthController extends Controller
             'is_active' => true,
         ]);
 
+        $this->farmService->createForAdministrator($user, [
+            'name' => 'FERM+',
+            'slug' => 'ferm-plus',
+            'manager_name' => $user->name,
+            'contact_email' => $user->email,
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+        ]);
+
+        $user->refresh();
+
         $this->auditService->record([
+            'farm_id' => $user->farm_id,
             'user_id' => $user->id,
             'module' => 'auth',
             'entity_type' => 'user',

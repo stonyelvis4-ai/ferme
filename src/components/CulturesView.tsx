@@ -110,9 +110,21 @@ export default function CulturesView({
 
       {showParcelleForm && role === 'admin' && (
         <form onSubmit={handleCreateParcelle} className="bg-white border border-lime-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input value={parcelleName} onChange={(e) => setParcelleName(e.target.value)} placeholder="Nom parcelle" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input type="number" min={0.1} step={0.1} value={parcelleArea} onChange={(e) => setParcelleArea(Number(e.target.value))} placeholder="Superficie" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input value={parcelleSoil} onChange={(e) => setParcelleSoil(e.target.value)} placeholder="Type de sol" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom parcelle</span>
+            <input value={parcelleName} onChange={(e) => setParcelleName(e.target.value)} placeholder="Ex. Champ Sud P1" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
+            <span className="block text-[10px] text-slate-500">Nom utilisé pour les campagnes.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Superficie</span>
+            <input type="number" min={0.1} step={0.1} value={parcelleArea} onChange={(e) => setParcelleArea(Number(e.target.value))} placeholder="Ex. 1.5 ha" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
+            <span className="block text-[10px] text-slate-500">Surface cultivable en hectares.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Type de sol</span>
+            <input value={parcelleSoil} onChange={(e) => setParcelleSoil(e.target.value)} placeholder="Ex. Argileux" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
+            <span className="block text-[10px] text-slate-500">Texture ou observation du sol.</span>
+          </label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowParcelleForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
             <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-lime-600 px-4 py-2 text-xs font-semibold text-white">Creer</button>
@@ -122,13 +134,29 @@ export default function CulturesView({
 
       {showCampaignForm && role === 'admin' && (
         <form onSubmit={handleCreateCampaign} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4">
-          <select value={campaignParcelleId} onChange={(e) => setCampaignParcelleId(e.target.value)} className="border border-slate-200 rounded-2xl p-2.5 text-xs bg-white">
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Parcelle</span>
+          <select value={campaignParcelleId} onChange={(e) => setCampaignParcelleId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
             <option value="">Parcelle</option>
             {parcelles.map((parcelle) => <option key={parcelle.id} value={parcelle.id}>{parcelle.name}</option>)}
           </select>
-          <input value={campaignCropType} onChange={(e) => setCampaignCropType(e.target.value)} placeholder="Culture" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input value={campaignVariety} onChange={(e) => setCampaignVariety(e.target.value)} placeholder="Variete" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input type="date" value={campaignStartDate} onChange={(e) => setCampaignStartDate(e.target.value)} className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
+            <span className="block text-[10px] text-slate-500">Terrain affecté à la culture.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Culture</span>
+            <input value={campaignCropType} onChange={(e) => setCampaignCropType(e.target.value)} placeholder="Ex. Maïs" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Espèce cultivée.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Variété</span>
+            <input value={campaignVariety} onChange={(e) => setCampaignVariety(e.target.value)} placeholder="Ex. Composite jaune" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Variété ou semence utilisée.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Date de semis</span>
+            <input type="date" value={campaignStartDate} onChange={(e) => setCampaignStartDate(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Début de la campagne.</span>
+          </label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowCampaignForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
             <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Creer</button>

@@ -22,6 +22,8 @@ class StoreFishStockingRequest extends FormRequest
             'total_weight_kg' => ['sometimes', 'numeric', 'min:0'],
             'supplier_name' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
+            'unit_cost' => ['required', 'numeric', 'min:0.01'],
+            'acquisition_cost' => ['sometimes', 'numeric', 'min:0.01'],
         ];
     }
 }

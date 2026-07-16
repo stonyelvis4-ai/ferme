@@ -22,7 +22,7 @@ interface PiscicultureViewProps {
   articles: StockArticle[];
   currency: string;
   onFeedFish: (bassinId: string, articleId: string, quantity: number) => void;
-  onHarvestFish: (bassinId: string, fishCount: number, revenueAmount: number) => void;
+  onHarvestFish: (bassinId: string, harvestWeightKg: number, revenueAmount: number) => void;
   onAddBassin: (data: Omit<FishBassin, 'id' | 'currentCount' | 'mortalityCount'>) => void;
   onUpdateBassin: (bassinId: string, updates: Partial<FishBassin>) => void;
   onDeleteBassin: (bassinId: string) => void;
@@ -46,10 +46,11 @@ export default function PiscicultureView({
   const [newName, setNewName] = useState('');
   const [newSpecies, setNewSpecies] = useState('Tilapia');
   const [newInitialCount, setNewInitialCount] = useState(1000);
+  const [newUnitCost, setNewUnitCost] = useState(0);
   const [newStockingDate, setNewStockingDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [harvestBassinId, setHarvestBassinId] = useState<string | null>(null);
-  const [harvestCount, setHarvestCount] = useState(1000);
+  const [harvestWeightKg, setHarvestWeightKg] = useState(0);
   const [harvestRevenue, setHarvestRevenue] = useState(500000);
 
   // Filter food articles in stock
@@ -62,22 +63,25 @@ export default function PiscicultureView({
   };
 
   const handleHarvestSubmit = (bassinId: string) => {
-    if (harvestCount <= 0 || harvestRevenue <= 0) return;
-    onHarvestFish(bassinId, harvestCount, harvestRevenue);
+    if (harvestWeightKg <= 0 || harvestRevenue <= 0) return;
+    onHarvestFish(bassinId, harvestWeightKg, harvestRevenue);
     setHarvestBassinId(null);
   };
 
   const handleCreateBassin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || newInitialCount <= 0) return;
+    if (!newName || newInitialCount <= 0 || newUnitCost <= 0) return;
     onAddBassin({
       name: newName,
       species: newSpecies,
       initialCount: newInitialCount,
+      unitCost: newUnitCost,
+      acquisitionCost: newInitialCount * newUnitCost,
       stockingDate: newStockingDate,
       status: 'active'
     });
     setNewName('');
+    setNewUnitCost(0);
     setShowCreateForm(false);
   };
 
@@ -124,11 +128,32 @@ export default function PiscicultureView({
       </div>
 
       {showCreateForm && role === 'admin' && (
-        <form onSubmit={handleCreateBassin} className="bg-white border border-sky-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4">
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nom du bassin" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input value={newSpecies} onChange={(e) => setNewSpecies(e.target.value)} placeholder="Espèce" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input type="number" min={1} value={newInitialCount} onChange={(e) => setNewInitialCount(Number(e.target.value))} placeholder="Effectif initial" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input type="date" value={newStockingDate} onChange={(e) => setNewStockingDate(e.target.value)} className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
+        <form onSubmit={handleCreateBassin} className="bg-white border border-sky-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-6 gap-4">
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du bassin</span>
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ex. Bassin Tilapia A" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100" />
+            <span className="block text-[10px] text-slate-500">Nom de suivi du bassin.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Espèce</span>
+            <input value={newSpecies} onChange={(e) => setNewSpecies(e.target.value)} placeholder="Ex. Tilapia" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100" />
+            <span className="block text-[10px] text-slate-500">Poisson ou souche élevée.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Effectif initial</span>
+            <input type="number" min={1} value={newInitialCount} onChange={(e) => setNewInitialCount(Number(e.target.value))} placeholder="Ex. 500" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100" />
+            <span className="block text-[10px] text-slate-500">Nombre d'alevins mis en bassin.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Prix par alevin</span>
+            <input type="number" required min={0.01} step="0.01" value={newUnitCost} onChange={(e) => setNewUnitCost(Number(e.target.value))} placeholder={`Ex. 150 ${currency}`} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100" />
+            <span className="block text-[10px] text-slate-500">Total : {(newInitialCount * newUnitCost).toLocaleString('fr-FR')} {currency}</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Date d'empoissonnement</span>
+            <input type="date" value={newStockingDate} onChange={(e) => setNewStockingDate(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100" />
+            <span className="block text-[10px] text-slate-500">Date d'entrée des alevins.</span>
+          </label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowCreateForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
             <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white">Créer</button>
@@ -218,6 +243,14 @@ export default function PiscicultureView({
                   <span className="text-slate-400">Effectif Estimé Actuel :</span>
                   <span className="font-bold text-slate-800">{bassin.currentCount} poissons</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Prix par alevin :</span>
+                  <span className="font-semibold text-slate-700">{(bassin.unitCost ?? 0).toLocaleString('fr-FR')} {currency}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Valeur d'acquisition :</span>
+                  <span className="font-bold text-slate-800">{(bassin.acquisitionCost ?? bassin.initialCount * (bassin.unitCost ?? 0)).toLocaleString('fr-FR')} {currency}</span>
+                </div>
                 {bassin.mortalityCount > 0 && (
                   <div className="flex justify-between text-rose-600">
                     <span>Mortalité constatée :</span>
@@ -240,7 +273,7 @@ export default function PiscicultureView({
                             id="feed-article-select"
                             value={feedArticleId}
                             onChange={(e) => setFeedArticleId(e.target.value)}
-                            className="w-full text-xs p-1.5 border border-slate-200 rounded-2xl shadow-sm focus:outline-none bg-white"
+                            className="w-full border border-slate-300 bg-white rounded-xl p-2 text-xs text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                           >
                             <option value="">Sélectionner</option>
                             {foodArticles.map((art) => (
@@ -249,6 +282,7 @@ export default function PiscicultureView({
                               </option>
                             ))}
                           </select>
+                          <p className="mt-1 text-[10px] text-slate-500">Intrant à déduire.</p>
                         </div>
                         <div>
                           <label className="block text-[10px] text-slate-500 mb-0.5">Quantité (kg)</label>
@@ -258,8 +292,10 @@ export default function PiscicultureView({
                             min={1}
                             value={feedQuantity}
                             onChange={(e) => setFeedQuantity(Number(e.target.value))}
-                            className="w-full text-xs p-1.5 border border-slate-200 rounded-2xl shadow-sm focus:outline-none"
+                            placeholder="Ex. 25"
+                            className="w-full border border-slate-300 bg-white rounded-xl p-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                           />
+                          <p className="mt-1 text-[10px] text-slate-500">Quantité distribuée.</p>
                         </div>
                       </div>
                       <div className="flex justify-between items-center bg-sky-50 border border-sky-100 p-2 rounded text-[10px] text-sky-800 leading-normal">
@@ -287,16 +323,18 @@ export default function PiscicultureView({
                       <h4 className="font-bold text-slate-800">Récolter et enregistrer la vente</h4>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[10px] text-slate-500 mb-0.5">Poissons récoltés</label>
+                          <label className="block text-[10px] text-slate-500 mb-0.5">Poids récolté (kg)</label>
                           <input
                             id="harvest-count-input"
                             type="number"
-                            min={1}
-                            max={bassin.currentCount}
-                            value={harvestCount}
-                            onChange={(e) => setHarvestCount(Number(e.target.value))}
-                            className="w-full text-xs p-1.5 border border-slate-200 rounded-2xl shadow-sm focus:outline-none"
+                            min={0.1}
+                            step={0.1}
+                            value={harvestWeightKg}
+                            onChange={(e) => setHarvestWeightKg(Number(e.target.value))}
+                            placeholder="Ex. 120"
+                            className="w-full border border-slate-300 bg-white rounded-xl p-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                           />
+                          <p className="mt-1 text-[10px] text-slate-500">Poids vendu en kg.</p>
                         </div>
                         <div>
                           <label className="block text-[10px] text-slate-500 mb-0.5">Revenu total obtenu ({currency})</label>
@@ -306,12 +344,14 @@ export default function PiscicultureView({
                             min={1}
                             value={harvestRevenue}
                             onChange={(e) => setHarvestRevenue(Number(e.target.value))}
-                            className="w-full text-xs p-1.5 border border-slate-200 rounded-2xl shadow-sm focus:outline-none"
+                            placeholder={`Ex. 300000 ${currency}`}
+                            className="w-full border border-slate-300 bg-white rounded-xl p-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                           />
+                          <p className="mt-1 text-[10px] text-slate-500">Montant encaissé.</p>
                         </div>
                       </div>
                       <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 p-2 rounded text-[10px] text-emerald-800 leading-normal">
-                        <span>💡 Cette action va clôturer/récolter le bassin et générer un revenu de {formatCurrency(harvestRevenue)}.</span>
+                        <span>Cette action va cloturer le bassin, enregistrer {harvestWeightKg || 0} kg de recolte et generer un revenu de {formatCurrency(harvestRevenue)}.</span>
                         <div className="flex gap-1">
                           <button
                             type="button"
@@ -346,8 +386,8 @@ export default function PiscicultureView({
                       <button
                         onClick={() => {
                           setHarvestBassinId(bassin.id);
-                          setHarvestCount(bassin.currentCount);
-                          setHarvestRevenue(bassin.currentCount * 500); // 500 currency / fish estim
+                          setHarvestWeightKg(0);
+                          setHarvestRevenue(0);
                           setSelectedBassinId(null);
                         }}
                         className="flex-1 inline-flex items-center justify-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-[10px] font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:-translate-y-0.5 hover:border-emerald-800 hover:bg-emerald-700"

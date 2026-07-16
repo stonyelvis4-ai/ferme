@@ -39,6 +39,8 @@ class PiscicultureService
             'feed_distributed_kg' => $data['feed_distributed_kg'] ?? 0,
             'fcr' => $data['fcr'] ?? null,
             'notes' => $data['notes'] ?? null,
+            'unit_cost' => $data['unit_cost'] ?? 0,
+            'acquisition_cost' => $data['acquisition_cost'] ?? 0,
         ]);
     }
 
@@ -53,7 +55,17 @@ class PiscicultureService
     public function recordStocking(array $data): FishStocking
     {
         return DB::transaction(function () use ($data) {
-            $pond = FishPond::query()->findOrFail($data['fish_pond_id']);
+            $pond = FishPond::query()
+                ->where('farm_id', $data['farm_id'])
+                ->findOrFail($data['fish_pond_id']);
+            $unitCost = (float) $data['unit_cost'];
+            $acquisitionCost = (float) ($data['acquisition_cost'] ?? ($data['fish_count'] * $unitCost));
+            $previousCount = (int) $pond->current_estimated_count;
+            $nextCount = $previousCount + (int) $data['fish_count'];
+            $nextAcquisitionCost = (float) $pond->acquisition_cost + $acquisitionCost;
+            $weightedUnitCost = $nextCount > 0
+                ? round(((((float) $pond->unit_cost) * $previousCount) + $acquisitionCost) / $nextCount, 2)
+                : $unitCost;
 
             $stocking = FishStocking::create([
                 'farm_id' => $data['farm_id'],
@@ -64,13 +76,30 @@ class PiscicultureService
                 'total_weight_kg' => $data['total_weight_kg'] ?? 0,
                 'supplier_name' => $data['supplier_name'] ?? null,
                 'notes' => $data['notes'] ?? null,
+                'unit_cost' => $unitCost,
+                'acquisition_cost' => $acquisitionCost,
             ]);
 
             $pond->forceFill([
-                'initial_fish_count' => $pond->initial_fish_count ?: $data['fish_count'],
-                'current_estimated_count' => max($pond->current_estimated_count, $data['fish_count']),
+                'initial_fish_count' => (int) $pond->initial_fish_count + (int) $data['fish_count'],
+                'current_estimated_count' => $nextCount,
                 'status' => 'active',
+                'unit_cost' => $weightedUnitCost,
+                'acquisition_cost' => $nextAcquisitionCost,
             ])->save();
+
+            $transaction = $this->financeService->createTransaction([
+                'farm_id' => $data['farm_id'],
+                'type' => 'expense',
+                'amount' => $acquisitionCost,
+                'category' => 'Achat Alevins',
+                'description' => sprintf('Empoissonnement de %d alevins dans le bassin %s', $data['fish_count'], $pond->name),
+                'source_module' => 'pisciculture',
+                'source_entity_type' => 'fish_stocking',
+                'source_entity_id' => (string) $stocking->id,
+                'occurred_at' => $data['stocking_date'],
+            ]);
+            $stocking->forceFill(['financial_transaction_id' => $transaction->id])->save();
 
             $this->auditService->record([
                 'farm_id' => $data['farm_id'],
@@ -86,14 +115,16 @@ class PiscicultureService
                 'source' => 'web',
             ]);
 
-            return $stocking;
+            return $stocking->refresh();
         });
     }
 
     public function recordMonitoring(array $data): FishMonitoring
     {
         return DB::transaction(function () use ($data) {
-            $pond = FishPond::query()->findOrFail($data['fish_pond_id']);
+            $pond = FishPond::query()
+                ->where('farm_id', $data['farm_id'])
+                ->findOrFail($data['fish_pond_id']);
             $previousBiomass = (float) $pond->biomass_kg;
             $biomass = (float) ($data['biomass_kg'] ?? ($data['estimated_count'] * $data['average_weight_kg']));
             $feed = (float) ($data['feed_distributed_kg'] ?? 0);
@@ -164,7 +195,9 @@ class PiscicultureService
     public function recordHarvest(array $data): FishHarvest
     {
         return DB::transaction(function () use ($data) {
-            $pond = FishPond::query()->findOrFail($data['fish_pond_id']);
+            $pond = FishPond::query()
+                ->where('farm_id', $data['farm_id'])
+                ->findOrFail($data['fish_pond_id']);
             $sellable = max(0, (float) $data['total_weight_kg'] - (float) ($data['losses_kg'] ?? 0));
 
             $harvest = FishHarvest::create([
@@ -219,7 +252,9 @@ class PiscicultureService
     public function recordSale(array $data): FishSale
     {
         return DB::transaction(function () use ($data) {
-            $pond = FishPond::query()->findOrFail($data['fish_pond_id']);
+            $pond = FishPond::query()
+                ->where('farm_id', $data['farm_id'])
+                ->findOrFail($data['fish_pond_id']);
             $stockItem = $this->getOrCreateFishStockItem($data['farm_id']);
             $unitPrice = $data['unit_price'] ?? $this->defaultFishPrice($data['farm_id']);
             $kilograms = (float) $data['kilograms_sold'];

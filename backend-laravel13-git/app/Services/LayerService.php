@@ -21,17 +21,40 @@ class LayerService
 
     public function createBatch(array $data): LayerBatch
     {
-        return LayerBatch::create([
-            'farm_id' => $data['farm_id'],
-            'name' => $data['name'],
-            'breed' => $data['breed'],
-            'entry_date' => $data['entry_date'],
-            'initial_count' => $data['initial_count'],
-            'mortality_total' => $data['mortality_total'] ?? 0,
-            'reform_total' => $data['reform_total'] ?? 0,
-            'current_count' => $data['current_count'] ?? $data['initial_count'],
-            'status' => $data['status'] ?? 'active',
-        ]);
+        return DB::transaction(function () use ($data) {
+            $unitCost = (float) $data['unit_cost'];
+            $acquisitionCost = (float) ($data['acquisition_cost'] ?? ($data['initial_count'] * $unitCost));
+
+            $batch = LayerBatch::create([
+                'farm_id' => $data['farm_id'],
+                'name' => $data['name'],
+                'breed' => $data['breed'],
+                'entry_date' => $data['entry_date'],
+                'initial_count' => $data['initial_count'],
+                'mortality_total' => $data['mortality_total'] ?? 0,
+                'reform_total' => $data['reform_total'] ?? 0,
+                'current_count' => $data['current_count'] ?? $data['initial_count'],
+                'status' => $data['status'] ?? 'active',
+                'unit_cost' => $unitCost,
+                'acquisition_cost' => $acquisitionCost,
+            ]);
+
+            $transaction = $this->financeService->createTransaction([
+                'farm_id' => $data['farm_id'],
+                'type' => 'expense',
+                'amount' => $acquisitionCost,
+                'category' => 'Achat Animaux',
+                'description' => sprintf('Achat initial de %d animaux pour le lot %s', $data['initial_count'], $data['name']),
+                'source_module' => 'elevage',
+                'source_entity_type' => 'layer_batch',
+                'source_entity_id' => (string) $batch->id,
+                'occurred_at' => $data['entry_date'],
+            ]);
+
+            $batch->forceFill(['financial_transaction_id' => $transaction->id])->save();
+
+            return $batch->refresh();
+        });
     }
 
     public function updateBatch(LayerBatch $batch, array $data): LayerBatch
@@ -48,7 +71,9 @@ class LayerService
     public function recordProduction(array $data): EggProduction
     {
         return DB::transaction(function () use ($data) {
-            $batch = LayerBatch::query()->findOrFail($data['layer_batch_id']);
+            $batch = LayerBatch::query()
+                ->where('farm_id', $data['farm_id'])
+                ->findOrFail($data['layer_batch_id']);
             $settings = FarmSetting::query()->where('farm_id', $data['farm_id'])->first();
 
             $broken = $data['broken_eggs'] ?? 0;
@@ -143,7 +168,9 @@ class LayerService
     public function recordSale(array $data): EggSale
     {
         return DB::transaction(function () use ($data) {
-            $batch = LayerBatch::query()->findOrFail($data['layer_batch_id']);
+            $batch = LayerBatch::query()
+                ->where('farm_id', $data['farm_id'])
+                ->findOrFail($data['layer_batch_id']);
             $stockItem = StockItem::query()
                 ->where('farm_id', $data['farm_id'])
                 ->where('name', 'Œufs')

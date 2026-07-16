@@ -174,11 +174,12 @@ export default function FinancesView({
                 id="tx-type-select"
                 value={type}
                 onChange={(e) => setType(e.target.value as 'income' | 'expense')}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 shadow-sm bg-white focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               >
                 <option value="expense">Dépense / Débit</option>
                 <option value="income">Revenu / Crédit</option>
               </select>
+              <p className="mt-1 text-[10px] text-slate-500">Entrée ou sortie d'argent.</p>
             </div>
 
             <div>
@@ -187,7 +188,7 @@ export default function FinancesView({
                 id="tx-cat-select"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 shadow-sm bg-white focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               >
                 <option value="Alimentation">Alimentation</option>
                 <option value="Sanitaire">Sanitaire / Véto</option>
@@ -197,6 +198,7 @@ export default function FinancesView({
                 <option value="Vente Oeufs">Vente d'œufs</option>
                 <option value="Autre">Divers / Autre</option>
               </select>
+              <p className="mt-1 text-[10px] text-slate-500">Classement comptable.</p>
             </div>
 
             <div>
@@ -208,8 +210,10 @@ export default function FinancesView({
                 min={1}
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:outline-none focus:border-emerald-500"
+                placeholder={`Ex. 50000 ${currency}`}
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Montant total payé ou reçu.</p>
             </div>
 
             <div>
@@ -220,8 +224,9 @@ export default function FinancesView({
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Date de l'opération.</p>
             </div>
 
             <div>
@@ -233,8 +238,9 @@ export default function FinancesView({
                 placeholder="Ex: Achat carburant groupe"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Libellé lisible dans la comptabilité.</p>
             </div>
           </div>
 

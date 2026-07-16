@@ -93,6 +93,7 @@ Route::prefix('v1')->group(function () {
                 Route::delete('/stocks/{stockItem}', [StockController::class, 'destroy']);
                 Route::post('/stocks/movements', [StockController::class, 'movement']);
                 Route::post('/finances', [FinanceController::class, 'store']);
+                Route::patch('/finances/{financialTransaction}', [FinanceController::class, 'update']);
                 Route::delete('/finances/{financialTransaction}', [FinanceController::class, 'destroy']);
                 Route::patch('/sanitary/{sanitaryTreatment}', [SanitaryController::class, 'update']);
                 Route::post('/pondeuses', [PondeusesController::class, 'store']);

@@ -139,6 +139,8 @@ export function mapLots(data: unknown[]): Lot[] {
       exitDate: lot.exit_date ? toDate(lot.exit_date) : lot.exitDate ? toDate(lot.exitDate) : undefined,
       status: (toText(lot.status, 'active') as Lot['status']) || 'active',
       notes: toText(lot.notes, ''),
+      unitCost: toNumber(lot.unit_cost ?? lot.unitCost, 0),
+      acquisitionCost: toNumber(lot.acquisition_cost ?? lot.acquisitionCost, 0),
     };
   });
 }
@@ -183,6 +185,8 @@ export function mapFishBassins(data: unknown[]): FishBassin[] {
       status: (toText(pond.status, 'active') as FishBassin['status']) || 'active',
       waterTemperature: pond.water_temperature ?? pond.waterTemperature ? toNumber(pond.water_temperature ?? pond.waterTemperature, 0) : undefined,
       waterPh: pond.ph ?? pond.water_ph ?? pond.waterPh ? toNumber(pond.ph ?? pond.water_ph ?? pond.waterPh, 0) : undefined,
+      unitCost: toNumber(pond.unit_cost ?? pond.unitCost, 0),
+      acquisitionCost: toNumber(pond.acquisition_cost ?? pond.acquisitionCost, 0),
     };
   });
 }
@@ -196,16 +200,23 @@ export function mapParcelles(data: unknown[]): CultureParcelle[] {
       area: toNumber(plot.area, 0),
       soilType: labelOrFallback(plot.soil_type ?? plot.soilType, 'Inconnu'),
       status: (toText(plot.status, 'fallow') as CultureParcelle['status']) || 'fallow',
+      cropId: toText(plot.crop_id ?? plot.cropId, ''),
     };
   });
 }
 
-export function mapCampaigns(data: unknown[]): Campaign[] {
+export function mapCampaigns(data: unknown[], plots: unknown[] = []): Campaign[] {
   return data.map((item, index) => {
     const crop = item as Record<string, unknown>;
+    const linkedPlot = plots.find((plot) => {
+      if (!plot || typeof plot !== 'object') return false;
+      const plotRecord = plot as Record<string, unknown>;
+      return String(plotRecord.crop_id ?? plotRecord.cropId ?? '') === String(crop.id ?? '');
+    }) as Record<string, unknown> | undefined;
+
     return {
       id: toText(crop.id, `crop-${index + 1}`),
-      parcelleId: toText(crop.plot_id ?? crop.parcelleId, ''),
+      parcelleId: toText(crop.plot_id ?? crop.parcelleId ?? linkedPlot?.id, ''),
       cropType: labelOrFallback(crop.name, 'Culture'),
       variety: labelOrFallback(crop.variety, ''),
       startDate: toDate(crop.planting_date ?? crop.startDate),
@@ -227,6 +238,7 @@ export function mapArticles(data: unknown[]): StockArticle[] {
       name: labelOrFallback(stock.name, 'Stock'),
       category: (toText(stock.category, 'other') as StockArticle['category']) || 'other',
       quantity: toNumber(stock.current_quantity ?? stock.quantity, 0),
+      unitCost: toNumber(stock.unit_cost ?? stock.unitCost, 0),
       unit: labelOrFallback(stock.unit, 'u'),
       minThreshold: toNumber(stock.minimum_threshold ?? stock.minThreshold, 0),
       locationId: toText(stock.location ?? stock.locationId, ''),
@@ -242,6 +254,7 @@ export function mapMovements(data: unknown[]): StockMovement[] {
       articleId: toText(movement.stock_item_id ?? movement.articleId, ''),
       type: (toText(movement.type, 'adjustment') as StockMovement['type']) || 'adjustment',
       quantity: toNumber(movement.quantity, 0),
+      unitCost: movement.unit_cost === null ? null : toNumber(movement.unit_cost ?? movement.unitCost, 0),
       date: toDate(movement.created_at ?? movement.date),
       reason: labelOrFallback(movement.source_module ?? movement.reason, ''),
       sourceModule: toText(movement.source_module ?? movement.sourceModule, ''),

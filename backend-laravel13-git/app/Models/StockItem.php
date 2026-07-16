@@ -16,12 +16,14 @@ class StockItem extends Model
         'name',
         'category',
         'unit',
+        'unit_cost',
         'minimum_threshold',
         'current_quantity',
         'location',
     ];
 
     protected $casts = [
+        'unit_cost' => 'decimal:2',
         'minimum_threshold' => 'integer',
         'current_quantity' => 'integer',
     ];
@@ -36,4 +38,3 @@ class StockItem extends Model
         return $this->hasMany(StockMovement::class);
     }
 }
-

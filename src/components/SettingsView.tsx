@@ -12,13 +12,17 @@ import {
   Lock,
   Building,
   KeyRound,
-  Siren
+  Siren,
+  UserPlus,
+  Users
 } from 'lucide-react';
 import { FarmSettings, UserRole } from '../types';
+import { AuthUser } from '../services/fermApi';
 
 interface SettingsViewProps {
   role: UserRole;
   settings: FarmSettings;
+  owners: AuthUser[];
   onUpdateSettings: (newSettings: FarmSettings) => void;
   onTestAlarm: (options: {
     soundEnabled: boolean;
@@ -31,14 +35,21 @@ interface SettingsViewProps {
     password: string;
     password_confirmation: string;
   }) => void;
+  onCreateOwner: (payload: {
+    name: string;
+    email: string;
+    password: string;
+  }) => void;
 }
 
 export default function SettingsView({
   role,
   settings,
+  owners,
   onUpdateSettings,
   onTestAlarm,
-  onChangePassword
+  onChangePassword,
+  onCreateOwner
 }: SettingsViewProps) {
   const [name, setName] = useState(settings.name);
   const [location, setLocation] = useState(settings.location);
@@ -55,6 +66,9 @@ export default function SettingsView({
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
 
   const [files, setFiles] = useState<{ name: string; size: string; date: string }[]>([]);
 
@@ -113,6 +127,21 @@ export default function SettingsView({
     setConfirmPassword('');
   };
 
+  const handleOwnerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (role !== 'admin') return;
+
+    onCreateOwner({
+      name: ownerName,
+      email: ownerEmail,
+      password: ownerPassword,
+    });
+
+    setOwnerName('');
+    setOwnerEmail('');
+    setOwnerPassword('');
+  };
+
   return (
     <div id="settings-view" className="space-y-6">
       {/* Header */}
@@ -147,8 +176,10 @@ export default function SettingsView({
                   disabled={role === 'owner'}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:outline-none focus:border-emerald-500 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
+                  placeholder="Ex. Ferme Saint-Elvis"
+                  className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:cursor-not-allowed"
                 />
+                <p className="mt-1 text-[10px] text-slate-500">Nom officiel affiché dans l'application.</p>
               </div>
 
               <div>
@@ -160,8 +191,10 @@ export default function SettingsView({
                   disabled={role === 'owner'}
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl p-2.5 focus:outline-none focus:border-emerald-500 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
+                  placeholder="Ex. Abidjan, Anyama"
+                  className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:cursor-not-allowed"
                 />
+                <p className="mt-1 text-[10px] text-slate-500">Ville, village ou zone d'exploitation.</p>
               </div>
 
               <div>
@@ -173,8 +206,10 @@ export default function SettingsView({
                   disabled={role === 'owner'}
                   value={managerName}
                   onChange={(e) => setManagerName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl p-2.5 focus:outline-none focus:border-emerald-500 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
+                  placeholder="Ex. Elvis Admin"
+                  className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:cursor-not-allowed"
                 />
+                <p className="mt-1 text-[10px] text-slate-500">Responsable principal du compte.</p>
               </div>
 
               <div>
@@ -186,8 +221,10 @@ export default function SettingsView({
                   disabled={role === 'owner'}
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl p-2.5 focus:outline-none focus:border-emerald-500 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
+                  placeholder="Ex. +225 07 00 00 00 00"
+                  className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:cursor-not-allowed"
                 />
+                <p className="mt-1 text-[10px] text-slate-500">Numéro utilisé sur les contacts ferme.</p>
               </div>
 
               <div>
@@ -199,8 +236,10 @@ export default function SettingsView({
                   disabled={role === 'owner'}
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl p-2.5 focus:outline-none focus:border-emerald-500 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
+                  placeholder="Ex. contact@ferme.ci"
+                  className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:cursor-not-allowed"
                 />
+                <p className="mt-1 text-[10px] text-slate-500">Adresse de contact officielle.</p>
               </div>
 
               <div>
@@ -210,12 +249,13 @@ export default function SettingsView({
                   value={currency}
                   disabled={role === 'owner'}
                   onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full border border-slate-200 rounded-2xl p-2.5 bg-white focus:outline-none focus:border-emerald-500 disabled:bg-slate-50 disabled:cursor-not-allowed"
+                  className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:cursor-not-allowed"
                 >
                   <option value="FCFA">Franc CFA (FCFA)</option>
                   <option value="EUR">Euro (â‚¬)</option>
                   <option value="USD">Dollar US ($)</option>
                 </select>
+                <p className="mt-1 text-[10px] text-slate-500">Devise utilisée pour les coûts et revenus.</p>
               </div>
             </div>
 
@@ -360,6 +400,85 @@ export default function SettingsView({
           </div>
 
           {role === 'admin' && (
+            <div className="mt-8 border-t border-slate-100 pt-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Comptes proprietaires rattaches
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500">
+                Creez ici les comptes proprietaires qui auront un acces en lecture seule sur cette ferme.
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  {owners.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                      Aucun proprietaire n'est encore rattache a cette ferme.
+                    </div>
+                  ) : (
+                    owners.map((owner) => (
+                      <div key={String(owner.id)} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-xs">
+                        <div className="font-semibold text-slate-800">{owner.name}</div>
+                        <div className="text-slate-500">{owner.email}</div>
+                        <div className="mt-1 text-[11px] text-emerald-700">
+                          {owner.is_active === false ? 'Compte inactif' : 'Compte actif'}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <form onSubmit={handleOwnerSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Nom du proprietaire</label>
+                    <input
+                      type="text"
+                      required
+                      value={ownerName}
+                      onChange={(e) => setOwnerName(e.target.value)}
+                      placeholder="Ex. Jean Proprietaire"
+                      className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Email du proprietaire</label>
+                    <input
+                      type="email"
+                      required
+                      value={ownerEmail}
+                      onChange={(e) => setOwnerEmail(e.target.value)}
+                      placeholder="Ex. proprietaire@ferme.ci"
+                      className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">Mot de passe initial</label>
+                    <input
+                      type="password"
+                      required
+                      minLength={8}
+                      value={ownerPassword}
+                      onChange={(e) => setOwnerPassword(e.target.value)}
+                      placeholder="Minimum 8 caracteres"
+                      className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:-translate-y-0.5 hover:border-emerald-800 hover:bg-emerald-700"
+                    >
+                      <UserPlus className="w-4 h-4" /> Creer un proprietaire
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {role === 'admin' && (
             <form onSubmit={handlePasswordSubmit} className="mt-8 border-t border-slate-100 pt-6 space-y-4">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                 <KeyRound className="w-4 h-4 text-emerald-600" />
@@ -372,9 +491,10 @@ export default function SettingsView({
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:outline-none focus:border-emerald-500 bg-white"
+                    className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   />
+                  <p className="mt-1 text-[10px] text-slate-500">Mot de passe utilisé actuellement.</p>
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Nouveau mot de passe</label>
@@ -382,9 +502,10 @@ export default function SettingsView({
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full border border-slate-200 rounded-2xl p-2.5 focus:outline-none focus:border-emerald-500 bg-white"
+                    className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   />
+                  <p className="mt-1 text-[10px] text-slate-500">Minimum 8 caractères.</p>
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Confirmation</label>
@@ -392,9 +513,10 @@ export default function SettingsView({
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full border border-slate-200 rounded-2xl p-2.5 focus:outline-none focus:border-emerald-500 bg-white"
+                    className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   />
+                  <p className="mt-1 text-[10px] text-slate-500">Doit être identique au nouveau mot de passe.</p>
                 </div>
               </div>
               <div className="flex justify-end">
@@ -443,7 +565,7 @@ export default function SettingsView({
                       placeholder="Nom du fichier (Ex: reçu_NPK.pdf)"
                       value={newFileName}
                       onChange={(e) => setNewFileName(e.target.value)}
-                      className="flex-1 text-xs border border-slate-200 rounded-2xl p-2 shadow-sm focus:outline-none focus:border-emerald-500"
+                      className="flex-1 border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     />
                     <button
                       type="submit"

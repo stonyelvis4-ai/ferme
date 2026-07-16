@@ -26,6 +26,8 @@ export interface Lot {
   exitDate?: string;
   status: LotStatus;
   notes?: string;
+  unitCost?: number;
+  acquisitionCost?: number;
 }
 
 export interface EggProduction {
@@ -52,6 +54,8 @@ export interface FishBassin {
   status: 'active' | 'harvested' | 'inactive';
   waterTemperature?: number; // °C
   waterPh?: number;
+  unitCost?: number;
+  acquisitionCost?: number;
 }
 
 export interface CultureParcelle {
@@ -60,6 +64,7 @@ export interface CultureParcelle {
   area: number; // in hectares (ha)
   soilType: string; // e.g. "Argileux", "Sableux"
   status: 'cultivated' | 'fallow' | 'preparing';
+  cropId?: string;
 }
 
 export interface Campaign {
@@ -208,4 +213,12 @@ export interface FarmSettings {
   taskCategories?: string[];
   taskPriorities?: string[];
   alertRules?: unknown[];
+}
+
+export interface StockArticle {
+  unitCost?: number;
+}
+
+export interface StockMovement {
+  unitCost?: number | null;
 }

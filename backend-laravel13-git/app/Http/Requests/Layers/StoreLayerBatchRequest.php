@@ -23,7 +23,8 @@ class StoreLayerBatchRequest extends FormRequest
             'reform_total' => ['sometimes', 'integer', 'min:0'],
             'current_count' => ['sometimes', 'integer', 'min:0'],
             'status' => ['sometimes', 'string', 'max:50'],
+            'unit_cost' => ['required', 'numeric', 'min:0.01'],
+            'acquisition_cost' => ['sometimes', 'numeric', 'min:0.01'],
         ];
     }
 }
-

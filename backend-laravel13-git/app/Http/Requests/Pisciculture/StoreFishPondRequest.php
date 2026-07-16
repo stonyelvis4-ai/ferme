@@ -29,6 +29,8 @@ class StoreFishPondRequest extends FormRequest
             'feed_distributed_kg' => ['sometimes', 'numeric', 'min:0'],
             'fcr' => ['sometimes', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
+            'unit_cost' => ['sometimes', 'numeric', 'min:0'],
+            'acquisition_cost' => ['sometimes', 'numeric', 'min:0'],
         ];
     }
 }

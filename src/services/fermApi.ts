@@ -181,7 +181,7 @@ export async function loadWorkspaceSnapshot(token: string): Promise<WorkspaceSna
     requestJson<ApiResponse<{ items?: unknown[]; movements?: unknown[] }>>('/stocks', {}, token),
     requestJson<ApiResponse<unknown[]>>('/finances', {}, token),
     requestJson<ApiResponse<unknown[]>>('/sanitary', {}, token),
-    requestJson<ApiResponse<unknown[]>>('/pondeuses', {}, token),
+    requestJson<ApiResponse<unknown>>('/pisciculture', {}, token),
     requestJson<ApiResponse<unknown[]>>('/cultures', {}, token),
     requestJson<ApiResponse<Record<string, unknown[]>>>('/infrastructures', {}, token),
     requestJson<ApiResponse<unknown>>('/reports', {}, token),

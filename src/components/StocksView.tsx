@@ -39,7 +39,11 @@ export default function StocksView({
   const [category, setCategory] = useState<StockArticle['category']>('other');
   const [quantity, setQuantity] = useState(0);
   const [unit, setUnit] = useState('kg');
+  const [unitCost, setUnitCost] = useState(0);
   const [minThreshold, setMinThreshold] = useState(10);
+
+  const formatCurrency = (value: number) =>
+    `${new Intl.NumberFormat('fr-FR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value)} ${currency}`;
 
   const handleAdjustSubmit = (articleId: string) => {
     if (adjustQty === 0 || !adjustReason) return;
@@ -52,8 +56,9 @@ export default function StocksView({
   const handleCreateArticle = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) return;
-    onAddStockArticle({ name, category, quantity, unit, minThreshold, locationId: 'main-stock' });
+    onAddStockArticle({ name, category, quantity, unitCost, unit, minThreshold, locationId: 'main-stock' });
     setName('');
+    setUnitCost(0);
     setShowCreateForm(false);
   };
 
@@ -79,23 +84,56 @@ export default function StocksView({
       </div>
 
       {showCreateForm && role === 'admin' && (
-        <form onSubmit={handleCreateArticle} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-6 gap-4">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom article" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <select value={category} onChange={(e) => setCategory(e.target.value as StockArticle['category'])} className="border border-slate-200 rounded-2xl p-2.5 text-xs bg-white">
-            <option value="feed">Aliment</option>
-            <option value="vaccine">Vaccin</option>
-            <option value="medicine">Medicament</option>
-            <option value="seed">Semence</option>
-            <option value="fertilizer">Engrais</option>
-            <option value="tool">Outil</option>
-            <option value="other">Autre</option>
-          </select>
-          <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} placeholder="Quantite" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Unite" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input type="number" value={minThreshold} onChange={(e) => setMinThreshold(Number(e.target.value))} placeholder="Seuil mini" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setShowCreateForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
-            <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Creer</button>
+        <form onSubmit={handleCreateArticle} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
+            <label className="space-y-1.5 xl:col-span-2">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom de l'article</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Aliment pondeuses 50 kg" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+              <span className="block text-[10px] text-slate-500">Le nom exact de l'intrant ou du produit.</span>
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Categorie</span>
+              <select value={category} onChange={(e) => setCategory(e.target.value as StockArticle['category'])} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
+                <option value="feed">Aliment</option>
+                <option value="vaccine">Vaccin</option>
+                <option value="medicine">Medicament</option>
+                <option value="seed">Semence</option>
+                <option value="fertilizer">Engrais</option>
+                <option value="tool">Outil</option>
+                <option value="other">Autre</option>
+              </select>
+              <span className="block text-[10px] text-slate-500">Famille comptable de l'article.</span>
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Quantite initiale</span>
+              <input type="number" min={0} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} placeholder="Ex. 25" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+              <span className="block text-[10px] text-slate-500">Stock disponible au depart.</span>
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Unite</span>
+              <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="kg, sac, litre, dose" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+              <span className="block text-[10px] text-slate-500">Unite de suivi du stock.</span>
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Prix unitaire</span>
+              <input type="number" min={0} value={unitCost} onChange={(e) => setUnitCost(Number(e.target.value))} placeholder={`Ex. 12500 ${currency}`} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+              <span className="block text-[10px] text-slate-500">Prix d'une unite en {currency}.</span>
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Seuil d'alerte</span>
+              <input type="number" min={0} value={minThreshold} onChange={(e) => setMinThreshold(Number(e.target.value))} placeholder="Ex. 5" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+              <span className="block text-[10px] text-slate-500">Alerte quand le stock descend ici.</span>
+            </label>
+          </div>
+
+          <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <button type="button" onClick={() => setShowCreateForm(false)} className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">Annuler</button>
+            <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Creer l'article</button>
           </div>
         </form>
       )}
@@ -117,6 +155,13 @@ export default function StocksView({
               {articles.map((article) => {
                 const isLow = article.quantity <= article.minThreshold;
                 const progressPct = Math.min((article.quantity / (article.minThreshold * 2.5)) * 100, 100);
+                const lastKnownUnitCost =
+                  article.unitCost ??
+                  movements
+                    .slice()
+                    .reverse()
+                    .find((movement) => movement.articleId === article.id && typeof movement.unitCost === 'number')
+                    ?.unitCost;
 
                 return (
                   <div key={article.id} className={`bg-white border rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow transition-shadow ${isLow ? 'border-amber-200 bg-amber-50/10' : 'border-slate-100'}`}>
@@ -132,6 +177,12 @@ export default function StocksView({
                       </div>
 
                       <div className="mt-4">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2">
+                          <span>Prix unitaire</span>
+                          <span className="font-semibold text-slate-700">
+                            {typeof lastKnownUnitCost === 'number' && lastKnownUnitCost > 0 ? formatCurrency(lastKnownUnitCost) : 'Non renseigne'}
+                          </span>
+                        </div>
                         <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                           <div className={`h-full rounded-full ${isLow ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${progressPct}%` }} />
                         </div>
@@ -177,7 +228,12 @@ export default function StocksView({
                               onEdit={() => {
                                 const nextName = window.prompt('Nom de l\'article', article.name);
                                 if (!nextName) return;
-                                onUpdateStockArticle(article.id, { name: nextName });
+                                const nextUnitCost = window.prompt(`Prix unitaire (${currency})`, String(article.unitCost ?? lastKnownUnitCost ?? 0));
+                                if (nextUnitCost === null) return;
+                                onUpdateStockArticle(article.id, {
+                                  name: nextName,
+                                  unitCost: Number(nextUnitCost) || 0,
+                                });
                               }}
                               onDelete={() => {
                                 if (window.confirm(`Supprimer l'article ${article.name} ?`)) {

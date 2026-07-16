@@ -44,6 +44,7 @@ export default function ElevageView({
   const [breed, setBreed] = useState('Cobb 500');
   const [buildingId, setBuildingId] = useState(buildings[0]?.id || '');
   const [initialCount, setInitialCount] = useState(1000);
+  const [unitCost, setUnitCost] = useState(0);
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [mortalityLotId, setMortalityLotId] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export default function ElevageView({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !species || !breed || !buildingId) return;
+    if (!name || !species || !breed || !buildingId || initialCount <= 0 || unitCost <= 0) return;
 
     onAddLot({
       name,
@@ -59,12 +60,15 @@ export default function ElevageView({
       breed,
       buildingId,
       initialCount,
+      unitCost,
+      acquisitionCost: initialCount * unitCost,
       entryDate,
       status: 'active',
       notes
     });
 
     setName('');
+    setUnitCost(0);
     setShowAddForm(false);
   };
 
@@ -129,8 +133,10 @@ export default function ElevageView({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="Ex. Lot poulets chair A"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Nom unique pour retrouver le lot.</p>
             </div>
 
             <div>
@@ -139,7 +145,7 @@ export default function ElevageView({
                 id="lot-species-input"
                 value={species}
                 onChange={(e) => setSpecies(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none bg-white"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               >
                 <option value="Volaille (Chair)">Volaille (Chair)</option>
                 <option value="Volaille (Pondeuses)">Volaille (Pondeuses)</option>
@@ -147,6 +153,7 @@ export default function ElevageView({
                 <option value="Bovin">Bovin</option>
                 <option value="Ovin/Caprin">Ovin/Caprin</option>
               </select>
+              <p className="mt-1 text-[10px] text-slate-500">Type d'animaux suivis.</p>
             </div>
 
             <div>
@@ -157,8 +164,10 @@ export default function ElevageView({
                 required
                 value={breed}
                 onChange={(e) => setBreed(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="Ex. Cobb 500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Race, souche ou variété animale.</p>
             </div>
 
             <div>
@@ -167,7 +176,7 @@ export default function ElevageView({
                 id="lot-building-input"
                 value={buildingId}
                 onChange={(e) => setBuildingId(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none bg-white"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               >
                 {buildings.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -175,6 +184,7 @@ export default function ElevageView({
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-[10px] text-slate-500">Lieu d'hébergement du lot.</p>
             </div>
 
             <div>
@@ -186,8 +196,10 @@ export default function ElevageView({
                 min={1}
                 value={initialCount}
                 onChange={(e) => setInitialCount(Number(e.target.value))}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="Ex. 1000"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Nombre d'animaux à l'entrée.</p>
             </div>
 
             <div>
@@ -198,8 +210,27 @@ export default function ElevageView({
                 required
                 value={entryDate}
                 onChange={(e) => setEntryDate(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Date d'arrivée dans la ferme.</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Prix unitaire ({currency}) *</label>
+              <input
+                id="lot-unit-cost-input"
+                type="number"
+                required
+                min={0.01}
+                step="0.01"
+                value={unitCost}
+                onChange={(e) => setUnitCost(Number(e.target.value))}
+                placeholder={`Ex. 850 ${currency}`}
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+              />
+              <p className="mt-1 text-[10px] text-slate-400">
+                Coût total : {(initialCount * unitCost).toLocaleString('fr-FR')} {currency}
+              </p>
             </div>
           </div>
 
@@ -210,8 +241,10 @@ export default function ElevageView({
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none"
+              placeholder="Ex. Lot vacciné à l'arrivée, fournisseur X"
+              className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
             />
+            <p className="mt-1 text-[10px] text-slate-500">Observation utile pour le suivi sanitaire ou financier.</p>
           </div>
 
           <div className="flex justify-end gap-2">
@@ -303,6 +336,14 @@ export default function ElevageView({
                       <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Taux de survie :
                     </span>
                     <span className="font-bold text-emerald-600">{survivalRate}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Prix unitaire :</span>
+                    <span className="font-semibold text-slate-700">{(lot.unitCost ?? 0).toLocaleString('fr-FR')} {currency}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Valeur d'acquisition :</span>
+                    <span className="font-bold text-slate-800">{(lot.acquisitionCost ?? lot.initialCount * (lot.unitCost ?? 0)).toLocaleString('fr-FR')} {currency}</span>
                   </div>
                   {lot.notes && (
                     <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100 text-[11px] text-slate-500 flex gap-1.5 items-start mt-2 shadow-sm">

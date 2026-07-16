@@ -30,6 +30,12 @@ class FarmController extends Controller
 
     public function store(StoreFarmRequest $request): JsonResponse
     {
+        if ($request->user()?->farm_id) {
+            return response()->json([
+                'message' => 'Ce compte est deja rattache a une ferme et ne peut pas en creer une deuxieme.',
+            ], 422);
+        }
+
         $farm = $this->farmService->createForAdministrator($request->user(), $request->validated());
 
         $this->auditService->record([
@@ -67,4 +73,3 @@ class FarmController extends Controller
         return response()->json(['data' => $farm]);
     }
 }
-

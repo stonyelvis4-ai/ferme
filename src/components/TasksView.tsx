@@ -119,8 +119,9 @@ export default function TasksView({
                 placeholder="Ex: Nettoyage mangeoires Poulailler B"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Action courte à afficher dans l'agenda.</p>
             </div>
 
             <div>
@@ -129,13 +130,14 @@ export default function TasksView({
                 id="task-priority-select"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as Priority)}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 shadow-sm bg-white focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               >
                 <option value="low">Faible</option>
                 <option value="normal">Normale</option>
                 <option value="high">Élevée</option>
                 <option value="critical">Critique</option>
               </select>
+              <p className="mt-1 text-[10px] text-slate-500">Niveau d'urgence.</p>
             </div>
 
             <div>
@@ -146,8 +148,9 @@ export default function TasksView({
                 required
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Date limite prévue.</p>
             </div>
 
             <div className="md:col-span-2">
@@ -158,8 +161,9 @@ export default function TasksView({
                 placeholder="Préciser les consignes techniques"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Détail utile pour l'exécution.</p>
             </div>
 
             <div>
@@ -170,8 +174,9 @@ export default function TasksView({
                 placeholder="Nom de l'exécutant"
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Personne chargée de la tâche.</p>
             </div>
 
             <div>
@@ -180,7 +185,7 @@ export default function TasksView({
                 id="task-module-select"
                 value={sourceModule}
                 onChange={(e) => setSourceModule(e.target.value)}
-                className="w-full border border-slate-200 rounded-2xl p-2.5 bg-white focus:outline-none focus:border-emerald-500"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               >
                 <option value="Ferme">Ferme (Général)</option>
                 <option value="Élevage">Élevage</option>
@@ -190,6 +195,7 @@ export default function TasksView({
                 <option value="Stocks">Stocks</option>
                 <option value="Bâtiments">Bâtiments</option>
               </select>
+              <p className="mt-1 text-[10px] text-slate-500">Module auquel rattacher l'action.</p>
             </div>
           </div>
 

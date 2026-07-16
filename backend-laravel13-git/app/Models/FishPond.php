@@ -27,6 +27,8 @@ class FishPond extends Model
         'feed_distributed_kg',
         'fcr',
         'notes',
+        'unit_cost',
+        'acquisition_cost',
     ];
 
     protected $casts = [
@@ -39,6 +41,8 @@ class FishPond extends Model
         'biomass_kg' => 'decimal:2',
         'feed_distributed_kg' => 'decimal:2',
         'fcr' => 'decimal:2',
+        'unit_cost' => 'decimal:2',
+        'acquisition_cost' => 'decimal:2',
     ];
 
     public function farm(): BelongsTo

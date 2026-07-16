@@ -20,8 +20,8 @@ class StoreStockItemRequest extends FormRequest
             'unit' => ['required', 'string', 'max:50'],
             'minimum_threshold' => ['sometimes', 'integer', 'min:0'],
             'current_quantity' => ['sometimes', 'integer', 'min:0'],
+            'unit_cost' => ['sometimes', 'numeric', 'min:0'],
             'location' => ['nullable', 'string', 'max:255'],
         ];
     }
 }
-

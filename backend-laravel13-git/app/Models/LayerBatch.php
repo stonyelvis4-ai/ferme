@@ -21,6 +21,9 @@ class LayerBatch extends Model
         'reform_total',
         'current_count',
         'status',
+        'unit_cost',
+        'acquisition_cost',
+        'financial_transaction_id',
     ];
 
     protected $casts = [
@@ -29,6 +32,8 @@ class LayerBatch extends Model
         'mortality_total' => 'integer',
         'reform_total' => 'integer',
         'current_count' => 'integer',
+        'unit_cost' => 'decimal:2',
+        'acquisition_cost' => 'decimal:2',
     ];
 
     public function farm(): BelongsTo
@@ -46,4 +51,3 @@ class LayerBatch extends Model
         return $this->hasMany(EggSale::class, 'layer_batch_id');
     }
 }
-

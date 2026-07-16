@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\StoreFinancialTransactionRequest;
+use App\Http\Requests\Finance\UpdateFinancialTransactionRequest;
 use App\Models\FinancialTransaction;
 use App\Services\FinanceService;
 use Illuminate\Http\JsonResponse;
@@ -40,6 +41,15 @@ class FinanceController extends Controller
         return response()->json(['data' => $financialTransaction]);
     }
 
+    public function update(UpdateFinancialTransactionRequest $request, FinancialTransaction $financialTransaction): JsonResponse
+    {
+        abort_if($financialTransaction->source_module !== 'Finances', 422, 'Only manual finance transactions can be updated here.');
+
+        $transaction = $this->financeService->updateTransaction($financialTransaction, $request->validated());
+
+        return response()->json(['data' => $transaction]);
+    }
+
     public function destroy(FinancialTransaction $financialTransaction): JsonResponse
     {
         $financialTransaction->delete();
@@ -47,4 +57,3 @@ class FinanceController extends Controller
         return response()->json(['message' => 'Transaction deleted.']);
     }
 }
-

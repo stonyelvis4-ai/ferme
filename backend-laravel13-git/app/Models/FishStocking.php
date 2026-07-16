@@ -19,6 +19,9 @@ class FishStocking extends Model
         'total_weight_kg',
         'supplier_name',
         'notes',
+        'unit_cost',
+        'acquisition_cost',
+        'financial_transaction_id',
     ];
 
     protected $casts = [
@@ -26,6 +29,8 @@ class FishStocking extends Model
         'fish_count' => 'integer',
         'average_weight_kg' => 'decimal:2',
         'total_weight_kg' => 'decimal:2',
+        'unit_cost' => 'decimal:2',
+        'acquisition_cost' => 'decimal:2',
     ];
 
     public function farm(): BelongsTo

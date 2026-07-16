@@ -52,6 +52,9 @@ class FarmService
             ]
         );
 
+        $administrator->forceFill(['farm_id' => $farm->id])->save();
+        $administrator->assignedFarms()->sync([$farm->id]);
+
         return $farm;
     }
 
@@ -67,7 +70,7 @@ class FarmService
             'is_active' => $data['is_active'] ?? true,
         ]);
 
-        $owner->assignedFarms()->syncWithoutDetaching([$farm->id]);
+        $owner->assignedFarms()->sync([$farm->id]);
 
         return $owner;
     }

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\StockItem;
 use App\Models\StockMovement;
+use Illuminate\Validation\ValidationException;
 
 class StockService
 {
@@ -28,7 +29,15 @@ class StockService
 
     public function recordMovement(array $data): StockMovement
     {
-        $item = StockItem::query()->findOrFail($data['stock_item_id']);
+        $item = StockItem::query()
+            ->when(isset($data['farm_id']), fn ($query) => $query->where('farm_id', $data['farm_id']))
+            ->findOrFail($data['stock_item_id']);
+
+        if ($data['type'] === 'out' && $item->current_quantity < $data['quantity']) {
+            throw ValidationException::withMessages([
+                'quantity' => 'Stock insuffisant pour cette sortie.',
+            ]);
+        }
 
         $movement = StockMovement::create($data);
 
@@ -61,4 +70,3 @@ class StockService
         return $movement;
     }
 }
-

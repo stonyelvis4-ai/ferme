@@ -64,16 +64,32 @@ export default function BatimentsView({
 
       {showCreateForm && role === 'admin' && (
         <form onSubmit={handleCreateBuilding} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom du batiment" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <select value={type} onChange={(e) => setType(e.target.value as Building['type'])} className="border border-slate-200 rounded-2xl p-2.5 text-xs bg-white">
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du batiment</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Poulailler A1" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Nom visible dans les affectations.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Type</span>
+          <select value={type} onChange={(e) => setType(e.target.value as Building['type'])} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
             <option value="poulailler">Poulailler</option>
             <option value="étable">Etable</option>
             <option value="pisciculture">Pisciculture</option>
             <option value="magasin">Magasin</option>
             <option value="autre">Autre</option>
           </select>
-          <input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} placeholder="Capacite" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
+            <span className="block text-[10px] text-slate-500">Usage principal du lieu.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Capacite</span>
+            <input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} placeholder="Ex. 1000" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Nombre maximal de sujets.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Notes</span>
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex. Zone ventilée" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Observation facultative.</span>
+          </label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowCreateForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
             <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Creer</button>

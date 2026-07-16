@@ -53,6 +53,7 @@ export default function PondeusesView({
   const [saleCount, setSaleCount] = useState(0);
   const [unitPrice, setUnitPrice] = useState(0);
   const [saleDescription, setSaleDescription] = useState('');
+  const layingLots = lots.filter((l) => l.species.includes("Pondeuses"));
 
   useEffect(() => {
     if (!lotId && layingLots.length > 0) {
@@ -87,7 +88,6 @@ export default function PondeusesView({
 
   // Get current egg stock from latest production or custom calc
   const eggStock = productions.length > 0 ? productions[productions.length - 1].stockCount : 0;
-  const layingLots = lots.filter((l) => l.species.includes("Pondeuses"));
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -243,7 +243,7 @@ export default function PondeusesView({
                 id="ponte-lot-input"
                 value={lotId}
                 onChange={(e) => setLotId(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-amber-500 focus:outline-none bg-white"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100"
               >
                 {layingLots.map((l) => (
                   <option key={l.id} value={l.id}>
@@ -251,6 +251,7 @@ export default function PondeusesView({
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-[10px] text-slate-500">Lot qui a produit les œufs.</p>
             </div>
 
             <div>
@@ -268,8 +269,10 @@ export default function PondeusesView({
                   setBroken(Math.floor(Number(e.target.value) * 0.01));
                   setLosses(Math.floor(Number(e.target.value) * 0.01));
                 }}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-amber-500 focus:outline-none"
+                placeholder="Ex. 850"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Total ramassé avant tri.</p>
             </div>
 
             <div>
@@ -281,8 +284,10 @@ export default function PondeusesView({
                 min={0}
                 value={compliant}
                 onChange={(e) => setCompliant(Number(e.target.value))}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-amber-500 focus:outline-none"
+                placeholder="Ex. 830"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Œufs vendables après tri.</p>
             </div>
 
             <div>
@@ -293,8 +298,10 @@ export default function PondeusesView({
                 min={0}
                 value={broken}
                 onChange={(e) => setBroken(Number(e.target.value))}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-amber-500 focus:outline-none"
+                placeholder="Ex. 10"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Œufs cassés ou invendables.</p>
             </div>
 
             <div>
@@ -305,8 +312,9 @@ export default function PondeusesView({
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-amber-500 focus:outline-none"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Jour de la collecte.</p>
             </div>
           </div>
 
@@ -355,7 +363,8 @@ export default function PondeusesView({
                 max={eggStock}
                 value={saleCount}
                 onChange={(e) => setSaleCount(Number(e.target.value))}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="Ex. 300"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Maximum disponible : {eggStock} œufs</span>
             </div>
@@ -369,7 +378,8 @@ export default function PondeusesView({
                 min={1}
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(Number(e.target.value))}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none"
+                placeholder={`Ex. 100 ${currency}`}
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               />
             </div>
 
@@ -380,8 +390,10 @@ export default function PondeusesView({
                 type="text"
                 value={saleDescription}
                 onChange={(e) => setSaleDescription(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-2xl p-2.5 shadow-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="Ex. Client comptoir"
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               />
+              <p className="mt-1 text-[10px] text-slate-500">Nom du client ou motif de vente.</p>
             </div>
           </div>
 

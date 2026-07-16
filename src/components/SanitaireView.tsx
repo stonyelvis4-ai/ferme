@@ -85,15 +85,35 @@ export default function SanitaireView({
 
       {showCreateForm && role === 'admin' && (
         <form onSubmit={handleCreateTreatment} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-6 gap-4">
-          <select value={lotId} onChange={(e) => setLotId(e.target.value)} className="border border-slate-200 rounded-2xl p-2.5 text-xs bg-white">
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Lot concerné</span>
+          <select value={lotId} onChange={(e) => setLotId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
             {lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.name}</option>)}
           </select>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Traitement" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
-          <select value={productId} onChange={(e) => setProductId(e.target.value)} className="border border-slate-200 rounded-2xl p-2.5 text-xs bg-white">
+            <span className="block text-[10px] text-slate-500">Animaux à traiter.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Traitement</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Vaccin Newcastle" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Nom du vaccin ou soin.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Date prévue</span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Date d'administration.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Produit stock</span>
+          <select value={productId} onChange={(e) => setProductId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
             {articles.map((article) => <option key={article.id} value={article.id}>{article.name}</option>)}
           </select>
-          <input type="number" min={1} value={cost} onChange={(e) => setCost(Number(e.target.value))} placeholder="Coût" className="border border-slate-200 rounded-2xl p-2.5 text-xs" />
+            <span className="block text-[10px] text-slate-500">Article déduit du stock.</span>
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Coût</span>
+            <input type="number" min={1} value={cost} onChange={(e) => setCost(Number(e.target.value))} placeholder="Ex. 15000" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Montant à comptabiliser.</span>
+          </label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowCreateForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
             <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Créer</button>
