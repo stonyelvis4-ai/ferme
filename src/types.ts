@@ -15,10 +15,10 @@ export type LotStatus = 'active' | 'archived' | 'sold';
 
 export interface Lot {
   id: string;
-  name: string; // e.g. "Poulets Chair Lot A"
-  species: string; // e.g. "Volaille", "Bovin", "Porcin"
-  breed: string; // e.g. "Cobb 500", "Charolais"
-  buildingId: string; // building location
+  name: string;
+  species: string;
+  breed: string;
+  buildingId: string;
   initialCount: number;
   currentCount: number;
   mortalityCount: number;
@@ -39,20 +39,20 @@ export interface EggProduction {
   brokenCount: number;
   lossesCount: number;
   soldCount: number;
-  stockCount: number; // remaining in stock
+  stockCount: number;
 }
 
 export interface FishBassin {
   id: string;
-  name: string; // e.g. "Bassin Tilapia A"
-  species: string; // e.g. "Tilapia", "Silure"
+  name: string;
+  species: string;
   initialCount: number;
   currentCount: number;
   mortalityCount: number;
   stockingDate: string;
   harvestDate?: string;
   status: 'active' | 'harvested' | 'inactive';
-  waterTemperature?: number; // °C
+  waterTemperature?: number;
   waterPh?: number;
   unitCost?: number;
   acquisitionCost?: number;
@@ -60,9 +60,9 @@ export interface FishBassin {
 
 export interface CultureParcelle {
   id: string;
-  name: string; // e.g. "Champ Sud Parcelle 1"
-  area: number; // in hectares (ha)
-  soilType: string; // e.g. "Argileux", "Sableux"
+  name: string;
+  area: number;
+  soilType: string;
   status: 'cultivated' | 'fallow' | 'preparing';
   cropId?: string;
 }
@@ -70,25 +70,76 @@ export interface CultureParcelle {
 export interface Campaign {
   id: string;
   parcelleId: string;
-  cropType: string; // e.g. "Maïs", "Soja", "Tomates"
-  variety: string; // e.g. "Pioneer 30F53"
+  cropType: string;
+  variety: string;
   startDate: string;
   endDate?: string;
   status: 'preparing' | 'sown' | 'growing' | 'harvested' | 'cancelled';
-  expectedYield?: number; // tons/ha
-  actualYield?: number; // tons
+  expectedYield?: number;
+  actualYield?: number;
   expenses: number;
   revenues: number;
 }
 
+export interface StockCategoryOption {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  isActive: boolean;
+}
+
+export interface SupplierOption {
+  id: string;
+  name: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  isActive: boolean;
+}
+
+export interface StockRelationOption {
+  id: string;
+  label: string;
+  type: string;
+  businessModule: 'livestock' | 'aquaculture' | 'crops' | 'infrastructure' | 'general';
+}
+
 export interface StockArticle {
   id: string;
-  name: string; // e.g. "Aliment Pondeuses Démarrage"
-  category: 'feed' | 'vaccine' | 'medicine' | 'seed' | 'fertilizer' | 'tool' | 'other';
+  name: string;
+  reference?: string;
+  category: string;
+  categoryId?: string;
+  categoryLabel?: string;
+  description?: string;
+  brand?: string;
+  supplierId?: string;
+  supplierName?: string;
+  batchNumber?: string;
+  purchaseDate?: string;
+  manufacturingDate?: string;
+  expirationDate?: string;
   quantity: number;
-  unit: string; // e.g. "kg", "litres", "doses", "unités"
-  minThreshold: number; // alert trigger
-  locationId: string; // building / warehouse
+  unit: string;
+  minThreshold: number;
+  minimumStock?: number;
+  maximumStock?: number;
+  locationId: string;
+  storageLocation?: string;
+  unitCost?: number;
+  totalPurchasePrice?: number;
+  currency?: string;
+  imageUrl?: string;
+  notes?: string;
+  isActive?: boolean;
+  businessModule?: 'livestock' | 'aquaculture' | 'crops' | 'infrastructure' | 'general';
+  relatedType?: string;
+  relatedId?: string;
+}
+
+export interface StockArticleInput extends Omit<StockArticle, 'id'> {
+  imageFile?: File | null;
 }
 
 export interface StockMovement {
@@ -97,30 +148,31 @@ export interface StockMovement {
   type: 'in' | 'out' | 'adjustment';
   quantity: number;
   date: string;
-  reason: string; // e.g. "Achat stock", "Alimentation Lot A", "Ajustement inventaire"
-  sourceModule?: string; // e.g. "Elevage", "Pisciculture", "Sanitaire", "Cultures"
+  reason: string;
+  sourceModule?: string;
   sourceElementId?: string;
+  unitCost?: number | null;
 }
 
 export interface FinanceTransaction {
   id: string;
   type: 'income' | 'expense';
-  category: string; // e.g. "Achat Aliment", "Vente Oeufs", "Salarial", "Vaccination"
+  category: string;
   amount: number;
   date: string;
   description: string;
-  sourceModule: string; // e.g. "Pondeuses", "Elevage", "Stocks", "Sanitaire"
-  sourceElementId?: string; // ID of the referenced object
+  sourceModule: string;
+  sourceElementId?: string;
 }
 
 export interface SanitaryTreatment {
   id: string;
   lotId: string;
   type: 'vaccine' | 'treatment';
-  name: string; // e.g. "Vaccin Newcastle"
+  name: string;
   date: string;
-  dosage: string; // e.g. "0.5 ml/sujet"
-  productId: string; // articleId of the vaccine/medicine in stock
+  dosage: string;
+  productId: string;
   quantityUsed: number;
   status: 'planned' | 'completed' | 'cancelled';
   cost: number;
@@ -128,9 +180,9 @@ export interface SanitaryTreatment {
 
 export interface Building {
   id: string;
-  name: string; // e.g. "Bâtiment Pondeuses 1", "Magasin d'Intrants"
-  type: 'poulailler' | 'étable' | 'pisciculture' | 'magasin' | 'autre';
-  capacity: number; // maximum animal count or weight
+  name: string;
+  type: 'poulailler' | 'etable' | 'pisciculture' | 'magasin' | 'autre';
+  capacity: number;
   notes?: string;
 }
 
@@ -138,7 +190,7 @@ export interface Task {
   id: string;
   title: string;
   description: string;
-  sourceModule: string; // e.g. "Sanitaire", "Stocks", "Pisciculture", "Ferme"
+  sourceModule: string;
   sourceElementId?: string;
   sourceEntityType?: string;
   farmId?: string | number;
@@ -148,8 +200,8 @@ export interface Task {
   reminderAt?: string;
   priority: Priority;
   status: TaskStatus;
-  assignedTo?: string; // e.g. "Ouvrier A"
-  reminderTime?: string; // e.g. "08:00"
+  assignedTo?: string;
+  reminderTime?: string;
 }
 
 export interface Alert {
@@ -167,13 +219,13 @@ export interface Alert {
 
 export interface AuditLog {
   id: string;
-  user: string; // "Admin" or "Propriétaire"
+  user: string;
   module: string;
-  action: string; // "Création d'un lot", "Ajustement de stock", etc.
+  action: string;
   oldValue?: string;
   newValue?: string;
   timestamp: string;
-  device: string; // e.g. "iPhone 14", "Safari Desktop"
+  device: string;
   syncStatus: SyncStatus;
 }
 
@@ -184,9 +236,9 @@ export interface FarmSettings {
   managerName: string;
   contactEmail: string;
   contactPhone: string;
-  currency: string; // e.g. "FCFA", "EUR", "USD"
-  areaUnit: string; // e.g. "ha", "m²"
-  weightUnit: string; // e.g. "kg", "g"
+  currency: string;
+  areaUnit: string;
+  weightUnit: string;
   eggTrayDefaultPrice?: number;
   fishKgDefaultPrice?: number;
   cropKgDefaultPrice?: number;
@@ -213,12 +265,4 @@ export interface FarmSettings {
   taskCategories?: string[];
   taskPriorities?: string[];
   alertRules?: unknown[];
-}
-
-export interface StockArticle {
-  unitCost?: number;
-}
-
-export interface StockMovement {
-  unitCost?: number | null;
 }

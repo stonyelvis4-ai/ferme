@@ -89,6 +89,7 @@ Route::prefix('v1')->group(function () {
                 Route::patch('/alerts/{alert}/resolve', [AlertController::class, 'resolve']);
                 Route::post('/alerts/sync-overdue-tasks', [AlertController::class, 'syncOverdueTasks']);
                 Route::post('/stocks', [StockController::class, 'store']);
+                Route::post('/stocks/suppliers', [StockController::class, 'storeSupplier']);
                 Route::patch('/stocks/{stockItem}', [StockController::class, 'update']);
                 Route::delete('/stocks/{stockItem}', [StockController::class, 'destroy']);
                 Route::post('/stocks/movements', [StockController::class, 'movement']);

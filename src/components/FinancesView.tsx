@@ -167,6 +167,24 @@ export default function FinancesView({
             Enregistrer une dépense ou un revenu divers
           </h3>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 text-xs">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Flux</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{type === 'income' ? 'Entrée de trésorerie' : 'Sortie de trésorerie'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Catégorie: {category}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Montant</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{formatCurrency(amount)}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Date comptable: {date}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Libellé</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{description || 'Motif en attente'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Cette écriture sera tracée dans les rapports.</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Type de flux *</label>
@@ -246,7 +264,7 @@ export default function FinancesView({
 
           <div className="flex justify-between items-center bg-slate-50 p-2.5 border border-slate-100 rounded-2xl">
             <span className="text-[10px] text-slate-500">
-              💡 Les transactions manuelles sont auditées sous l'origine 'Finances'.
+              Les transactions manuelles restent historisées sous l'origine "Finances".
             </span>
             <div className="flex gap-1.5">
               <button

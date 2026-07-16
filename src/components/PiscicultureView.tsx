@@ -52,6 +52,7 @@ export default function PiscicultureView({
   const [harvestBassinId, setHarvestBassinId] = useState<string | null>(null);
   const [harvestWeightKg, setHarvestWeightKg] = useState(0);
   const [harvestRevenue, setHarvestRevenue] = useState(500000);
+  const acquisitionCost = newInitialCount * newUnitCost;
 
   // Filter food articles in stock
   const foodArticles = articles.filter((a) => a.category === 'feed' && a.name.toLowerCase().includes('poisson'));
@@ -128,7 +129,25 @@ export default function PiscicultureView({
       </div>
 
       {showCreateForm && role === 'admin' && (
-        <form onSubmit={handleCreateBassin} className="bg-white border border-sky-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-6 gap-4">
+        <form onSubmit={handleCreateBassin} className="bg-white border border-sky-100 p-5 rounded-2xl shadow-sm space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Projection bassin</span>
+              <span className="mt-1 block text-sm font-semibold text-sky-900">{newName || 'Nom en attente'}</span>
+              <p className="mt-1 text-[11px] text-sky-800">Espece: {newSpecies}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Empoissonnement</span>
+              <span className="mt-1 block text-sm font-semibold text-sky-900">{newInitialCount.toLocaleString('fr-FR')} alevins</span>
+              <p className="mt-1 text-[11px] text-sky-800">Date: {newStockingDate}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Valeur initiale</span>
+              <span className="mt-1 block text-sm font-semibold text-sky-900">{acquisitionCost.toLocaleString('fr-FR')} {currency}</span>
+              <p className="mt-1 text-[11px] text-sky-800">Effectif initial × prix par alevin.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <label className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du bassin</span>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ex. Bassin Tilapia A" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100" />
@@ -157,6 +176,7 @@ export default function PiscicultureView({
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowCreateForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
             <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white">Créer</button>
+          </div>
           </div>
         </form>
       )}

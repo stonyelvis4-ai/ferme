@@ -109,6 +109,24 @@ export default function TasksView({
             Créer et affecter une nouvelle tâche
           </h3>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 text-xs">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Tâche</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{title || 'Intitulé en attente'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Module source: {sourceModule}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Pilotage</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{assignedTo || 'Responsable à préciser'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Priorité: {priority}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Échéance</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{dueDate}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">La tâche sera visible dans le suivi quotidien.</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
             <div className="md:col-span-2">
               <label className="block text-xs font-semibold text-slate-600 mb-1">Intitulé de la tâche *</label>

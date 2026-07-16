@@ -20,6 +20,10 @@ interface AuditViewProps {
 }
 
 export default function AuditView({ auditLogs }: AuditViewProps) {
+  const syncedCount = auditLogs.filter((log) => log.syncStatus === 'synced').length;
+  const pendingCount = auditLogs.filter((log) => log.syncStatus === 'pending').length;
+  const conflictCount = auditLogs.filter((log) => log.syncStatus === 'conflict' || log.syncStatus === 'error').length;
+
   return (
     <div id="audit-view" className="space-y-6">
       {/* Header */}
@@ -37,6 +41,24 @@ export default function AuditView({ auditLogs }: AuditViewProps) {
           <Wifi className="w-3.5 h-3.5 text-emerald-600" />
           Moteur d'Audit Actif
         </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Synchronisés</span>
+          <span className="mt-2 block text-2xl font-bold text-emerald-900">{syncedCount}</span>
+          <p className="mt-1 text-xs text-emerald-800">Entrées confirmées sur les appareils connectés.</p>
+        </div>
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">En attente</span>
+          <span className="mt-2 block text-2xl font-bold text-amber-900">{pendingCount}</span>
+          <p className="mt-1 text-xs text-amber-800">Écritures encore en cours de propagation.</p>
+        </div>
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Conflits</span>
+          <span className="mt-2 block text-2xl font-bold text-rose-900">{conflictCount}</span>
+          <p className="mt-1 text-xs text-rose-800">À surveiller si plusieurs appareils modifient la même donnée.</p>
+        </div>
       </div>
 
       {/* Audit Log list */}

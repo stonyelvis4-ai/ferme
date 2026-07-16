@@ -103,9 +103,11 @@ export default function PondeusesView({
   const lossRate = totalCollected > 0 ? (totalLosses / totalCollected) * 100 : 0;
   const lastProduction = productions.length > 0 ? productions[productions.length - 1] : null;
   const referenceLot = layingLots.find((lot) => lot.id === lastProduction?.lotId) ?? layingLots[0];
+  const selectedLayingLot = layingLots.find((lot) => lot.id === lotId) ?? referenceLot;
   const lastLayingRate = lastProduction && referenceLot
     ? (lastProduction.collectedCount / Math.max(referenceLot.currentCount, 1)) * 100
     : 0;
+  const saleTotal = saleCount * unitPrice;
 
   const handleEditProduction = (production: EggProduction) => {
     const compliantValue = window.prompt('Oeufs conformes', String(production.compliantCount));
@@ -236,6 +238,26 @@ export default function PondeusesView({
             Enregistrer la ponte journalière
           </h3>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-amber-100 bg-amber-50/60 p-4 text-xs">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Lot suivi</span>
+              <span className="mt-1 block text-sm font-semibold text-amber-900">{selectedLayingLot?.name || 'Lot à sélectionner'}</span>
+              <p className="mt-1 text-[11px] text-amber-800">Effectif actuel: {selectedLayingLot?.currentCount ?? 0} sujets</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Collecte du jour</span>
+              <span className="mt-1 block text-sm font-semibold text-amber-900">{collected.toLocaleString('fr-FR')} oeufs</span>
+              <p className="mt-1 text-[11px] text-amber-800">Conformes: {compliant.toLocaleString('fr-FR')} | Cassés: {broken.toLocaleString('fr-FR')}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Projection</span>
+              <span className="mt-1 block text-sm font-semibold text-amber-900">
+                {selectedLayingLot?.currentCount ? `${((collected / Math.max(selectedLayingLot.currentCount, 1)) * 100).toFixed(1)}% de ponte` : 'Taux en attente'}
+              </span>
+              <p className="mt-1 text-[11px] text-amber-800">Repère utile avant validation de la production.</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Lot de Poules *</label>
@@ -351,6 +373,24 @@ export default function PondeusesView({
             <DollarSign className="w-4 h-4 text-emerald-500" />
             Enregistrer une vente d'œufs
           </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 text-xs">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Stock disponible</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{eggStock.toLocaleString('fr-FR')} oeufs</span>
+              <p className="mt-1 text-[11px] text-emerald-800">La quantité vendue ne peut pas dépasser ce niveau.</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Vente prévue</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{saleCount.toLocaleString('fr-FR')} oeufs</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Prix unitaire: {unitPrice > 0 ? formatCurrency(unitPrice) : `0 ${currency}`}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Impact financier</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{formatCurrency(saleTotal)}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Montant qui sera remonté dans la trésorerie.</p>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>

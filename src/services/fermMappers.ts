@@ -16,7 +16,10 @@ import {
   Lot,
   SanitaryTreatment,
   StockArticle,
+  StockCategoryOption,
   StockMovement,
+  StockRelationOption,
+  SupplierOption,
   Task,
 } from '../types';
 import { AuthUser } from './fermApi';
@@ -233,15 +236,80 @@ export function mapCampaigns(data: unknown[], plots: unknown[] = []): Campaign[]
 export function mapArticles(data: unknown[]): StockArticle[] {
   return data.map((item, index) => {
     const stock = item as Record<string, unknown>;
+    const categoryRelation = (stock.category_relation ?? stock.categoryRelation) as Record<string, unknown> | undefined;
+    const supplier = stock.supplier as Record<string, unknown> | undefined;
+    const storageLocation = toText(stock.storage_location ?? stock.storageLocation ?? stock.location ?? stock.locationId, '');
+    const minimumStock = toNumber(stock.minimum_threshold ?? stock.minimumStock ?? stock.minThreshold, 0);
     return {
       id: toText(stock.id, `stock-${index + 1}`),
       name: labelOrFallback(stock.name, 'Stock'),
-      category: (toText(stock.category, 'other') as StockArticle['category']) || 'other',
+      reference: toText(stock.reference, ''),
+      category: toText(stock.category, 'other'),
+      categoryId: toText(stock.category_id ?? stock.categoryId ?? categoryRelation?.id, ''),
+      categoryLabel: toText(categoryRelation?.name, toText(stock.category, 'Autre')),
+      description: toText(stock.description, ''),
+      brand: toText(stock.brand, ''),
+      supplierId: toText(stock.supplier_id ?? stock.supplierId ?? supplier?.id, ''),
+      supplierName: toText(supplier?.name, ''),
+      batchNumber: toText(stock.batch_number ?? stock.batchNumber, ''),
+      purchaseDate: stock.purchase_date ? toDate(stock.purchase_date) : stock.purchaseDate ? toDate(stock.purchaseDate) : undefined,
+      manufacturingDate: stock.manufacturing_date ? toDate(stock.manufacturing_date) : stock.manufacturingDate ? toDate(stock.manufacturingDate) : undefined,
+      expirationDate: stock.expiration_date ? toDate(stock.expiration_date) : stock.expirationDate ? toDate(stock.expirationDate) : undefined,
       quantity: toNumber(stock.current_quantity ?? stock.quantity, 0),
       unitCost: toNumber(stock.unit_cost ?? stock.unitCost, 0),
+      totalPurchasePrice: toNumber(stock.purchase_total_cost ?? stock.totalPurchasePrice, 0),
       unit: labelOrFallback(stock.unit, 'u'),
-      minThreshold: toNumber(stock.minimum_threshold ?? stock.minThreshold, 0),
-      locationId: toText(stock.location ?? stock.locationId, ''),
+      minThreshold: minimumStock,
+      minimumStock,
+      maximumStock: stock.maximum_stock ?? stock.maximumStock ? toNumber(stock.maximum_stock ?? stock.maximumStock, 0) : undefined,
+      locationId: storageLocation,
+      storageLocation,
+      currency: toText(stock.currency, 'XOF'),
+      imageUrl: toText(stock.image_path ?? stock.imageUrl, ''),
+      notes: toText(stock.notes, ''),
+      isActive: Boolean(stock.is_active ?? stock.isActive ?? true),
+      businessModule: (toText(stock.business_module ?? stock.businessModule, 'general') as StockArticle['businessModule']) || 'general',
+      relatedType: toText(stock.related_type ?? stock.relatedType, ''),
+      relatedId: toText(stock.related_id ?? stock.relatedId, ''),
+    };
+  });
+}
+
+export function mapStockCategories(data: unknown[]): StockCategoryOption[] {
+  return data.map((item, index) => {
+    const category = item as Record<string, unknown>;
+    return {
+      id: toText(category.id, `category-${index + 1}`),
+      name: labelOrFallback(category.name, 'Catégorie'),
+      slug: toText(category.slug, 'other'),
+      description: toText(category.description, ''),
+      isActive: Boolean(category.is_active ?? category.isActive ?? true),
+    };
+  });
+}
+
+export function mapSuppliers(data: unknown[]): SupplierOption[] {
+  return data.map((item, index) => {
+    const supplier = item as Record<string, unknown>;
+    return {
+      id: toText(supplier.id, `supplier-${index + 1}`),
+      name: labelOrFallback(supplier.name, 'Fournisseur'),
+      contactName: toText(supplier.contact_name ?? supplier.contactName, ''),
+      phone: toText(supplier.phone, ''),
+      email: toText(supplier.email, ''),
+      isActive: Boolean(supplier.is_active ?? supplier.isActive ?? true),
+    };
+  });
+}
+
+export function mapStockRelations(data: unknown[]): StockRelationOption[] {
+  return data.map((item, index) => {
+    const relation = item as Record<string, unknown>;
+    return {
+      id: toText(relation.id, `relation-${index + 1}`),
+      label: labelOrFallback(relation.label, 'Élément'),
+      type: toText(relation.type, 'general'),
+      businessModule: (toText(relation.business_module ?? relation.businessModule, 'general') as StockRelationOption['businessModule']) || 'general',
     };
   });
 }

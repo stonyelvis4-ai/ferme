@@ -81,6 +81,7 @@ export default function DashboardView({
   const pendingTasks = tasks.filter((task) => task.status === 'todo' || task.status === 'in_progress');
   const overdueTasksCount = tasks.filter((task) => task.status === 'overdue').length;
   const activeAlerts = alerts.filter((alert) => !alert.read);
+  const stockAlerts = articles.filter((article) => article.quantity <= (article.minimumStock ?? article.minThreshold ?? 0)).length;
 
   const expenseBreakdown = Object.entries(
     transactions
@@ -121,6 +122,31 @@ export default function DashboardView({
           <p className="mt-2 text-sm text-slate-500">
             Commencez par créer un lot, une parcelle, un bassin, un stock ou une tâche pour alimenter les indicateurs.
           </p>
+        </div>
+      ) : null}
+
+      {!isEmpty ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Résultat net</span>
+            <span className={`mt-2 block text-xl font-bold ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(netProfit)}</span>
+            <p className="mt-1 text-xs text-slate-500">Différence entre revenus et dépenses enregistrés.</p>
+          </div>
+          <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-4 shadow-sm">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Cheptel aquacole</span>
+            <span className="mt-2 block text-xl font-bold text-sky-900">{totalFishCount.toLocaleString('fr-FR')}</span>
+            <p className="mt-1 text-xs text-sky-800">Poissons actuellement suivis dans les bassins.</p>
+          </div>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 shadow-sm">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Stocks sensibles</span>
+            <span className="mt-2 block text-xl font-bold text-amber-900">{stockAlerts}</span>
+            <p className="mt-1 text-xs text-amber-800">Articles proches ou sous leur seuil d'alerte.</p>
+          </div>
+          <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 shadow-sm">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Vigilance</span>
+            <span className="mt-2 block text-xl font-bold text-rose-900">{activeAlerts.length + overdueTasksCount}</span>
+            <p className="mt-1 text-xs text-rose-800">Total des alertes ouvertes et tâches en retard.</p>
+          </div>
         </div>
       ) : null}
 

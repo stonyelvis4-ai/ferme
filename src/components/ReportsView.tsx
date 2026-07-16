@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -6,7 +6,6 @@
 import React, { useState } from 'react';
 import {
   FileText,
-  Calendar,
   Filter,
   Download,
   FileSpreadsheet,
@@ -24,6 +23,22 @@ export default function ReportsView({ role }: ReportsViewProps) {
   const [reportType, setReportType] = useState('global');
   const [isExporting, setIsExporting] = useState<string | null>(null);
 
+  const reportLabels: Record<string, string> = {
+    global: "Consolidé de l'exploitation",
+    finances: 'Compte de résultat simplifié',
+    livestock: 'Performance des lots de chair',
+    eggs: 'Suivi de ponte et casse',
+    fish: 'Croissance et qualité des bassins',
+    stocks: 'Mouvements des intrants',
+    sanitary: 'Couverture vaccinale',
+  };
+
+  const periodLabels: Record<string, string> = {
+    week: 'Hebdomadaire',
+    month: 'Mensuel',
+    year: 'Annuel',
+  };
+
   const handleExport = (format: 'PDF' | 'EXCEL' | 'CSV') => {
     setIsExporting(format);
     setTimeout(() => {
@@ -34,7 +49,6 @@ export default function ReportsView({ role }: ReportsViewProps) {
 
   return (
     <div id="rapports-view" className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-sans tracking-tight flex items-center gap-2">
@@ -45,19 +59,27 @@ export default function ReportsView({ role }: ReportsViewProps) {
             Générez des rapports consolidés de production, financiers et sanitaires pour la gestion de votre ferme.
           </p>
         </div>
+        {role === 'owner' && (
+          <span className="text-xs text-slate-400 font-medium flex items-center gap-1 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-full shadow-sm">
+            <Lock className="w-3 h-3" /> Lecture seule
+          </span>
+        )}
       </div>
 
-      {/* Main Grid: Filters & Export */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Filter Selection Panel */}
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-4">
           <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-2">
             <Filter className="w-4 h-4 text-emerald-600" />
             Critères d'Analyse du Rapport
           </h3>
 
-          {/* Time range */}
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 text-xs">
+            <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Aperçu du rapport</span>
+            <span className="mt-1 block text-sm font-semibold text-emerald-900">{reportLabels[reportType]}</span>
+            <p className="mt-1 text-[11px] text-emerald-800">Période sélectionnée: {periodLabels[period]}</p>
+            <p className="mt-1 text-[11px] text-emerald-800">Les exports reprendront exactement ce périmètre.</p>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">Périodicité</label>
             <div className="grid grid-cols-3 gap-2 text-xs">
@@ -91,7 +113,6 @@ export default function ReportsView({ role }: ReportsViewProps) {
             </div>
           </div>
 
-          {/* Report types */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">Type de Synthèse</label>
             <select
@@ -111,21 +132,21 @@ export default function ReportsView({ role }: ReportsViewProps) {
             <p className="mt-1 text-[10px] text-slate-500">Choisir le rapport à afficher et exporter.</p>
           </div>
 
-          {/* Connected parameters warning */}
           <div className="bg-slate-50 border border-slate-100 p-3 rounded-2xl text-[11px] text-slate-500 leading-normal shadow-sm">
-            â„¹ï¸ Le rapport extrait les données consolidées en temps réel des modules. Tout nouvel enregistrement y est instantanément inclus.
+            Le rapport extrait les données consolidées en temps réel des modules. Tout nouvel enregistrement y est automatiquement inclus.
           </div>
         </div>
 
-        {/* Export Formats Panel */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-6">
-          <div>
+          <div className="space-y-2">
             <h3 className="font-bold text-slate-900 text-sm">Génération & Téléchargements</h3>
             <p className="text-xs text-slate-500 mt-0.5">Choisissez le format d'export de votre choix.</p>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-[11px] text-slate-600">
+              PDF pour l'impression, Excel pour les calculs, CSV pour l'échange brut avec d'autres outils.
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Excel Download block */}
             <div
               onClick={() => !isExporting && handleExport('EXCEL')}
               className={`p-4 rounded-3xl border border-slate-100 hover:border-emerald-500/40 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer text-center space-y-3 flex flex-col items-center justify-center shadow-sm hover:shadow-md ${
@@ -144,7 +165,6 @@ export default function ReportsView({ role }: ReportsViewProps) {
               </span>
             </div>
 
-            {/* PDF Download block */}
             <div
               onClick={() => !isExporting && handleExport('PDF')}
               className={`p-4 rounded-3xl border border-slate-100 hover:border-rose-500/40 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer text-center space-y-3 flex flex-col items-center justify-center shadow-sm hover:shadow-md ${
@@ -163,7 +183,6 @@ export default function ReportsView({ role }: ReportsViewProps) {
               </span>
             </div>
 
-            {/* CSV Download block */}
             <div
               onClick={() => !isExporting && handleExport('CSV')}
               className={`p-4 rounded-3xl border border-slate-100 hover:border-slate-500/40 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer text-center space-y-3 flex flex-col items-center justify-center shadow-sm hover:shadow-md ${
@@ -185,14 +204,11 @@ export default function ReportsView({ role }: ReportsViewProps) {
 
           {isExporting && (
             <div className="p-3 bg-slate-50 border border-slate-200 text-center rounded-2xl text-xs text-slate-500 flex items-center justify-center gap-2 animate-pulse shadow-sm">
-              <span>🔄 Compilation analytique des données de l'exploitation pour le format {isExporting}...</span>
+              <span>Compilation analytique des données de l'exploitation pour le format {isExporting}...</span>
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
 }
-
-

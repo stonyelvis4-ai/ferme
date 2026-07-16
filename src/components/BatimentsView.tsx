@@ -30,6 +30,7 @@ export default function BatimentsView({
   const [type, setType] = useState<Building['type']>('poulailler');
   const [capacity, setCapacity] = useState(1000);
   const [notes, setNotes] = useState('');
+  const usageLabel = type === 'magasin' ? 'stockage / intrants' : type === 'pisciculture' ? 'zone aquacole' : 'hebergement / production';
 
   const handleCreateBuilding = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +65,23 @@ export default function BatimentsView({
 
       {showCreateForm && role === 'admin' && (
         <form onSubmit={handleCreateBuilding} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="md:col-span-5 grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Infrastructure</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{name || 'Nom en attente'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Type: {type}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Capacite prevue</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{capacity.toLocaleString('fr-FR')}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Base de controle des affectations et surcharges.</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Usage metier</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{usageLabel}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Aide le classement dans les autres modules.</p>
+            </div>
+          </div>
           <label className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du batiment</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Poulailler A1" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />

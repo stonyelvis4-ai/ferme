@@ -13,19 +13,44 @@ class StockItem extends Model
 
     protected $fillable = [
         'farm_id',
+        'reference',
         'name',
+        'description',
+        'brand',
         'category',
+        'category_id',
+        'supplier_id',
+        'batch_number',
+        'purchase_date',
+        'manufacturing_date',
+        'expiration_date',
         'unit',
         'unit_cost',
+        'purchase_total_cost',
+        'currency',
         'minimum_threshold',
+        'maximum_stock',
         'current_quantity',
         'location',
+        'storage_location',
+        'image_path',
+        'notes',
+        'is_active',
+        'business_module',
+        'related_type',
+        'related_id',
     ];
 
     protected $casts = [
         'unit_cost' => 'decimal:2',
-        'minimum_threshold' => 'integer',
-        'current_quantity' => 'integer',
+        'purchase_total_cost' => 'decimal:2',
+        'minimum_threshold' => 'decimal:3',
+        'maximum_stock' => 'decimal:3',
+        'current_quantity' => 'decimal:3',
+        'purchase_date' => 'date',
+        'manufacturing_date' => 'date',
+        'expiration_date' => 'date',
+        'is_active' => 'boolean',
     ];
 
     public function farm(): BelongsTo
@@ -36,5 +61,15 @@ class StockItem extends Model
     public function movements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    public function categoryRelation(): BelongsTo
+    {
+        return $this->belongsTo(StockCategory::class, 'category_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
     }
 }

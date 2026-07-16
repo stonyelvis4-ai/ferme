@@ -36,6 +36,10 @@ export default function AgendaView({
     }
     groupedTasks[t.dueDate].push(t);
   });
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter((task) => task.status === 'completed').length;
+  const overdueTasks = tasks.filter((task) => task.status === 'overdue').length;
+  const nextTask = sortedTasks.find((task) => task.status !== 'completed');
 
   return (
     <div id="agenda-view" className="space-y-6">
@@ -55,6 +59,24 @@ export default function AgendaView({
             <Lock className="w-3 h-3" /> Lecture Seule (Propriétaire)
           </span>
         )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Charge planifiée</span>
+          <span className="mt-2 block text-2xl font-bold text-slate-900">{totalTasks}</span>
+          <p className="mt-1 text-xs text-slate-500">Événements et tâches visibles dans l'agenda.</p>
+        </div>
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Avancement</span>
+          <span className="mt-2 block text-2xl font-bold text-emerald-900">{completedTasks}</span>
+          <p className="mt-1 text-xs text-emerald-800">Tâches déjà clôturées sur la période affichée.</p>
+        </div>
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Point d'attention</span>
+          <span className="mt-2 block text-sm font-bold text-amber-900">{nextTask?.title || 'Aucune échéance ouverte'}</span>
+          <p className="mt-1 text-xs text-amber-800">{overdueTasks > 0 ? `${overdueTasks} tâche(s) en retard à traiter.` : 'Aucun retard critique détecté.'}</p>
+        </div>
       </div>
 
       {/* Agenda Timeline List grouped by date */}

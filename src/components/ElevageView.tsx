@@ -49,6 +49,8 @@ export default function ElevageView({
   const [notes, setNotes] = useState('');
   const [mortalityLotId, setMortalityLotId] = useState<string | null>(null);
   const [mortalityCount, setMortalityCount] = useState(1);
+  const acquisitionCost = initialCount * unitCost;
+  const selectedBuilding = buildings.find((item) => item.id === buildingId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +125,24 @@ export default function ElevageView({
           <h3 className="font-bold text-slate-800 text-sm border-b border-slate-50 pb-2">
             Creer un nouveau lot d'animaux
           </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Projection lot</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{name || 'Nom en attente'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Espece: {species} • Race: {breed}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Affectation</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{selectedBuilding?.name || 'Batiment a choisir'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Capacite: {selectedBuilding?.capacity ?? 0} sujets</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Valeur initiale</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{acquisitionCost.toLocaleString('fr-FR')} {currency}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Effectif initial × prix unitaire.</p>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>

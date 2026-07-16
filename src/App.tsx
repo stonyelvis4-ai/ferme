@@ -39,7 +39,11 @@ import {
   CultureParcelle,
   Campaign,
   StockArticle,
+  StockArticleInput,
+  StockCategoryOption,
   StockMovement,
+  StockRelationOption,
+  SupplierOption,
   FinanceTransaction,
   SanitaryTreatment,
   Building,
@@ -82,7 +86,9 @@ import {
   login,
   logout,
   patchJson,
+  patchForm,
   postJson,
+  postForm,
   registerAdmin,
   setStoredAuthToken,
   setStoredAuthUser,
@@ -103,9 +109,12 @@ import {
   mapMovements,
   mapParcelles,
   mapSettings,
+  mapStockCategories,
+  mapStockRelations,
   mapTasks,
   mapTransactions,
-  mapTreatments
+  mapTreatments,
+  mapSuppliers
 } from './services/fermMappers';
 
 const ALARM_SOUND_LIBRARY: Record<string, string> = {
@@ -393,6 +402,11 @@ export default function App() {
   const [parcelles, setParcelles] = useState<CultureParcelle[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [articles, setArticles] = useState<StockArticle[]>([]);
+  const [stockCategories, setStockCategories] = useState<StockCategoryOption[]>([]);
+  const [stockSuppliers, setStockSuppliers] = useState<SupplierOption[]>([]);
+  const [stockRelationOptions, setStockRelationOptions] = useState<StockRelationOption[]>([]);
+  const [stockUnits, setStockUnits] = useState<string[]>([]);
+  const [stockStorageLocations, setStockStorageLocations] = useState<string[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
   const [treatments, setTreatments] = useState<SanitaryTreatment[]>([]);
@@ -476,11 +490,21 @@ export default function App() {
       const mappedBassins = mapFishBassins(((pondObject.ponds ?? pondObject.data ?? []) as unknown[]) ?? []);
       const rawPlots = ((culturesObject.plots ?? culturesObject.data ?? []) as unknown[]) ?? [];
       const rawCrops = ((culturesObject.crops ?? culturesObject.data ?? []) as unknown[]) ?? [];
+      const stockMeta = (stocksObject.meta && typeof stocksObject.meta === 'object' && !Array.isArray(stocksObject.meta))
+        ? (stocksObject.meta as Record<string, unknown>)
+        : {};
       const mappedParcelles = mapParcelles(rawPlots);
       const mappedCampaigns = mapCampaigns(rawCrops, rawPlots);
       const mappedBuildings = mapBuildings(((infraObject.buildings ?? []) as unknown[]) ?? []);
       const mappedArticles = mapArticles(((stocksObject.items ?? []) as unknown[]) ?? []);
       const mappedMovements = mapMovements(((stocksObject.movements ?? []) as unknown[]) ?? []);
+      const mappedStockCategories = mapStockCategories(((stockMeta.categories ?? []) as unknown[]) ?? []);
+      const mappedSuppliers = mapSuppliers(((stockMeta.suppliers ?? []) as unknown[]) ?? []);
+      const relationBuckets = Object.values(stockMeta.relations ?? {})
+        .flatMap((value) => (Array.isArray(value) ? value : [])) as unknown[];
+      const mappedStockRelations = mapStockRelations(relationBuckets);
+      const mappedStockUnits = Array.isArray(stockMeta.units) ? (stockMeta.units as string[]) : [];
+      const mappedStorageLocations = Array.isArray(stockMeta.storage_locations) ? (stockMeta.storage_locations as string[]) : [];
       const mappedTransactions = mapTransactions((financesData as unknown[]) ?? []);
       const mappedTreatments = mapTreatments((sanitaryData as unknown[]) ?? []);
       const mappedTasks = mapTasks((tasksData as unknown[]) ?? [], apiUsers);
@@ -519,6 +543,11 @@ export default function App() {
       setParcelles(pickMapped(culturesObject.plots ?? culturesObject.data, mappedParcelles, localCache?.parcelles ?? mappedParcelles));
       setCampaigns(pickMapped(culturesObject.crops ?? culturesObject.data, mappedCampaigns, localCache?.campaigns ?? mappedCampaigns));
       setArticles(pickMapped(stocksObject.items, mappedArticles, localCache?.articles ?? mappedArticles));
+      setStockCategories(mappedStockCategories);
+      setStockSuppliers(mappedSuppliers);
+      setStockRelationOptions(mappedStockRelations);
+      setStockUnits(mappedStockUnits);
+      setStockStorageLocations(mappedStorageLocations);
       setMovements(pickMapped(stocksObject.movements, mappedMovements, localCache?.movements ?? mappedMovements));
       setTransactions(pickMapped(financesData, mappedTransactions, localCache?.transactions ?? mappedTransactions));
       setTreatments(pickMapped(sanitaryData, mappedTreatments, localCache?.treatments ?? mappedTreatments));
@@ -1557,19 +1586,9 @@ export default function App() {
         console.warn('Stock adjustment sync skipped: invalid backend stock id', articleId);
       } else {
       try {
-        const currentQuantity = articles.find((art) => art.id === articleId)?.quantity ?? 0;
-        const nextQuantity = Math.max(currentQuantity + quantityToAdd, 0);
-        await patchJson(
-          `/stocks/${backendArticleId}`,
-          {
-            current_quantity: nextQuantity,
-          },
-          authToken
-        );
         await postJson(
           '/stocks/movements',
           {
-            farm_id: Number(activeFarmId),
             stock_item_id: backendArticleId,
             type: quantityToAdd > 0 ? 'in' : 'out',
             quantity: Math.abs(quantityToAdd),
@@ -2292,22 +2311,79 @@ export default function App() {
     addAuditLog('Bâtiments', `Suppression du bâtiment ${currentBuilding.name}`);
   };
 
-  const handleAddStockArticle = async (data: Omit<StockArticle, 'id'>) => {
+  const handleAddStockSupplier = async (payload: { name: string; contactName?: string; phone?: string; email?: string }) => {
+    if (!authToken) return null;
+    try {
+      const response = await postJson('/stocks/suppliers', {
+        name: payload.name,
+        contact_name: payload.contactName ?? '',
+        phone: payload.phone ?? '',
+        email: payload.email ?? '',
+      }, authToken);
+
+      const rawSupplier = response.data && typeof response.data === 'object'
+        ? response.data as Record<string, unknown>
+        : null;
+
+      if (!rawSupplier) return null;
+
+      const nextSupplier: SupplierOption = {
+        id: String(rawSupplier.id ?? ''),
+        name: String(rawSupplier.name ?? payload.name),
+        contactName: String(rawSupplier.contact_name ?? payload.contactName ?? ''),
+        phone: String(rawSupplier.phone ?? payload.phone ?? ''),
+        email: String(rawSupplier.email ?? payload.email ?? ''),
+        isActive: Boolean(rawSupplier.is_active ?? true),
+      };
+
+      setStockSuppliers((prev) => [...prev, nextSupplier].sort((a, b) => a.name.localeCompare(b.name)));
+      return nextSupplier;
+    } catch (error) {
+      console.error('Stock supplier create failed:', error);
+      return null;
+    }
+  };
+
+  const handleAddStockArticle = async (data: StockArticleInput) => {
     const articleId = generateId('art');
-    const article: StockArticle = { ...data, id: articleId };
+    const article: StockArticle = {
+      ...data,
+      id: articleId,
+      imageUrl: data.imageFile ? URL.createObjectURL(data.imageFile) : (data.imageUrl ?? ''),
+      minimumStock: data.minimumStock ?? data.minThreshold,
+      storageLocation: data.storageLocation ?? data.locationId,
+    };
     setArticles((prev) => [...prev, article]);
     if (authToken && activeFarmId) {
       try {
-        const response = await postJson('/stocks', {
-          farm_id: Number(activeFarmId),
-          name: data.name,
-          category: data.category,
-          unit: data.unit,
-          minimum_threshold: data.minThreshold,
-          current_quantity: data.quantity,
-          unit_cost: data.unitCost ?? 0,
-          location: data.locationId || null,
-        }, authToken);
+        const formData = new FormData();
+        formData.append('name', data.name);
+        formData.append('reference', data.reference ?? '');
+        formData.append('description', data.description ?? '');
+        formData.append('brand', data.brand ?? '');
+        formData.append('category', data.category);
+        if (data.categoryId) formData.append('category_id', data.categoryId);
+        if (data.supplierId) formData.append('supplier_id', data.supplierId);
+        formData.append('batch_number', data.batchNumber ?? '');
+        formData.append('purchase_date', data.purchaseDate ?? '');
+        formData.append('manufacturing_date', data.manufacturingDate ?? '');
+        formData.append('expiration_date', data.expirationDate ?? '');
+        formData.append('unit', data.unit);
+        formData.append('minimum_stock', String(data.minimumStock ?? data.minThreshold ?? 0));
+        formData.append('maximum_stock', data.maximumStock !== undefined ? String(data.maximumStock) : '');
+        formData.append('current_quantity', String(data.quantity));
+        formData.append('unit_cost', String(data.unitCost ?? 0));
+        formData.append('purchase_total_cost', String(data.totalPurchasePrice ?? ((data.quantity ?? 0) * (data.unitCost ?? 0))));
+        formData.append('storage_location', data.storageLocation ?? data.locationId ?? '');
+        formData.append('currency', data.currency ?? 'XOF');
+        formData.append('notes', data.notes ?? '');
+        formData.append('is_active', String(data.isActive ?? true ? 1 : 0));
+        formData.append('business_module', data.businessModule ?? 'general');
+        if (data.relatedType) formData.append('related_type', data.relatedType);
+        if (data.relatedId) formData.append('related_id', data.relatedId);
+        if (data.imageFile) formData.append('image', data.imageFile);
+
+        const response = await postForm('/stocks', formData, authToken);
         const backendArticleId = response.data && typeof response.data === 'object'
           ? String((response.data as Record<string, unknown>).id ?? '')
           : '';
@@ -2329,19 +2405,33 @@ export default function App() {
     setArticles((prev) => prev.map((item) => (item.id === articleId ? { ...item, ...updates } : item)));
     if (authToken && /^\d+$/.test(String(articleId))) {
       try {
-        await patchJson(
-          '/stocks/' + articleId,
-          {
-            ...(updates.name !== undefined ? { name: updates.name } : {}),
-            ...(updates.category !== undefined ? { category: updates.category } : {}),
-            ...(updates.quantity !== undefined ? { current_quantity: updates.quantity } : {}),
-            ...(updates.unit !== undefined ? { unit: updates.unit } : {}),
-            ...(updates.unitCost !== undefined ? { unit_cost: updates.unitCost } : {}),
-            ...(updates.minThreshold !== undefined ? { minimum_threshold: updates.minThreshold } : {}),
-            ...(updates.locationId !== undefined ? { location: updates.locationId } : {}),
-          },
-          authToken
-        );
+        const formData = new FormData();
+        if (updates.name !== undefined) formData.append('name', updates.name);
+        if (updates.reference !== undefined) formData.append('reference', updates.reference);
+        if (updates.category !== undefined) formData.append('category', updates.category);
+        if (updates.categoryId !== undefined) formData.append('category_id', updates.categoryId);
+        if (updates.description !== undefined) formData.append('description', updates.description);
+        if (updates.brand !== undefined) formData.append('brand', updates.brand);
+        if (updates.supplierId !== undefined) formData.append('supplier_id', updates.supplierId);
+        if (updates.batchNumber !== undefined) formData.append('batch_number', updates.batchNumber);
+        if (updates.purchaseDate !== undefined) formData.append('purchase_date', updates.purchaseDate);
+        if (updates.manufacturingDate !== undefined) formData.append('manufacturing_date', updates.manufacturingDate);
+        if (updates.expirationDate !== undefined) formData.append('expiration_date', updates.expirationDate);
+        if (updates.quantity !== undefined) formData.append('current_quantity', String(updates.quantity));
+        if (updates.unit !== undefined) formData.append('unit', updates.unit);
+        if (updates.unitCost !== undefined) formData.append('unit_cost', String(updates.unitCost));
+        if (updates.minThreshold !== undefined) formData.append('minimum_stock', String(updates.minThreshold));
+        if (updates.maximumStock !== undefined) formData.append('maximum_stock', String(updates.maximumStock));
+        if (updates.storageLocation !== undefined || updates.locationId !== undefined) {
+          formData.append('storage_location', updates.storageLocation ?? updates.locationId ?? '');
+        }
+        if (updates.currency !== undefined) formData.append('currency', updates.currency);
+        if (updates.notes !== undefined) formData.append('notes', updates.notes);
+        if (updates.isActive !== undefined) formData.append('is_active', String(updates.isActive ? 1 : 0));
+        if (updates.businessModule !== undefined) formData.append('business_module', updates.businessModule);
+        if (updates.relatedType !== undefined) formData.append('related_type', updates.relatedType);
+        if (updates.relatedId !== undefined) formData.append('related_id', updates.relatedId);
+        await patchForm('/stocks/' + articleId, formData, authToken);
       } catch (error) {
         console.error('Stock article update sync failed:', error);
       }
@@ -3282,8 +3372,19 @@ export default function App() {
                 articles={articles}
                 movements={movements}
                 currency={settings.currency}
+                categories={stockCategories}
+                suppliers={stockSuppliers}
+                relationOptions={stockRelationOptions}
+                unitOptions={stockUnits}
+                storageLocations={stockStorageLocations}
+                lots={lots}
+                bassins={fishBassins}
+                parcelles={parcelles}
+                campaigns={campaigns}
+                buildings={buildings}
                 onAdjustStock={handleAdjustStock}
                 onGeneratePurchaseTask={handleGeneratePurchaseTask}
+                onAddSupplier={handleAddStockSupplier}
                 onAddStockArticle={handleAddStockArticle}
                 onUpdateStockArticle={handleUpdateStockArticle}
                 onDeleteStockArticle={handleDeleteStockArticle}

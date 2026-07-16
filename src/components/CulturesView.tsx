@@ -48,6 +48,7 @@ export default function CulturesView({
   const [campaignVariety, setCampaignVariety] = useState('Standard');
   const [campaignStartDate, setCampaignStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [campaignYield, setCampaignYield] = useState(3);
+  const selectedCampaignParcelle = parcelles.find((item) => item.id === campaignParcelleId);
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'decimal', maximumFractionDigits: 0 }).format(val) + ' ' + currency;
@@ -109,57 +110,102 @@ export default function CulturesView({
       </div>
 
       {showParcelleForm && role === 'admin' && (
-        <form onSubmit={handleCreateParcelle} className="bg-white border border-lime-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
-          <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom parcelle</span>
-            <input value={parcelleName} onChange={(e) => setParcelleName(e.target.value)} placeholder="Ex. Champ Sud P1" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
-            <span className="block text-[10px] text-slate-500">Nom utilisé pour les campagnes.</span>
-          </label>
-          <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Superficie</span>
-            <input type="number" min={0.1} step={0.1} value={parcelleArea} onChange={(e) => setParcelleArea(Number(e.target.value))} placeholder="Ex. 1.5 ha" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
-            <span className="block text-[10px] text-slate-500">Surface cultivable en hectares.</span>
-          </label>
-          <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Type de sol</span>
-            <input value={parcelleSoil} onChange={(e) => setParcelleSoil(e.target.value)} placeholder="Ex. Argileux" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
-            <span className="block text-[10px] text-slate-500">Texture ou observation du sol.</span>
-          </label>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setShowParcelleForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
-            <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-lime-600 px-4 py-2 text-xs font-semibold text-white">Creer</button>
+        <form onSubmit={handleCreateParcelle} className="bg-white border border-lime-100 p-5 rounded-2xl shadow-sm space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-lime-100 bg-lime-50/60 p-4">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-lime-700">Parcelle</span>
+              <span className="mt-1 block text-sm font-semibold text-lime-900">{parcelleName || 'Nom en attente'}</span>
+              <p className="mt-1 text-[11px] text-lime-800">Surface prevue: {parcelleArea > 0 ? `${parcelleArea} ha` : 'a renseigner'}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-lime-700">Type de sol</span>
+              <span className="mt-1 block text-sm font-semibold text-lime-900">{parcelleSoil || 'Sol non renseigne'}</span>
+              <p className="mt-1 text-[11px] text-lime-800">Cette information aidera au choix des cultures.</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-lime-700">Lecture rapide</span>
+              <span className="mt-1 block text-sm font-semibold text-lime-900">{parcelleArea >= 1 ? 'Parcelle exploitable' : 'Micro-zone ou test'}</span>
+              <p className="mt-1 text-[11px] text-lime-800">Le plan cultural utilisera cette base.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom parcelle</span>
+              <input value={parcelleName} onChange={(e) => setParcelleName(e.target.value)} placeholder="Ex. Champ Sud P1" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
+              <span className="block text-[10px] text-slate-500">Nom utilise pour les campagnes.</span>
+            </label>
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Superficie</span>
+              <input type="number" min={0.1} step={0.1} value={parcelleArea} onChange={(e) => setParcelleArea(Number(e.target.value))} placeholder="Ex. 1.5 ha" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
+              <span className="block text-[10px] text-slate-500">Surface cultivable en hectares.</span>
+            </label>
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Type de sol</span>
+              <input value={parcelleSoil} onChange={(e) => setParcelleSoil(e.target.value)} placeholder="Ex. Argileux" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
+              <span className="block text-[10px] text-slate-500">Texture ou observation du sol.</span>
+            </label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setShowParcelleForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
+              <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-lime-600 px-4 py-2 text-xs font-semibold text-white">Creer</button>
+            </div>
           </div>
         </form>
       )}
 
       {showCampaignForm && role === 'admin' && (
-        <form onSubmit={handleCreateCampaign} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4">
-          <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Parcelle</span>
-          <select value={campaignParcelleId} onChange={(e) => setCampaignParcelleId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
-            <option value="">Parcelle</option>
-            {parcelles.map((parcelle) => <option key={parcelle.id} value={parcelle.id}>{parcelle.name}</option>)}
-          </select>
-            <span className="block text-[10px] text-slate-500">Terrain affecté à la culture.</span>
-          </label>
-          <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Culture</span>
-            <input value={campaignCropType} onChange={(e) => setCampaignCropType(e.target.value)} placeholder="Ex. Maïs" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
-            <span className="block text-[10px] text-slate-500">Espèce cultivée.</span>
-          </label>
-          <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Variété</span>
-            <input value={campaignVariety} onChange={(e) => setCampaignVariety(e.target.value)} placeholder="Ex. Composite jaune" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
-            <span className="block text-[10px] text-slate-500">Variété ou semence utilisée.</span>
-          </label>
-          <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Date de semis</span>
-            <input type="date" value={campaignStartDate} onChange={(e) => setCampaignStartDate(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
-            <span className="block text-[10px] text-slate-500">Début de la campagne.</span>
-          </label>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setShowCampaignForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
-            <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Creer</button>
+        <form onSubmit={handleCreateCampaign} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Campagne</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{campaignCropType || 'Culture a choisir'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Variete: {campaignVariety || 'non precisee'}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Parcelle liee</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{selectedCampaignParcelle?.name || 'Parcelle a selectionner'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Surface: {selectedCampaignParcelle ? `${selectedCampaignParcelle.area} ha` : 'indisponible'}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Projection</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{campaignYield} t/ha attendues</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Repere initial pour suivre la performance.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Parcelle</span>
+              <select value={campaignParcelleId} onChange={(e) => setCampaignParcelleId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
+                <option value="">Parcelle</option>
+                {parcelles.map((parcelle) => <option key={parcelle.id} value={parcelle.id}>{parcelle.name}</option>)}
+              </select>
+              <span className="block text-[10px] text-slate-500">Terrain affecte a la culture.</span>
+            </label>
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Culture</span>
+              <input value={campaignCropType} onChange={(e) => setCampaignCropType(e.target.value)} placeholder="Ex. Mais" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+              <span className="block text-[10px] text-slate-500">Espece cultivee.</span>
+            </label>
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Variete</span>
+              <input value={campaignVariety} onChange={(e) => setCampaignVariety(e.target.value)} placeholder="Ex. Composite jaune" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+              <span className="block text-[10px] text-slate-500">Variete ou semence utilisee.</span>
+            </label>
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Date de semis</span>
+              <input type="date" value={campaignStartDate} onChange={(e) => setCampaignStartDate(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+              <span className="block text-[10px] text-slate-500">Debut de la campagne.</span>
+            </label>
+            <label className="space-y-1.5">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Rendement attendu</span>
+              <input type="number" min={0.1} step={0.1} value={campaignYield} onChange={(e) => setCampaignYield(Number(e.target.value))} placeholder="Ex. 3.5" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+              <span className="block text-[10px] text-slate-500">Estimation initiale en tonne par hectare.</span>
+            </label>
+            <div className="md:col-span-5 flex gap-2">
+              <button type="button" onClick={() => setShowCampaignForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
+              <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Creer</button>
+            </div>
           </div>
         </form>
       )}

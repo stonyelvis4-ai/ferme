@@ -5,26 +5,25 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class StockMovement extends Model
+class Supplier extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'farm_id',
-        'stock_item_id',
-        'type',
-        'quantity',
-        'unit_cost',
-        'source_module',
-        'source_entity_type',
-        'source_entity_id',
-        'operation_id',
+        'name',
+        'contact_name',
+        'phone',
+        'email',
+        'address',
+        'notes',
+        'is_active',
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:3',
-        'unit_cost' => 'decimal:2',
+        'is_active' => 'boolean',
     ];
 
     public function farm(): BelongsTo
@@ -32,8 +31,8 @@ class StockMovement extends Model
         return $this->belongsTo(Farm::class);
     }
 
-    public function item(): BelongsTo
+    public function stockItems(): HasMany
     {
-        return $this->belongsTo(StockItem::class, 'stock_item_id');
+        return $this->hasMany(StockItem::class);
     }
 }

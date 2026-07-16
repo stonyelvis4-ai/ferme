@@ -39,6 +39,8 @@ export default function SanitaireView({
   const [productId, setProductId] = useState(articles[0]?.id || '');
   const [quantityUsed, setQuantityUsed] = useState(1);
   const [cost, setCost] = useState(10000);
+  const selectedLot = lots.find((item) => item.id === lotId);
+  const selectedArticle = articles.find((item) => item.id === productId);
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'decimal', maximumFractionDigits: 0 }).format(val) + ' ' + currency;
@@ -69,7 +71,7 @@ export default function SanitaireView({
             Module Sanitaire & Veterinaire
           </h2>
           <p className="text-xs text-slate-500">
-            Suivi des vaccinations, traitements therapeutiques et biosécurité.
+            Suivi des vaccinations, traitements therapeutiques et biosecurite.
           </p>
         </div>
         {role === 'admin' ? (
@@ -85,35 +87,70 @@ export default function SanitaireView({
 
       {showCreateForm && role === 'admin' && (
         <form onSubmit={handleCreateTreatment} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="md:col-span-6 grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Traitement</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{name || 'Nom en attente'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Lot: {selectedLot?.name || 'a choisir'}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Produit stock</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{selectedArticle?.name || 'Produit a choisir'}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Quantite prevue: {quantityUsed} {selectedArticle?.unit || 'unites'}</p>
+            </div>
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Impact financier</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{formatCurrency(cost)}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Montant repris dans la comptabilite sanitaire.</p>
+            </div>
+          </div>
+
           <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Lot concerné</span>
-          <select value={lotId} onChange={(e) => setLotId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
-            {lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.name}</option>)}
-          </select>
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Lot concerne</span>
+            <select value={lotId} onChange={(e) => setLotId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
+              {lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.name}</option>)}
+            </select>
             <span className="block text-[10px] text-slate-500">Animaux à traiter.</span>
           </label>
+
           <label className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Traitement</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Vaccin Newcastle" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
             <span className="block text-[10px] text-slate-500">Nom du vaccin ou soin.</span>
           </label>
+
           <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Date prévue</span>
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Date prevue</span>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
             <span className="block text-[10px] text-slate-500">Date d'administration.</span>
           </label>
+
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Dosage</span>
+            <input value={dosage} onChange={(e) => setDosage(e.target.value)} placeholder="Ex. 1 ml / sujet" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Indication utile pour la traçabilité sanitaire.</span>
+          </label>
+
           <label className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Produit stock</span>
-          <select value={productId} onChange={(e) => setProductId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
-            {articles.map((article) => <option key={article.id} value={article.id}>{article.name}</option>)}
-          </select>
+            <select value={productId} onChange={(e) => setProductId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
+              {articles.map((article) => <option key={article.id} value={article.id}>{article.name}</option>)}
+            </select>
             <span className="block text-[10px] text-slate-500">Article déduit du stock.</span>
           </label>
+
           <label className="space-y-1.5">
-            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Coût</span>
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Quantite utilisee</span>
+            <input type="number" min={0.1} step={0.1} value={quantityUsed} onChange={(e) => setQuantityUsed(Number(e.target.value))} placeholder="Ex. 2" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Quantité consommée en stock pour ce soin.</span>
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Cout</span>
             <input type="number" min={1} value={cost} onChange={(e) => setCost(Number(e.target.value))} placeholder="Ex. 15000" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
             <span className="block text-[10px] text-slate-500">Montant à comptabiliser.</span>
           </label>
+
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowCreateForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
             <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Créer</button>

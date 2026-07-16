@@ -166,6 +166,23 @@ export default function SettingsView({
           </h3>
 
           <form onSubmit={handleSave} className="space-y-4 text-xs text-slate-700">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Identité ferme</span>
+                <span className="mt-1 block text-sm font-semibold text-emerald-900">{name || 'Nom à renseigner'}</span>
+                <p className="mt-1 text-[11px] text-emerald-800">Localisation: {location || 'non renseignée'}</p>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Responsable</span>
+                <span className="mt-1 block text-sm font-semibold text-emerald-900">{managerName || 'Administrateur à préciser'}</span>
+                <p className="mt-1 text-[11px] text-emerald-800">Téléphone: {contactPhone || 'non renseigné'}</p>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Paramètre financier</span>
+                <span className="mt-1 block text-sm font-semibold text-emerald-900">{currency}</span>
+                <p className="mt-1 text-[11px] text-emerald-800">Cette devise sera utilisée dans les modules connectés.</p>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">Raison Sociale de la Ferme *</label>

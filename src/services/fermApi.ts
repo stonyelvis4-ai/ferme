@@ -52,7 +52,7 @@ async function requestJson<T>(
       ...options,
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
+        ...(!(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers ?? {}),
       },
@@ -228,6 +228,23 @@ export async function postJson<T>(path: string, payload: unknown, token?: string
   return requestJson<ApiResponse<T>>(path, {
     method: 'POST',
     body: JSON.stringify(payload),
+  }, token);
+}
+
+export async function postForm<T>(path: string, payload: FormData, token?: string) {
+  return requestJson<ApiResponse<T>>(path, {
+    method: 'POST',
+    body: payload,
+  }, token);
+}
+
+export async function patchForm<T>(path: string, payload: FormData, token?: string) {
+  return requestJson<ApiResponse<T>>(path, {
+    method: 'POST',
+    headers: {
+      'X-HTTP-Method-Override': 'PATCH',
+    },
+    body: payload,
   }, token);
 }
 

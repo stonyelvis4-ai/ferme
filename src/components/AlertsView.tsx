@@ -99,6 +99,24 @@ export default function AlertsView({
         )}
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Alertes ouvertes</span>
+          <span className="mt-2 block text-2xl font-bold text-slate-900">{activeAlerts.length}</span>
+          <p className="mt-1 text-xs text-slate-500">Anomalies encore visibles dans le centre d'alertes.</p>
+        </div>
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Critiques</span>
+          <span className="mt-2 block text-2xl font-bold text-rose-900">{criticalAlertsCount}</span>
+          <p className="mt-1 text-xs text-rose-800">Demandent une action immédiate ou un contrôle rapproché.</p>
+        </div>
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Importantes</span>
+          <span className="mt-2 block text-2xl font-bold text-amber-900">{warningAlertsCount}</span>
+          <p className="mt-1 text-xs text-amber-800">À transformer au besoin en tâche corrective.</p>
+        </div>
+      </div>
+
       {hasRingingAlerts && (
         <div className={`overflow-hidden rounded-3xl border p-5 shadow-sm ${
           alarmSilenced || alarmPlaybackBlocked
@@ -157,7 +175,7 @@ export default function AlertsView({
       <div className="space-y-4">
         {activeAlerts.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-slate-100 text-slate-400 text-xs">
-            🎉 Excellente nouvelle ! Aucune anomalie détectée sur l'exploitation.
+            Excellente nouvelle : aucune anomalie détectée sur l'exploitation.
           </div>
         ) : (
           activeAlerts.map((alert) => {

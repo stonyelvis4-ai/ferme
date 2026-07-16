@@ -107,19 +107,23 @@ class ReportService
             ],
             'stocks' => [
                 'title' => 'Rapport des stocks',
-                'headers' => ['Nom', 'Categorie', 'Unite', 'Quantite', 'Seuil', 'Emplacement'],
+                'headers' => ['Reference', 'Nom', 'Categorie', 'Quantite', 'Unite', 'Min', 'Max', 'Emplacement', 'Peremption', 'Valeur'],
                 'rows' => StockItem::query()
                     ->where('farm_id', $farmId)
                     ->latest()
                     ->limit(200)
                     ->get()
                     ->map(fn (StockItem $item) => [
+                        (string) ($item->reference ?? ''),
                         $item->name,
                         $item->category,
-                        $item->unit,
                         (string) $item->current_quantity,
+                        $item->unit,
                         (string) $item->minimum_threshold,
-                        (string) ($item->location ?? ''),
+                        (string) ($item->maximum_stock ?? ''),
+                        (string) ($item->storage_location ?? $item->location ?? ''),
+                        optional($item->expiration_date)->format('Y-m-d') ?? '',
+                        (string) ($item->purchase_total_cost ?? 0),
                     ])->all(),
             ],
             'layers' => [
