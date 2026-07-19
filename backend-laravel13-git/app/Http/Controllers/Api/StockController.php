@@ -84,9 +84,14 @@ class StockController extends Controller
 
     public function destroy(StockItem $stockItem): JsonResponse
     {
-        $this->stockService->deleteItem($stockItem);
+        $transaction = $this->stockService->deleteItem($stockItem);
 
-        return response()->json(['message' => 'Stock item deleted.']);
+        return response()->json([
+            'message' => 'Stock item deleted.',
+            'data' => [
+                'financial_transaction' => $transaction,
+            ],
+        ]);
     }
 
     public function movement(StoreStockMovementRequest $request): JsonResponse

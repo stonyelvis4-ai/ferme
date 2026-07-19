@@ -9,9 +9,12 @@ class CalendarService
 {
     public function syncFromTask(Task $task): ?CalendarEvent
     {
-        if (! $task->due_at) {
+        if (! $task->start_at && ! $task->due_at) {
             return null;
         }
+
+        $startAt = $task->start_at ?? $task->due_at;
+        $endAt = $task->due_at ?? $task->start_at;
 
         return CalendarEvent::updateOrCreate(
             [
@@ -20,8 +23,8 @@ class CalendarService
             ],
             [
                 'title' => $task->title,
-                'start_at' => $task->due_at,
-                'end_at' => $task->due_at,
+                'start_at' => $startAt,
+                'end_at' => $endAt,
                 'source_module' => $task->source_module ?? 'tasks',
                 'source_entity_type' => $task->source_entity_type ?? 'task',
                 'source_entity_id' => $task->source_entity_id ?? (string) $task->id,
@@ -29,4 +32,3 @@ class CalendarService
         );
     }
 }
-

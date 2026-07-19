@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Task, Priority, UserRole } from '../types';
 import AdminEntityActions from './AdminEntityActions';
+import FormDialog from './FormDialog';
 
 interface TasksViewProps {
   role: UserRole;
@@ -32,13 +33,30 @@ export default function TasksView({
   onUpdateTask,
   onDeleteTask
 }: TasksViewProps) {
+  const taskModuleOptions = ['Ferme', 'Élevage', 'Pondeuses', 'Pisciculture', 'Cultures', 'Stocks', 'Bâtiments', 'Sanitaire', 'Finances'];
+  const today = new Date().toISOString().split('T')[0];
   const [showAddForm, setShowAddForm] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('normal');
-  const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(today);
+  const [dueDate, setDueDate] = useState(today);
   const [assignedTo, setAssignedTo] = useState('');
   const [sourceModule, setSourceModule] = useState('Ferme');
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskDescription, setEditTaskDescription] = useState('');
+  const isCriticalPriority = priority === 'critical' || priority === 'high';
+  const durationInDays = Math.max(
+    1,
+    Math.round((new Date(`${dueDate}T00:00:00`).getTime() - new Date(`${startDate}T00:00:00`).getTime()) / 86400000) + 1
+  );
+
+  React.useEffect(() => {
+    if (dueDate < startDate) {
+      setDueDate(startDate);
+    }
+  }, [dueDate, startDate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +66,7 @@ export default function TasksView({
       title,
       description,
       priority,
-      startDate: new Date().toISOString().split('T')[0],
+      startDate,
       dueDate,
       assignedTo,
       sourceModule
@@ -58,23 +76,74 @@ export default function TasksView({
     setTitle('');
     setDescription('');
     setAssignedTo('');
+    setPriority('normal');
+    setStartDate(today);
+    setDueDate(today);
+    setSourceModule('Ferme');
     setShowAddForm(false);
   };
 
   const handleEditTask = (task: Task) => {
-    const titleValue = window.prompt('Titre de la tâche', task.title);
-    if (!titleValue) return;
-    const descriptionValue = window.prompt('Description', task.description) ?? task.description;
-    onUpdateTask(task.id, {
-      title: titleValue,
-      description: descriptionValue
+    setEditingTaskId(task.id);
+    setEditTaskTitle(task.title);
+    setEditTaskDescription(task.description);
+  };
+
+  const handleSubmitTaskEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTaskId || !editTaskTitle.trim()) return;
+
+    onUpdateTask(editingTaskId, {
+      title: editTaskTitle.trim(),
+      description: editTaskDescription.trim()
     });
+
+    setEditingTaskId(null);
+    setEditTaskTitle('');
+    setEditTaskDescription('');
   };
 
   return (
     <div id="tasks-view" className="space-y-6">
+      <FormDialog
+        open={editingTaskId !== null}
+        title="Modifier la tache"
+        subtitle="Mettez a jour l'intitule et les consignes sans quitter l'ecran de planification."
+        confirmLabel="Enregistrer"
+        confirmDisabled={!editTaskTitle.trim()}
+        onCancel={() => {
+          setEditingTaskId(null);
+          setEditTaskTitle('');
+          setEditTaskDescription('');
+        }}
+        onSubmit={handleSubmitTaskEdit}
+      >
+        <div className="grid grid-cols-1 gap-4">
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Titre</span>
+            <input
+              autoFocus
+              value={editTaskTitle}
+              onChange={(e) => setEditTaskTitle(e.target.value)}
+              placeholder="Ex. Nettoyage mangeoires Poulailler B"
+              className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Description</span>
+            <textarea
+              rows={4}
+              value={editTaskDescription}
+              onChange={(e) => setEditTaskDescription(e.target.value)}
+              placeholder="Precisez les consignes techniques pour l'equipe."
+              className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+        </div>
+      </FormDialog>
+
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-sans tracking-tight flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-emerald-600" />
@@ -122,8 +191,11 @@ export default function TasksView({
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Échéance</span>
-              <span className="mt-1 block text-sm font-semibold text-emerald-900">{dueDate}</span>
-              <p className="mt-1 text-[11px] text-emerald-800">La tâche sera visible dans le suivi quotidien.</p>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{startDate} au {dueDate}</span>
+              <p className="mt-1 text-[11px] text-emerald-800">
+                {durationInDays} {durationInDays > 1 ? 'jours planifies' : 'jour planifie'}.
+                {isCriticalPriority ? ' Cette tache ressortira en priorite dans le suivi quotidien.' : ' La tache sera visible dans le suivi quotidien.'}
+              </p>
             </div>
           </div>
 
@@ -159,6 +231,19 @@ export default function TasksView({
             </div>
 
             <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Début *</label>
+              <input
+                id="task-start-input"
+                type="date"
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+              />
+              <p className="mt-1 text-[10px] text-slate-500">Date de debut de la tache dans le calendrier.</p>
+            </div>
+
+            <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Échéance de fin *</label>
               <input
                 id="task-due-input"
@@ -166,9 +251,18 @@ export default function TasksView({
                 required
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
+                min={startDate}
                 className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
-              <p className="mt-1 text-[10px] text-slate-500">Date limite prévue.</p>
+              <p className="mt-1 text-[10px] text-slate-500">{isCriticalPriority ? "Fixez une fin proche si l'action est urgente." : 'Date de fin prevue.'}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Durée calculée</label>
+              <div className="flex min-h-[48px] items-center rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 text-sm font-semibold text-emerald-900">
+                {durationInDays} {durationInDays > 1 ? 'jours' : 'jour'}
+              </div>
+              <p className="mt-1 text-[10px] text-slate-500">Calcule automatiquement a partir des dates choisies.</p>
             </div>
 
             <div className="md:col-span-2">
@@ -205,19 +299,17 @@ export default function TasksView({
                 onChange={(e) => setSourceModule(e.target.value)}
                 className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               >
-                <option value="Ferme">Ferme (Général)</option>
-                <option value="Élevage">Élevage</option>
-                <option value="Pondeuses">Pondeuses</option>
-                <option value="Pisciculture">Pisciculture</option>
-                <option value="Cultures">Cultures</option>
-                <option value="Stocks">Stocks</option>
-                <option value="Bâtiments">Bâtiments</option>
+                {taskModuleOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'Ferme' ? 'Ferme (General)' : option}
+                  </option>
+                ))}
               </select>
-              <p className="mt-1 text-[10px] text-slate-500">Module auquel rattacher l'action.</p>
+              <p className="mt-1 text-[10px] text-slate-500">Module auquel rattacher l'action pour l'agenda et les rapports.</p>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 p-1 border-t border-slate-50">
+          <div className="flex flex-col-reverse gap-2 p-1 border-t border-slate-50 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => setShowAddForm(false)}

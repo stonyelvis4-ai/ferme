@@ -20,6 +20,7 @@ import {
   UserRole,
 } from '../types';
 import AdminEntityActions from './AdminEntityActions';
+import FormDialog from './FormDialog';
 
 interface StocksViewProps {
   role: UserRole;
@@ -53,6 +54,25 @@ const BUSINESS_MODULE_OPTIONS: Array<{ value: NonNullable<StockArticle['business
 ];
 
 const PERISHABLE_CATEGORY_SLUGS = ['medicine', 'vaccine', 'veterinary', 'feed'];
+const DEFAULT_STOCK_CATEGORIES: StockCategoryOption[] = [
+  { id: 'default-feed', name: 'Aliment', slug: 'feed', isActive: true },
+  { id: 'default-medicine', name: 'Medicament', slug: 'medicine', isActive: true },
+  { id: 'default-vaccine', name: 'Vaccin', slug: 'vaccine', isActive: true },
+  { id: 'default-seed', name: 'Semence', slug: 'seed', isActive: true },
+  { id: 'default-fertilizer', name: 'Engrais', slug: 'fertilizer', isActive: true },
+  { id: 'default-phytosanitary', name: 'Produit phytosanitaire', slug: 'phytosanitary', isActive: true },
+  { id: 'default-veterinary', name: 'Produit veterinaire', slug: 'veterinary', isActive: true },
+  { id: 'default-material', name: 'Materiel', slug: 'material', isActive: true },
+  { id: 'default-equipment', name: 'Equipement', slug: 'equipment', isActive: true },
+  { id: 'default-tool', name: 'Outil', slug: 'tool', isActive: true },
+  { id: 'default-fuel', name: 'Carburant', slug: 'fuel', isActive: true },
+  { id: 'default-packaging', name: 'Emballage', slug: 'packaging', isActive: true },
+  { id: 'default-cleaning', name: "Produit d'entretien", slug: 'cleaning', isActive: true },
+  { id: 'default-spare-part', name: 'Piece de rechange', slug: 'spare-part', isActive: true },
+  { id: 'default-other', name: 'Autre', slug: 'other', isActive: true },
+];
+const DEFAULT_UNITS = ['kg', 'g', 'tonne', 'litre', 'millilitre', 'sac', 'boite', 'bouteille', 'bidon', 'dose', 'comprime', 'flacon', 'unite', 'piece', 'paquet', 'rouleau', 'metre', 'metre carre', 'hectare'];
+const DEFAULT_STORAGE_LOCATIONS = ['Magasin principal', 'Depot', 'Pharmacie', 'Chambre froide', 'Entrepot aliments'];
 
 export default function StocksView({
   role,
@@ -76,29 +96,87 @@ export default function StocksView({
   onUpdateStockArticle,
   onDeleteStockArticle,
 }: StocksViewProps) {
+  const effectiveCategories = useMemo(() => {
+    if (categories.length > 0) return categories;
+
+    const articleCategories = articles
+      .map((article) => ({
+        id: `article-category-${article.categoryId || article.category || article.id}`,
+        name: article.categoryLabel || article.category || 'Autre',
+        slug: article.category || 'other',
+        isActive: true,
+      }))
+      .filter((item, index, list) => list.findIndex((candidate) => candidate.slug === item.slug) === index);
+
+    return articleCategories.length > 0 ? articleCategories : DEFAULT_STOCK_CATEGORIES;
+  }, [articles, categories]);
+
+  const effectiveSuppliers = useMemo(() => {
+    if (suppliers.length > 0) return suppliers;
+
+    return articles
+      .filter((article) => article.supplierName)
+      .map((article) => ({
+        id: article.supplierId || `article-supplier-${article.id}`,
+        name: article.supplierName || 'Fournisseur',
+        contactName: '',
+        phone: '',
+        email: '',
+        isActive: true,
+      }))
+      .filter((item, index, list) => list.findIndex((candidate) => candidate.name === item.name) === index);
+  }, [articles, suppliers]);
+
+  const effectiveUnitOptions = useMemo(() => {
+    const source = unitOptions.length > 0 ? unitOptions : [...articles.map((article) => article.unit), ...DEFAULT_UNITS];
+    return source.filter((item, index, list) => item && list.indexOf(item) === index);
+  }, [articles, unitOptions]);
+
+  const effectiveStorageLocations = useMemo(() => {
+    const source = storageLocations.length > 0
+      ? storageLocations
+      : [
+          ...articles.map((article) => article.storageLocation || article.locationId),
+          ...buildings.filter((building) => building.type === 'magasin').map((building) => building.name),
+          ...DEFAULT_STORAGE_LOCATIONS,
+        ];
+    return source.filter((item, index, list) => item && list.indexOf(item) === index);
+  }, [articles, buildings, storageLocations]);
+
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [isSavingSupplier, setIsSavingSupplier] = useState(false);
   const [adjustQty, setAdjustQty] = useState(100);
   const [adjustReason, setAdjustReason] = useState('Approvisionnement periodique');
+  const [supplierDraft, setSupplierDraft] = useState({
+    name: '',
+    contactName: '',
+    phone: '',
+    email: '',
+  });
+  const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+  const [editArticleName, setEditArticleName] = useState('');
+  const [editArticleUnitCost, setEditArticleUnitCost] = useState('0');
   const [form, setForm] = useState<StockArticleInput>({
     name: '',
     reference: '',
     description: '',
     brand: '',
-    category: categories[0]?.slug ?? 'feed',
-    categoryId: categories[0]?.id ?? '',
+    category: categories[0]?.slug ?? DEFAULT_STOCK_CATEGORIES[0].slug,
+    categoryId: categories[0]?.id ?? DEFAULT_STOCK_CATEGORIES[0].id,
     supplierId: '',
     batchNumber: '',
     purchaseDate: '',
     manufacturingDate: '',
     expirationDate: '',
     quantity: 0,
-    unit: unitOptions[0] ?? 'kg',
+    unit: unitOptions[0] ?? DEFAULT_UNITS[0],
     minThreshold: 10,
     minimumStock: 10,
     maximumStock: undefined,
-    locationId: storageLocations[0] ?? 'Magasin principal',
-    storageLocation: storageLocations[0] ?? 'Magasin principal',
+    locationId: storageLocations[0] ?? DEFAULT_STORAGE_LOCATIONS[0],
+    storageLocation: storageLocations[0] ?? DEFAULT_STORAGE_LOCATIONS[0],
     unitCost: 0,
     totalPurchasePrice: 0,
     currency: 'XOF',
@@ -112,12 +190,12 @@ export default function StocksView({
   });
 
   const selectedCategory = useMemo(
-    () => categories.find((item) => item.id === form.categoryId) ?? categories.find((item) => item.slug === form.category),
-    [categories, form.category, form.categoryId]
+    () => effectiveCategories.find((item) => item.id === form.categoryId) ?? effectiveCategories.find((item) => item.slug === form.category),
+    [effectiveCategories, form.category, form.categoryId]
   );
   const selectedSupplier = useMemo(
-    () => suppliers.find((item) => item.id === form.supplierId),
-    [suppliers, form.supplierId]
+    () => effectiveSuppliers.find((item) => item.id === form.supplierId),
+    [effectiveSuppliers, form.supplierId]
   );
 
   const availableRelations = useMemo(
@@ -146,20 +224,20 @@ export default function StocksView({
       reference: '',
       description: '',
       brand: '',
-      category: categories[0]?.slug ?? 'feed',
-      categoryId: categories[0]?.id ?? '',
+      category: effectiveCategories[0]?.slug ?? DEFAULT_STOCK_CATEGORIES[0].slug,
+      categoryId: effectiveCategories[0]?.id ?? DEFAULT_STOCK_CATEGORIES[0].id,
       supplierId: '',
       batchNumber: '',
       purchaseDate: '',
       manufacturingDate: '',
       expirationDate: '',
       quantity: 0,
-      unit: unitOptions[0] ?? 'kg',
+      unit: effectiveUnitOptions[0] ?? DEFAULT_UNITS[0],
       minThreshold: 10,
       minimumStock: 10,
       maximumStock: undefined,
-      locationId: storageLocations[0] ?? 'Magasin principal',
-      storageLocation: storageLocations[0] ?? 'Magasin principal',
+      locationId: effectiveStorageLocations[0] ?? DEFAULT_STORAGE_LOCATIONS[0],
+      storageLocation: effectiveStorageLocations[0] ?? DEFAULT_STORAGE_LOCATIONS[0],
       unitCost: 0,
       totalPurchasePrice: 0,
       currency: 'XOF',
@@ -199,23 +277,101 @@ export default function StocksView({
     setShowCreateForm(false);
   };
 
-  const promptNewSupplier = async () => {
-    const name = window.prompt('Nom du fournisseur');
-    if (!name) return;
-    const contactName = window.prompt('Nom du contact (optionnel)') ?? '';
-    const phone = window.prompt('Téléphone (optionnel)') ?? '';
-    const email = window.prompt('Email (optionnel)') ?? '';
-    const supplier = await onAddSupplier({ name, contactName, phone, email });
-    if (supplier) {
-      setForm((prev) => ({ ...prev, supplierId: supplier.id }));
+  const resetSupplierDraft = () => {
+    setSupplierDraft({
+      name: '',
+      contactName: '',
+      phone: '',
+      email: '',
+    });
+  };
+
+  const openSupplierForm = () => {
+    resetSupplierDraft();
+    setShowSupplierForm(true);
+  };
+
+  const handleSupplierSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supplierDraft.name.trim() || isSavingSupplier) return;
+
+    setIsSavingSupplier(true);
+    try {
+      const supplier = await onAddSupplier({
+        name: supplierDraft.name.trim(),
+        contactName: supplierDraft.contactName.trim(),
+        phone: supplierDraft.phone.trim(),
+        email: supplierDraft.email.trim(),
+      });
+
+      if (supplier) {
+        setForm((prev) => ({ ...prev, supplierId: supplier.id }));
+        setShowSupplierForm(false);
+        resetSupplierDraft();
+      }
+    } finally {
+      setIsSavingSupplier(false);
     }
   };
 
   const linkedEntityCount = lots.length + bassins.length + parcelles.length + campaigns.length + buildings.length;
 
+  const handleSubmitArticleEdit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingArticleId || !editArticleName.trim()) return;
+
+    onUpdateStockArticle(editingArticleId, {
+      name: editArticleName.trim(),
+      unitCost: Number(editArticleUnitCost) || 0,
+    });
+
+    setEditingArticleId(null);
+    setEditArticleName('');
+    setEditArticleUnitCost('0');
+  };
+
   return (
     <div id="stocks-view" className="space-y-6">
-      <div className="flex justify-between items-center">
+      <FormDialog
+        open={editingArticleId !== null}
+        title="Modifier l'article"
+        subtitle="Ajustez le libelle et le prix unitaire directement dans l interface."
+        confirmLabel="Enregistrer"
+        confirmDisabled={!editArticleName.trim()}
+        onCancel={() => {
+          setEditingArticleId(null);
+          setEditArticleName('');
+          setEditArticleUnitCost('0');
+        }}
+        onSubmit={handleSubmitArticleEdit}
+      >
+        <div className="grid grid-cols-1 gap-4">
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom de l'article</span>
+            <input
+              autoFocus
+              value={editArticleName}
+              onChange={(e) => setEditArticleName(e.target.value)}
+              placeholder="Ex. Aliment croissance"
+              className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Prix unitaire ({currency})</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={editArticleUnitCost}
+              onChange={(e) => setEditArticleUnitCost(e.target.value)}
+              placeholder={`Ex. 15000 ${currency}`}
+              className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+        </div>
+      </FormDialog>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-sans tracking-tight flex items-center gap-2">
             <Package className="w-5 h-5 text-emerald-600" />
@@ -278,7 +434,7 @@ export default function StocksView({
               <select
                 value={form.categoryId || ''}
                 onChange={(e) => {
-                  const category = categories.find((item) => item.id === e.target.value);
+                  const category = effectiveCategories.find((item) => item.id === e.target.value);
                   setForm((prev) => ({
                     ...prev,
                     categoryId: e.target.value,
@@ -287,7 +443,7 @@ export default function StocksView({
                 }}
                 className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               >
-                {categories.map((category) => (
+                {effectiveCategories.map((category) => (
                   <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
               </select>
@@ -296,14 +452,14 @@ export default function StocksView({
 
             <label className="space-y-1.5 xl:col-span-2">
               <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Fournisseur</span>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <select value={form.supplierId ?? ''} onChange={(e) => setForm((prev) => ({ ...prev, supplierId: e.target.value }))} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
                   <option value="">Aucun fournisseur</option>
-                  {suppliers.map((supplier) => (
+                  {effectiveSuppliers.map((supplier) => (
                     <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
                   ))}
                 </select>
-                <button type="button" onClick={promptNewSupplier} className="shrink-0 rounded-xl border border-emerald-600 px-3 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                <button type="button" onClick={openSupplierForm} className="shrink-0 rounded-xl border border-emerald-600 px-3 py-3 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 sm:py-0">
                   Ajouter
                 </button>
               </div>
@@ -328,7 +484,7 @@ export default function StocksView({
             <label className="space-y-1.5">
               <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Unité</span>
               <select value={form.unit} onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
-                {unitOptions.map((unit) => (
+                {effectiveUnitOptions.map((unit) => (
                   <option key={unit} value={unit}>{unit}</option>
                 ))}
               </select>
@@ -362,7 +518,7 @@ export default function StocksView({
             <label className="space-y-1.5">
               <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Emplacement</span>
               <select value={form.storageLocation ?? ''} onChange={(e) => setForm((prev) => ({ ...prev, storageLocation: e.target.value, locationId: e.target.value }))} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
-                {storageLocations.map((location) => (
+                {effectiveStorageLocations.map((location) => (
                   <option key={location} value={location}>{location}</option>
                 ))}
               </select>
@@ -466,6 +622,116 @@ export default function StocksView({
           </div>
         </form>
       )}
+
+      {showSupplierForm ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-3 sm:items-center sm:p-6">
+          <div className="w-full max-w-xl overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-2xl shadow-slate-950/20">
+            <div className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-lime-50 px-5 py-4 sm:px-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="block text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-700">Nouveau fournisseur</span>
+                  <h3 className="mt-1 text-lg font-bold text-slate-900">Ajouter un fournisseur proprement</h3>
+                  <p className="mt-1 text-xs text-slate-500">Cette fiche sera reutilisable dans les stocks, la finance et la tracabilite des achats.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSupplierForm(false);
+                    resetSupplierDraft();
+                  }}
+                  className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSupplierSubmit} className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+                <div>
+                  <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Fournisseur</span>
+                  <span className="mt-1 block text-sm font-semibold text-emerald-900">{supplierDraft.name || 'Nom en attente'}</span>
+                  <p className="mt-1 text-[11px] text-emerald-800">Visible dans la liste des intrants.</p>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Contact</span>
+                  <span className="mt-1 block text-sm font-semibold text-emerald-900">{supplierDraft.contactName || 'Contact optionnel'}</span>
+                  <p className="mt-1 text-[11px] text-emerald-800">{supplierDraft.phone || supplierDraft.email || 'Telephone ou email non renseignes.'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="space-y-1.5 sm:col-span-2">
+                  <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du fournisseur</span>
+                  <input
+                    autoFocus
+                    value={supplierDraft.name}
+                    onChange={(e) => setSupplierDraft((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="Ex. Sanders Abidjan"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                    required
+                  />
+                  <span className="block text-[10px] text-slate-500">Nom commercial ou raison sociale qui apparaitra dans les achats.</span>
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du contact</span>
+                  <input
+                    value={supplierDraft.contactName}
+                    onChange={(e) => setSupplierDraft((prev) => ({ ...prev, contactName: e.target.value }))}
+                    placeholder="Ex. M. Koffi"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  />
+                  <span className="block text-[10px] text-slate-500">Interlocuteur principal pour les commandes.</span>
+                </label>
+
+                <label className="space-y-1.5">
+                  <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Telephone</span>
+                  <input
+                    value={supplierDraft.phone}
+                    onChange={(e) => setSupplierDraft((prev) => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Ex. +225 07 00 00 00 00"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  />
+                  <span className="block text-[10px] text-slate-500">Numero utile pour les relances et livraisons.</span>
+                </label>
+
+                <label className="space-y-1.5 sm:col-span-2">
+                  <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Email</span>
+                  <input
+                    type="email"
+                    value={supplierDraft.email}
+                    onChange={(e) => setSupplierDraft((prev) => ({ ...prev, email: e.target.value }))}
+                    placeholder="Ex. commandes@sanders.ci"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  />
+                  <span className="block text-[10px] text-slate-500">Adresse pratique pour les devis, factures et confirmations.</span>
+                </label>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSupplierForm(false);
+                    resetSupplierDraft();
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingSupplier || !supplierDraft.name.trim()}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none"
+                >
+                  {isSavingSupplier ? 'Enregistrement...' : 'Creer le fournisseur'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
@@ -606,14 +872,9 @@ export default function StocksView({
                             <AdminEntityActions
                               compact
                               onEdit={() => {
-                                const nextName = window.prompt('Nom de l\'article', article.name);
-                                if (!nextName) return;
-                                const nextUnitCost = window.prompt(`Prix unitaire (${currency})`, String(article.unitCost ?? lastKnownUnitCost ?? 0));
-                                if (nextUnitCost === null) return;
-                                onUpdateStockArticle(article.id, {
-                                  name: nextName,
-                                  unitCost: Number(nextUnitCost) || 0,
-                                });
+                                setEditingArticleId(article.id);
+                                setEditArticleName(article.name);
+                                setEditArticleUnitCost(String(article.unitCost ?? lastKnownUnitCost ?? 0));
                               }}
                               onDelete={() => {
                                 if (window.confirm(`Supprimer l'article ${article.name} ?`)) {

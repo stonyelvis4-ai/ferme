@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   Egg,
@@ -35,7 +35,10 @@ import {
 import {
   Lot,
   EggProduction,
+  EggSale,
   AnimalFeeding,
+  AnimalFeedPlan,
+  AnimalWeighing,
   FishBassin,
   CultureParcelle,
   Campaign,
@@ -60,22 +63,6 @@ import {
   initialSettings,
 } from './data';
 
-// Import Modular Views
-import DashboardView from './components/DashboardView';
-import ElevageView from './components/ElevageView';
-import PondeusesView from './components/PondeusesView';
-import PiscicultureView from './components/PiscicultureView';
-import CulturesView from './components/CulturesView';
-import StocksView from './components/StocksView';
-import FinancesView from './components/FinancesView';
-import SanitaireView from './components/SanitaireView';
-import BatimentsView from './components/BatimentsView';
-import AgendaView from './components/AgendaView';
-import TasksView from './components/TasksView';
-import AlertsView from './components/AlertsView';
-import ReportsView from './components/ReportsView';
-import AuditView from './components/AuditView';
-import SettingsView from './components/SettingsView';
 import AuthGate from './components/AuthGate';
 import {
   changePassword,
@@ -99,12 +86,15 @@ import {
 import {
   mapAlerts,
   mapAnimalFeedings,
+  mapAnimalFeedPlans,
+  mapAnimalWeighings,
   mapAuditLogs,
   mapArticles,
   mapAuthUser,
   mapBuildings,
   mapCampaigns,
   mapEggProductions,
+  mapEggSales,
   mapFishBassins,
   mapLots,
   mapMovements,
@@ -122,6 +112,22 @@ const ALARM_SOUND_LIBRARY: Record<string, string> = {
   'ferm-plus-default': '/audio/ferm-plus-alert-loop.m4a',
 };
 
+const DashboardView = lazy(() => import('./components/DashboardView'));
+const ElevageView = lazy(() => import('./components/ElevageView'));
+const PondeusesView = lazy(() => import('./components/PondeusesView'));
+const PiscicultureView = lazy(() => import('./components/PiscicultureView'));
+const CulturesView = lazy(() => import('./components/CulturesView'));
+const StocksView = lazy(() => import('./components/StocksView'));
+const FinancesView = lazy(() => import('./components/FinancesView'));
+const SanitaireView = lazy(() => import('./components/SanitaireView'));
+const BatimentsView = lazy(() => import('./components/BatimentsView'));
+const AgendaView = lazy(() => import('./components/AgendaView'));
+const TasksView = lazy(() => import('./components/TasksView'));
+const AlertsView = lazy(() => import('./components/AlertsView'));
+const ReportsView = lazy(() => import('./components/ReportsView'));
+const AuditView = lazy(() => import('./components/AuditView'));
+const SettingsView = lazy(() => import('./components/SettingsView'));
+
 const WORKSPACE_CACHE_PREFIX = 'fermplus_workspace_cache';
 
 type WorkspaceLocalCache = {
@@ -131,7 +137,10 @@ type WorkspaceLocalCache = {
   buildings: Building[];
   lots: Lot[];
   eggProductions: EggProduction[];
+  eggSales: EggSale[];
   animalFeedings: AnimalFeeding[];
+  animalFeedPlans: AnimalFeedPlan[];
+  animalWeighings: AnimalWeighing[];
   fishBassins: FishBassin[];
   parcelles: CultureParcelle[];
   campaigns: Campaign[];
@@ -142,6 +151,13 @@ type WorkspaceLocalCache = {
   tasks: Task[];
   alerts: Alert[];
   auditLogs: AuditLog[];
+};
+
+type AppNotice = {
+  id: string;
+  type: 'success' | 'warning' | 'error' | 'info';
+  title: string;
+  description?: string;
 };
 
 function getWorkspaceCacheKey(userId: string | number | null | undefined) {
@@ -182,117 +198,294 @@ const responseId = (payload: unknown) => {
   return data && typeof data === 'object' ? String((data as Record<string, unknown>).id ?? '') : '';
 };
 
-async function syncLocalCacheToServer(token: string, farmId: string | number | null | undefined, localCache: WorkspaceLocalCache | null) {
-  if (!token || !farmId || !localCache) return false;
+const toUtcIso = (date: string, time: string) => new Date(`${date}T${time}:00Z`).toISOString();
 
-  let synced = false;
+function createPendingWorkspaceCache(localCache: WorkspaceLocalCache): WorkspaceLocalCache {
+  return {
+    ...localCache,
+    farms: [],
+    users: [],
+    buildings: [],
+    lots: [],
+    eggProductions: [],
+    eggSales: [],
+    animalFeedings: [],
+    animalFeedPlans: [],
+    animalWeighings: [],
+    fishBassins: [],
+    parcelles: [],
+    campaigns: [],
+    articles: [],
+    movements: [],
+    transactions: [],
+    treatments: [],
+    tasks: [],
+    alerts: [],
+    auditLogs: [],
+  };
+}
+
+function countPendingWorkspaceEntries(localCache: WorkspaceLocalCache | null) {
+  if (!localCache) return 0;
+
+  return [
+    localCache.buildings,
+    localCache.lots,
+    localCache.eggProductions,
+    localCache.eggSales,
+    localCache.animalFeedings,
+    localCache.animalFeedPlans,
+    localCache.animalWeighings,
+    localCache.fishBassins,
+    localCache.parcelles,
+    localCache.campaigns,
+    localCache.articles,
+    localCache.transactions,
+    localCache.tasks,
+  ].reduce((sum, bucket) => sum + bucket.length, 0);
+}
+
+async function syncLocalCacheToServer(token: string, farmId: string | number | null | undefined, localCache: WorkspaceLocalCache | null) {
+  if (!token || !farmId || !localCache) {
+    return { syncedCount: 0, pendingCache: localCache };
+  }
+
+  let syncedCount = 0;
   const numericFarmId = Number(farmId);
   const localToBackendIds = new Map<string, string>();
+  const pendingCache = createPendingWorkspaceCache(localCache);
 
   for (const building of localCache.buildings.filter((item) => !isBackendId(item.id))) {
-    const response = await postJson('/infrastructures/buildings', {
-      farm_id: numericFarmId,
-      name: building.name,
-      type: building.type,
-      capacity: building.capacity,
-      notes: building.notes ?? '',
-      status: 'active',
-      state: 'good',
-      assigned_use: building.type,
-    }, token);
-    const backendId = responseId(response);
-    if (backendId) localToBackendIds.set(building.id, backendId);
-    synced = true;
+    try {
+      const response = await postJson('/infrastructures/buildings', {
+        farm_id: numericFarmId,
+        name: building.name,
+        type: building.type,
+        capacity: building.capacity,
+        notes: building.notes ?? '',
+        status: 'active',
+        state: 'good',
+        assigned_use: building.type,
+      }, token);
+      const backendId = responseId(response);
+      if (backendId) {
+        localToBackendIds.set(building.id, backendId);
+        syncedCount += 1;
+      } else {
+        pendingCache.buildings.push(building);
+      }
+    } catch {
+      pendingCache.buildings.push(building);
+    }
   }
 
   for (const article of localCache.articles.filter((item) => !isBackendId(item.id))) {
-    const response = await postJson('/stocks', {
-      farm_id: numericFarmId,
-      name: article.name,
-      category: article.category,
-      unit: article.unit,
-      minimum_threshold: article.minThreshold,
-      current_quantity: article.quantity,
-      unit_cost: article.unitCost ?? 0,
-      location: article.locationId || null,
-    }, token);
-    const backendId = responseId(response);
-    if (backendId) localToBackendIds.set(article.id, backendId);
-    synced = true;
+    try {
+      const response = await postJson('/stocks', {
+        farm_id: numericFarmId,
+        name: article.name,
+        category: article.category,
+        unit: article.unit,
+        minimum_threshold: article.minThreshold,
+        current_quantity: article.quantity,
+        unit_cost: article.unitCost ?? 0,
+        location: article.locationId || null,
+      }, token);
+      const backendId = responseId(response);
+      if (backendId) {
+        localToBackendIds.set(article.id, backendId);
+        syncedCount += 1;
+      } else {
+        pendingCache.articles.push(article);
+      }
+    } catch {
+      pendingCache.articles.push(article);
+    }
   }
 
   for (const lot of localCache.lots.filter((item) => !isBackendId(item.id))) {
     const backendBuildingId = localToBackendIds.get(lot.buildingId) ?? lot.buildingId;
-    const response = await postJson('/pondeuses', {
-      farm_id: numericFarmId,
-      name: lot.name,
-      breed: lot.breed,
-      building_id: isBackendId(backendBuildingId) ? Number(backendBuildingId) : null,
-      entry_date: lot.entryDate,
-      initial_count: lot.initialCount,
-      mortality_total: lot.mortalityCount,
-      reform_total: 0,
-      current_count: lot.currentCount,
-      status: lot.status,
-      unit_cost: lot.unitCost ?? 0,
-      acquisition_cost: lot.acquisitionCost ?? lot.initialCount * (lot.unitCost ?? 0),
-      notes: lot.notes ?? null,
-    }, token);
-    const backendId = responseId(response);
-    if (backendId) localToBackendIds.set(lot.id, backendId);
-    synced = true;
+    if (!isBackendId(backendBuildingId)) {
+      pendingCache.lots.push(lot);
+      continue;
+    }
+
+    try {
+      const response = await postJson('/pondeuses', {
+        farm_id: numericFarmId,
+        name: lot.name,
+        breed: lot.breed,
+        building_id: Number(backendBuildingId),
+        entry_date: lot.entryDate,
+        initial_count: lot.initialCount,
+        mortality_total: lot.mortalityCount,
+        reform_total: 0,
+        current_count: lot.currentCount,
+        status: lot.status,
+        unit_cost: lot.unitCost ?? 0,
+        acquisition_cost: lot.acquisitionCost ?? lot.initialCount * (lot.unitCost ?? 0),
+        notes: lot.notes ?? null,
+      }, token);
+      const backendId = responseId(response);
+      if (backendId) {
+        localToBackendIds.set(lot.id, backendId);
+        syncedCount += 1;
+      } else {
+        pendingCache.lots.push(lot);
+      }
+    } catch {
+      pendingCache.lots.push(lot);
+    }
   }
 
   for (const production of localCache.eggProductions.filter((item) => !isBackendId(item.id))) {
     const backendLotId = localToBackendIds.get(production.lotId) ?? production.lotId;
-    if (!isBackendId(backendLotId) || production.collectedCount <= 0) continue;
-    await postJson('/pondeuses/productions', {
-      farm_id: numericFarmId,
-      layer_batch_id: Number(backendLotId),
-      production_date: production.date,
-      eggs_produced: production.collectedCount,
-      broken_eggs: production.brokenCount,
-      dirty_eggs: production.lossesCount,
-      lost_eggs: Math.max(production.collectedCount - production.compliantCount - production.brokenCount - production.lossesCount, 0),
-      mortality: 0,
-      observations: '',
-    }, token);
-    synced = true;
+    if (!isBackendId(backendLotId) || production.collectedCount <= 0) {
+      pendingCache.eggProductions.push(production);
+      continue;
+    }
+
+    try {
+      await postJson('/pondeuses/productions', {
+        farm_id: numericFarmId,
+        layer_batch_id: Number(backendLotId),
+        production_date: production.date,
+        eggs_produced: production.collectedCount,
+        broken_eggs: production.brokenCount,
+        dirty_eggs: production.lossesCount,
+        lost_eggs: Math.max(production.collectedCount - production.compliantCount - production.brokenCount - production.lossesCount, 0),
+        mortality: 0,
+        observations: '',
+      }, token);
+      syncedCount += 1;
+    } catch {
+      pendingCache.eggProductions.push(production);
+    }
+  }
+
+  for (const sale of localCache.eggSales.filter((item) => !isBackendId(item.id))) {
+    const backendLotId = localToBackendIds.get(sale.lotId) ?? sale.lotId;
+    if (!isBackendId(backendLotId) || sale.eggsSold <= 0) {
+      pendingCache.eggSales.push(sale);
+      continue;
+    }
+
+    try {
+      await postJson('/pondeuses/sales', {
+        farm_id: numericFarmId,
+        layer_batch_id: Number(backendLotId),
+        sale_date: sale.date,
+        customer_name: sale.customerName || 'Client comptoir',
+        trays_sold: sale.traysSold,
+        eggs_sold: sale.eggsSold,
+        unit_price: sale.unitPrice,
+        amount_paid: sale.amountPaid,
+        remaining_due: sale.remainingDue,
+        payment_method: 'cash',
+        notes: sale.customerName ?? '',
+      }, token);
+      syncedCount += 1;
+    } catch {
+      pendingCache.eggSales.push(sale);
+    }
   }
 
   for (const feeding of localCache.animalFeedings.filter((item) => !isBackendId(item.id))) {
     const backendLotId = localToBackendIds.get(feeding.lotId) ?? feeding.lotId;
     const backendArticleId = localToBackendIds.get(feeding.articleId) ?? feeding.articleId;
-    if (!isBackendId(backendLotId) || !isBackendId(backendArticleId) || feeding.quantity <= 0) continue;
-    await postJson('/pondeuses/feedings', {
-      farm_id: numericFarmId,
-      layer_batch_id: Number(backendLotId),
-      stock_item_id: Number(backendArticleId),
-      feeding_date: feeding.date,
-      feeding_time: feeding.time || null,
-      quantity: feeding.quantity,
-      notes: feeding.notes ?? '',
-    }, token);
-    synced = true;
+    if (!isBackendId(backendLotId) || !isBackendId(backendArticleId) || feeding.quantity <= 0) {
+      pendingCache.animalFeedings.push(feeding);
+      continue;
+    }
+
+    try {
+      await postJson('/pondeuses/feedings', {
+        farm_id: numericFarmId,
+        layer_batch_id: Number(backendLotId),
+        stock_item_id: Number(backendArticleId),
+        feeding_date: feeding.date,
+        feeding_time: feeding.time || null,
+        quantity: feeding.quantity,
+        notes: feeding.notes ?? '',
+      }, token);
+      syncedCount += 1;
+    } catch {
+      pendingCache.animalFeedings.push(feeding);
+    }
+  }
+
+  for (const plan of localCache.animalFeedPlans.filter((item) => !isBackendId(item.id))) {
+    const backendLotId = localToBackendIds.get(plan.lotId) ?? plan.lotId;
+    const backendArticleId = plan.articleId ? (localToBackendIds.get(plan.articleId) ?? plan.articleId) : null;
+    if (!isBackendId(backendLotId) || plan.rationPerHeadKg <= 0) {
+      pendingCache.animalFeedPlans.push(plan);
+      continue;
+    }
+
+    try {
+      await postJson('/pondeuses/feed-plans', {
+        farm_id: numericFarmId,
+        layer_batch_id: Number(backendLotId),
+        stock_item_id: backendArticleId && isBackendId(backendArticleId) ? Number(backendArticleId) : null,
+        plan_name: plan.planName,
+        ration_per_head_kg: plan.rationPerHeadKg,
+        feedings_per_day: plan.feedingsPerDay,
+        target_daily_quantity_kg: plan.targetDailyQuantityKg,
+        start_date: plan.startDate,
+        notes: plan.notes ?? '',
+        is_active: plan.isActive,
+      }, token);
+      syncedCount += 1;
+    } catch {
+      pendingCache.animalFeedPlans.push(plan);
+    }
+  }
+
+  for (const weighing of localCache.animalWeighings.filter((item) => !isBackendId(item.id))) {
+    const backendLotId = localToBackendIds.get(weighing.lotId) ?? weighing.lotId;
+    if (!isBackendId(backendLotId) || weighing.averageWeightKg <= 0) {
+      pendingCache.animalWeighings.push(weighing);
+      continue;
+    }
+
+    try {
+      await postJson('/pondeuses/weighings', {
+        farm_id: numericFarmId,
+        layer_batch_id: Number(backendLotId),
+        weighing_date: weighing.date,
+        sample_size: weighing.sampleSize ?? null,
+        average_weight_kg: weighing.averageWeightKg,
+        total_weight_kg: weighing.totalWeightKg || null,
+        notes: weighing.notes ?? '',
+      }, token);
+      syncedCount += 1;
+    } catch {
+      pendingCache.animalWeighings.push(weighing);
+    }
   }
 
   for (const bassin of localCache.fishBassins.filter((item) => !isBackendId(item.id))) {
-    const response = await postJson('/pisciculture', {
-      farm_id: numericFarmId,
-      name: bassin.name,
-      pond_type: 'bassin',
-      capacity_kg: 0,
-      species: bassin.species,
-      initial_fish_count: bassin.initialCount,
-      stocking_date: bassin.stockingDate,
-      status: bassin.status,
-      current_estimated_count: bassin.currentCount,
-      mortality_total: bassin.mortalityCount,
-      unit_cost: bassin.unitCost ?? 0,
-      acquisition_cost: bassin.acquisitionCost ?? bassin.initialCount * (bassin.unitCost ?? 0),
-    }, token);
-    const backendId = responseId(response);
-    if (backendId) {
+    try {
+      const response = await postJson('/pisciculture', {
+        farm_id: numericFarmId,
+        name: bassin.name,
+        pond_type: 'bassin',
+        capacity_kg: 0,
+        species: bassin.species,
+        initial_fish_count: bassin.initialCount,
+        stocking_date: bassin.stockingDate,
+        status: bassin.status,
+        current_estimated_count: bassin.currentCount,
+        mortality_total: bassin.mortalityCount,
+        unit_cost: bassin.unitCost ?? 0,
+        acquisition_cost: bassin.acquisitionCost ?? bassin.initialCount * (bassin.unitCost ?? 0),
+      }, token);
+      const backendId = responseId(response);
+      if (!backendId) {
+        pendingCache.fishBassins.push(bassin);
+        continue;
+      }
+
       localToBackendIds.set(bassin.id, backendId);
       await postJson('/pisciculture/stockings', {
         farm_id: numericFarmId,
@@ -303,28 +496,38 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
         acquisition_cost: bassin.acquisitionCost ?? bassin.initialCount * (bassin.unitCost ?? 0),
         notes: `Migration locale du bassin ${bassin.name}`,
       }, token);
+      syncedCount += 1;
+    } catch {
+      pendingCache.fishBassins.push(bassin);
     }
-    synced = true;
   }
 
   for (const campaign of localCache.campaigns.filter((item) => !isBackendId(item.id))) {
     const parcelle = localCache.parcelles.find((item) => item.id === campaign.parcelleId);
-    const cropResponse = await postJson('/cultures', {
-      farm_id: numericFarmId,
-      name: campaign.cropType,
-      variety: campaign.variety,
-      cycle_days: 90,
-      planting_date: campaign.startDate,
-      area: parcelle?.area ?? 0,
-      status: campaign.status,
-      estimated_harvest_date: campaign.endDate,
-      expected_yield_kg: (campaign.expectedYield ?? 0) * 1000,
-      total_operations_cost: campaign.expenses,
-      total_harvest_kg: (campaign.actualYield ?? 0) * 1000,
-    }, token);
-    const backendCropId = responseId(cropResponse);
-    if (backendCropId) {
+
+    try {
+      const cropResponse = await postJson('/cultures', {
+        farm_id: numericFarmId,
+        name: campaign.cropType,
+        variety: campaign.variety,
+        cycle_days: 90,
+        planting_date: campaign.startDate,
+        area: parcelle?.area ?? 0,
+        status: campaign.status,
+        estimated_harvest_date: campaign.endDate,
+        expected_yield_kg: (campaign.expectedYield ?? 0) * 1000,
+        total_operations_cost: campaign.expenses,
+        total_harvest_kg: (campaign.actualYield ?? 0) * 1000,
+      }, token);
+      const backendCropId = responseId(cropResponse);
+      if (!backendCropId) {
+        pendingCache.campaigns.push(campaign);
+        if (parcelle && !isBackendId(parcelle.id)) pendingCache.parcelles.push(parcelle);
+        continue;
+      }
+
       localToBackendIds.set(campaign.id, backendCropId);
+
       if (parcelle && !isBackendId(parcelle.id)) {
         const plotResponse = await postJson('/cultures/plots', {
           farm_id: numericFarmId,
@@ -335,45 +538,65 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
           status: parcelle.status,
         }, token);
         const backendPlotId = responseId(plotResponse);
-        if (backendPlotId) localToBackendIds.set(parcelle.id, backendPlotId);
+        if (backendPlotId) {
+          localToBackendIds.set(parcelle.id, backendPlotId);
+        } else {
+          pendingCache.parcelles.push(parcelle);
+        }
       }
+
+      syncedCount += 1;
+    } catch {
+      pendingCache.campaigns.push(campaign);
+      if (parcelle && !isBackendId(parcelle.id)) pendingCache.parcelles.push(parcelle);
     }
-    synced = true;
   }
 
   for (const task of localCache.tasks.filter((item) => !isBackendId(item.id))) {
-    await postJson('/tasks', {
-      farm_id: numericFarmId,
-      title: task.title,
-      description: task.description,
-      source_module: task.sourceModule,
-      source_entity_type: task.sourceEntityType ?? null,
-      source_entity_id: task.sourceElementId ?? null,
-      priority: task.priority,
-      status: task.status,
-      due_at: new Date(`${task.dueDate}T12:00:00Z`).toISOString(),
-      reminder_at: task.reminderAt ?? null,
-      assigned_to: undefined,
-    }, token);
-    synced = true;
+    try {
+      await postJson('/tasks', {
+        farm_id: numericFarmId,
+        title: task.title,
+        description: task.description,
+        source_module: task.sourceModule,
+        source_entity_type: task.sourceEntityType ?? null,
+        source_entity_id: task.sourceElementId ?? null,
+        start_at: task.startDate ? toUtcIso(task.startDate, '08:00') : null,
+        priority: task.priority,
+        status: task.status,
+        due_at: task.dueDate ? toUtcIso(task.dueDate, '17:00') : null,
+        reminder_at: task.reminderAt ?? null,
+        assigned_to: undefined,
+      }, token);
+      syncedCount += 1;
+    } catch {
+      pendingCache.tasks.push(task);
+    }
   }
 
   for (const transaction of localCache.transactions.filter((item) => !isBackendId(item.id) && item.sourceModule === 'Finances')) {
-    await postJson('/finances', {
-      farm_id: numericFarmId,
-      type: transaction.type,
-      amount: transaction.amount,
-      category: transaction.category,
-      description: transaction.description,
-      source_module: 'Finances',
-      source_entity_id: null,
-      source_entity_type: null,
-      occurred_at: transaction.date ? new Date(transaction.date).toISOString() : new Date().toISOString(),
-    }, token);
-    synced = true;
+    try {
+      await postJson('/finances', {
+        farm_id: numericFarmId,
+        type: transaction.type,
+        amount: transaction.amount,
+        category: transaction.category,
+        description: transaction.description,
+        source_module: 'Finances',
+        source_entity_id: null,
+        source_entity_type: null,
+        occurred_at: transaction.date ? new Date(transaction.date).toISOString() : new Date().toISOString(),
+      }, token);
+      syncedCount += 1;
+    } catch {
+      pendingCache.transactions.push(transaction);
+    }
   }
 
-  return synced;
+  return {
+    syncedCount,
+    pendingCache: countPendingWorkspaceEntries(pendingCache) > 0 ? pendingCache : null,
+  };
 }
 
 export default function App() {
@@ -416,7 +639,10 @@ export default function App() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
   const [eggProductions, setEggProductions] = useState<EggProduction[]>([]);
+  const [eggSales, setEggSales] = useState<EggSale[]>([]);
   const [animalFeedings, setAnimalFeedings] = useState<AnimalFeeding[]>([]);
+  const [animalFeedPlans, setAnimalFeedPlans] = useState<AnimalFeedPlan[]>([]);
+  const [animalWeighings, setAnimalWeighings] = useState<AnimalWeighing[]>([]);
   const [fishBassins, setFishBassins] = useState<FishBassin[]>([]);
   const [parcelles, setParcelles] = useState<CultureParcelle[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -437,6 +663,7 @@ export default function App() {
   const [showAlertDropdown, setShowAlertDropdown] = useState<boolean>(false);
   const [alarmSilenced, setAlarmSilenced] = useState<boolean>(false);
   const [alarmPlaybackBlocked, setAlarmPlaybackBlocked] = useState<boolean>(false);
+  const [notices, setNotices] = useState<AppNotice[]>([]);
   const alarmAudioRef = useRef<HTMLAudioElement | null>(null);
   const previousAlarmCountRef = useRef<number>(0);
 
@@ -444,6 +671,18 @@ export default function App() {
   const generateId = (prefix: string) => `${prefix}-${Math.floor(Math.random() * 100000)}`;
   const getTodayDate = () => new Date().toISOString().split('T')[0];
   const getSyncStatus = (): SyncStatus => (isOffline ? 'pending' : 'synced');
+  const pushNotice = (
+    type: AppNotice['type'],
+    title: string,
+    description?: string,
+    durationMs = 4200
+  ) => {
+    const noticeId = generateId('notice');
+    setNotices((prev) => [...prev, { id: noticeId, type, title, description }]);
+    window.setTimeout(() => {
+      setNotices((prev) => prev.filter((item) => item.id !== noticeId));
+    }, durationMs);
+  };
 
   const resetToLogin = (message: string) => {
     clearStoredAuthToken();
@@ -457,7 +696,7 @@ export default function App() {
   const hydrateWorkspace = async (token = authToken, options?: { silent?: boolean }) => {
     if (!token) {
       setAuthReady(true);
-      return;
+      
     }
 
     const silent = options?.silent ?? false;
@@ -508,7 +747,10 @@ export default function App() {
 
       const mappedLots = mapLots(((layersObject.batches ?? []) as unknown[]) ?? []);
       const mappedEggProductions = mapEggProductions(((layersObject.productions ?? []) as unknown[]) ?? []);
+      const mappedEggSales = mapEggSales(((layersObject.sales ?? []) as unknown[]) ?? []);
       const mappedAnimalFeedings = mapAnimalFeedings(((layersObject.feedings ?? []) as unknown[]) ?? []);
+      const mappedAnimalFeedPlans = mapAnimalFeedPlans(((layersObject.feed_plans ?? []) as unknown[]) ?? []);
+      const mappedAnimalWeighings = mapAnimalWeighings(((layersObject.weighings ?? []) as unknown[]) ?? []);
       const mappedBassins = mapFishBassins(((pondObject.ponds ?? pondObject.data ?? []) as unknown[]) ?? []);
       const rawPlots = ((culturesObject.plots ?? culturesObject.data ?? []) as unknown[]) ?? [];
       const rawCrops = ((culturesObject.crops ?? culturesObject.data ?? []) as unknown[]) ?? [];
@@ -539,9 +781,14 @@ export default function App() {
 
       if (localCache && activeHydrationFarmId) {
         try {
-          const migrated = await syncLocalCacheToServer(token, activeHydrationFarmId, localCache);
-          if (migrated) {
+          const syncResult = await syncLocalCacheToServer(token, activeHydrationFarmId, localCache);
+          if (syncResult.pendingCache) {
+            writeWorkspaceCache(cacheUserId, syncResult.pendingCache);
+          } else if (syncResult.syncedCount > 0) {
             clearWorkspaceCache(cacheUserId);
+          }
+
+          if (syncResult.syncedCount > 0) {
             await hydrateWorkspace(token, { silent: true });
             return;
           }
@@ -561,7 +808,10 @@ export default function App() {
       setBuildings(pickMapped(infraObject.buildings, mappedBuildings, localCache?.buildings ?? mappedBuildings));
       setLots(pickMapped(layersObject.batches, mappedLots, localCache?.lots ?? mappedLots));
       setEggProductions(pickMapped(layersObject.productions, mappedEggProductions, localCache?.eggProductions ?? mappedEggProductions));
+      setEggSales(pickMapped(layersObject.sales, mappedEggSales, localCache?.eggSales ?? mappedEggSales));
       setAnimalFeedings(pickMapped(layersObject.feedings, mappedAnimalFeedings, localCache?.animalFeedings ?? mappedAnimalFeedings));
+      setAnimalFeedPlans(pickMapped(layersObject.feed_plans, mappedAnimalFeedPlans, localCache?.animalFeedPlans ?? mappedAnimalFeedPlans));
+      setAnimalWeighings(pickMapped(layersObject.weighings, mappedAnimalWeighings, localCache?.animalWeighings ?? mappedAnimalWeighings));
       setFishBassins(pickMapped(pondObject.ponds ?? pondObject.data, mappedBassins, localCache?.fishBassins ?? mappedBassins));
       setParcelles(pickMapped(culturesObject.plots ?? culturesObject.data, mappedParcelles, localCache?.parcelles ?? mappedParcelles));
       setCampaigns(pickMapped(culturesObject.crops ?? culturesObject.data, mappedCampaigns, localCache?.campaigns ?? mappedCampaigns));
@@ -609,7 +859,10 @@ export default function App() {
         setBuildings(localCache.buildings);
         setLots(localCache.lots);
         setEggProductions(localCache.eggProductions);
+        setEggSales(localCache.eggSales ?? []);
         setAnimalFeedings(localCache.animalFeedings);
+        setAnimalFeedPlans(localCache.animalFeedPlans ?? []);
+        setAnimalWeighings(localCache.animalWeighings ?? []);
         setFishBassins(localCache.fishBassins);
         setParcelles(localCache.parcelles);
         setCampaigns(localCache.campaigns);
@@ -713,7 +966,10 @@ export default function App() {
       buildings,
       lots,
       eggProductions,
+      eggSales,
       animalFeedings,
+      animalFeedPlans,
+      animalWeighings,
       fishBassins,
       parcelles,
       campaigns,
@@ -731,10 +987,13 @@ export default function App() {
     authReady,
     authToken,
     animalFeedings,
+    animalFeedPlans,
+    animalWeighings,
     authUser?.id,
     buildings,
     campaigns,
     eggProductions,
+    eggSales,
     fishBassins,
     farms,
     lots,
@@ -783,7 +1042,7 @@ export default function App() {
     event.preventDefault();
     if (registerPassword !== registerConfirmPassword) {
       setAuthError('Les mots de passe ne correspondent pas.');
-      return;
+      
     }
 
     setAuthBusy(true);
@@ -990,20 +1249,39 @@ export default function App() {
   };
 
   // Connectivity Sync Handler
-  const handleToggleOffline = () => {
+  const handleToggleOffline = async () => {
     if (isOffline) {
-      // Re-connecting: sync pending local actions
       setIsSyncing(true);
-      setTimeout(() => {
-        setIsSyncing(false);
-        setIsOffline(false);
+      try {
+        if (authToken) {
+          const localCache = readWorkspaceCache(authUser?.id);
+          if (activeFarmId) {
+            const syncResult = await syncLocalCacheToServer(authToken, activeFarmId, localCache);
+            if (syncResult.pendingCache) {
+              writeWorkspaceCache(authUser?.id, syncResult.pendingCache);
+            } else if (syncResult.syncedCount > 0) {
+              clearWorkspaceCache(authUser?.id);
+            }
+          }
+          await hydrateWorkspace(authToken, { silent: true });
+        }
 
-        // Update all pending items in audit logs
+        setIsOffline(false);
         setAuditLogs((prev) =>
           prev.map((log) => (log.syncStatus === 'pending' ? { ...log, syncStatus: 'synced' } : log))
         );
-        return;
-
+        pushNotice('success', 'Synchronisation relancée', 'Les données locales ont été resynchronisées en arrière-plan.');
+      } catch (error) {
+        console.error('Reconnect sync failed:', error);
+        setAuditLogs((prev) =>
+          prev.map((log) => (log.syncStatus === 'pending' ? { ...log, syncStatus: 'error' } : log))
+        );
+        pushNotice('error', 'Synchronisation incomplète', 'Certaines opérations locales n’ont pas encore pu être renvoyées au serveur.');
+      } finally {
+        setIsSyncing(false);
+      }
+      return;
+      /*
         // Trigger a success notification
         const newAlert: Alert = {
           id: generateId('alt'),
@@ -1029,10 +1307,10 @@ export default function App() {
         };
         setAuditLogs((prev) => [...prev, newLog]);
       }, 2000);
+      */
     } else {
       setIsOffline(true);
-      return;
-      alert("La PWA Fermé+ est maintenant hors ligne. Les opérations que vous réaliserez seront stockées localement en attente de synchronisation.");
+      pushNotice('info', 'Mode hors ligne', 'Les nouvelles opérations seront conservées localement jusqu’à la prochaine reconnexion.');
     }
   };
 
@@ -1215,7 +1493,12 @@ export default function App() {
 
     if (!targetLot || !targetArticle || quantity <= 0) return;
     if (targetArticle.quantity < quantity) {
-      alert(`Stock insuffisant pour ${targetArticle.name}. Disponible : ${targetArticle.quantity} ${targetArticle.unit}.`);
+      console.warn('Livestock feeding blocked: insufficient stock', {
+        articleId,
+        availableQuantity: targetArticle.quantity,
+        requestedQuantity: quantity,
+      });
+      pushNotice('warning', 'Stock insuffisant', `${targetArticle.name} ne dispose que de ${targetArticle.quantity} ${targetArticle.unit}.`);
       return;
     }
 
@@ -1340,7 +1623,180 @@ export default function App() {
     }
   };
 
-  // 5. Sell Eggs
+  // 5. Record Livestock Weighing
+  const handleRecordWeighing = async (lotId: string, averageWeightKg: number, weighingDate: string, sampleSize?: number, notes?: string) => {
+    const targetLot = lots.find((lot) => lot.id === lotId);
+    if (!targetLot || averageWeightKg <= 0) return;
+
+    const previousWeighing = [...animalWeighings]
+      .filter((weighing) => weighing.lotId === lotId)
+      .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())[0];
+
+    const weighingId = generateId('weigh');
+    const normalizedSampleSize = sampleSize && sampleSize > 0 ? sampleSize : undefined;
+    const totalWeightKg = Number((averageWeightKg * Math.max(normalizedSampleSize ?? targetLot.currentCount, 1)).toFixed(3));
+    const weightGainKg = Number((averageWeightKg - (previousWeighing?.averageWeightKg ?? averageWeightKg)).toFixed(3));
+
+    const newWeighing: AnimalWeighing = {
+      id: weighingId,
+      lotId,
+      lotName: targetLot.name,
+      date: weighingDate,
+      sampleSize: normalizedSampleSize,
+      averageWeightKg,
+      totalWeightKg,
+      weightGainKg: previousWeighing ? weightGainKg : 0,
+      notes: notes?.trim() || '',
+    };
+
+    setAnimalWeighings((prev) =>
+      [newWeighing, ...prev].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+    );
+
+    if (previousWeighing && weightGainKg <= 0) {
+      const alt: Alert = {
+        id: generateId('alt'),
+        title: `Croissance à surveiller : ${targetLot.name}`,
+        description: `La pesée du ${weighingDate} indique un gain moyen de ${weightGainKg.toFixed(3)} kg pour le lot ${targetLot.name}.`,
+        severity: 'warning',
+        date: new Date().toISOString(),
+        read: false,
+        sourceModule: 'Élevage',
+        sourceElementId: lotId,
+      };
+      setAlerts((prev) => [alt, ...prev]);
+
+      const followUpTaskId = generateId('task');
+      const followUpTask: Task = {
+        id: followUpTaskId,
+        title: `Contrôler la croissance du lot ${targetLot.name}`,
+        description: `Analyser l'alimentation, l'ambiance et le sanitaire suite à la pesée du ${weighingDate}.`,
+        sourceModule: 'Élevage',
+        sourceElementId: lotId,
+        sourceEntityType: 'layer_batch',
+        startDate: getTodayDate(),
+        dueDate: weighingDate,
+        priority: 'high',
+        status: 'todo',
+        assignedTo: authUser?.name ?? settings.managerName,
+        farmId: activeFarmId ?? undefined,
+      };
+      setTasks((prev) => [followUpTask, ...prev]);
+    }
+
+    addAuditLog(
+      'Élevage',
+      `Pesée enregistrée pour le lot ${targetLot.name}`,
+      `${averageWeightKg.toFixed(3)} kg de poids moyen`
+    );
+
+    if (authToken && activeFarmId) {
+      const backendLotId = Number(lotId);
+      if (!Number.isFinite(backendLotId) || backendLotId <= 0) {
+        console.warn('Livestock weighing sync skipped: invalid backend lot id', lotId);
+      } else {
+        try {
+          const response = await postJson(
+            '/pondeuses/weighings',
+            {
+              farm_id: Number(activeFarmId),
+              layer_batch_id: backendLotId,
+              weighing_date: weighingDate,
+              sample_size: normalizedSampleSize ?? null,
+              average_weight_kg: averageWeightKg,
+              total_weight_kg: totalWeightKg,
+              notes: notes?.trim() || '',
+            },
+            authToken
+          );
+          const backendId = response.data && typeof response.data === 'object' ? String((response.data as Record<string, unknown>).id ?? '') : '';
+          if (backendId) {
+            setAnimalWeighings((prev) => prev.map((weighing) => (weighing.id === weighingId ? { ...weighing, id: backendId } : weighing)));
+          }
+        } catch (error) {
+          console.error('Livestock weighing sync failed:', error);
+        }
+      }
+    }
+  };
+
+  // 6. Create Livestock Feed Plan
+  const handleCreateFeedPlan = async (
+    lotId: string,
+    planName: string,
+    rationPerHeadKg: number,
+    feedingsPerDay: number,
+    startDate: string,
+    articleId?: string,
+    notes?: string
+  ) => {
+    const targetLot = lots.find((lot) => lot.id === lotId);
+    const targetArticle = articleId ? articles.find((article) => article.id === articleId) : undefined;
+    if (!targetLot || rationPerHeadKg <= 0 || feedingsPerDay <= 0) return;
+
+    const planId = generateId('plan');
+    const targetDailyQuantityKg = Number((rationPerHeadKg * Math.max(targetLot.currentCount, 1)).toFixed(3));
+    const newPlan: AnimalFeedPlan = {
+      id: planId,
+      lotId,
+      lotName: targetLot.name,
+      articleId: articleId || '',
+      articleName: targetArticle?.name ?? '',
+      planName,
+      rationPerHeadKg,
+      feedingsPerDay,
+      targetDailyQuantityKg,
+      startDate,
+      notes: notes?.trim() || '',
+      isActive: true,
+    };
+
+    setAnimalFeedPlans((prev) => [
+      newPlan,
+      ...prev.filter((plan) => plan.lotId !== lotId),
+    ]);
+
+    addAuditLog(
+      'Élevage',
+      `Plan d'alimentation créé pour ${targetLot.name}`,
+      `${rationPerHeadKg.toFixed(3)} kg/tête/jour, ${feedingsPerDay} distribution(s)`
+    );
+
+    if (authToken && activeFarmId) {
+      const backendLotId = Number(lotId);
+      const backendArticleId = articleId ? Number(articleId) : null;
+      if (!Number.isFinite(backendLotId) || backendLotId <= 0) {
+        console.warn('Feed plan sync skipped: invalid backend lot id', lotId);
+      } else {
+        try {
+          const response = await postJson(
+            '/pondeuses/feed-plans',
+            {
+              farm_id: Number(activeFarmId),
+              layer_batch_id: backendLotId,
+              stock_item_id: backendArticleId && Number.isFinite(backendArticleId) && backendArticleId > 0 ? backendArticleId : null,
+              plan_name: planName,
+              ration_per_head_kg: rationPerHeadKg,
+              feedings_per_day: feedingsPerDay,
+              target_daily_quantity_kg: targetDailyQuantityKg,
+              start_date: startDate,
+              notes: notes?.trim() || '',
+              is_active: true,
+            },
+            authToken
+          );
+          const backendId = response.data && typeof response.data === 'object' ? String((response.data as Record<string, unknown>).id ?? '') : '';
+          if (backendId) {
+            setAnimalFeedPlans((prev) => prev.map((plan) => (plan.id === planId ? { ...plan, id: backendId } : plan)));
+          }
+        } catch (error) {
+          console.error('Feed plan sync failed:', error);
+        }
+      }
+    }
+  };
+
+  // 7. Sell Eggs
   const handleSellEggs = async (count: number, unitPrice: number, description: string) => {
     const latestProd = eggProductions[eggProductions.length - 1];
     const prevStock = latestProd ? latestProd.stockCount : 0;
@@ -1350,7 +1806,8 @@ export default function App() {
       ?? '';
 
     if (!saleLotId) {
-      alert("Impossible d'enregistrer la vente : aucun lot de pondeuses actif n'a été trouvé.");
+      console.warn('Egg sale blocked: no active laying lot available');
+      pushNotice('warning', 'Vente impossible', 'Aucun lot de pondeuses actif n’est disponible pour enregistrer cette vente.');
       return;
     }
 
@@ -1370,6 +1827,20 @@ export default function App() {
       stockCount: newStock
     };
     setEggProductions((prev) => [...prev, newProd]);
+
+    const saleId = generateId('egg-sale');
+    const newSale: EggSale = {
+      id: saleId,
+      date: getTodayDate(),
+      lotId: saleLotId,
+      customerName,
+      traysSold: Math.max(Math.ceil(count / 30), 1),
+      eggsSold: count,
+      unitPrice,
+      amountPaid: count * unitPrice,
+      remainingDue: 0,
+    };
+    setEggSales((prev) => [newSale, ...prev]);
 
     // Financial credit
     const revenue = count * unitPrice;
@@ -1392,7 +1863,7 @@ export default function App() {
         console.warn('Egg sale sync skipped: invalid backend lot id', newProd.lotId);
       } else {
       try {
-        await postJson(
+        const response = await postJson(
           '/pondeuses/sales',
           {
             farm_id: Number(activeFarmId),
@@ -1409,6 +1880,10 @@ export default function App() {
           },
           authToken
         );
+        const backendId = response.data && typeof response.data === 'object' ? String((response.data as Record<string, unknown>).id ?? '') : '';
+        if (backendId) {
+          setEggSales((prev) => prev.map((sale) => (sale.id === saleId ? { ...sale, id: backendId } : sale)));
+        }
       } catch (error) {
         console.error('Egg sale sync failed:', error);
       }
@@ -1422,7 +1897,7 @@ export default function App() {
     );
   };
 
-  // 6. Feed Fish (distribute pellets from stock)
+  // 8. Feed Fish (distribute pellets from stock)
   const handleFeedFish = async (bassinId: string, articleId: string, quantity: number) => {
     // Subtract from Stocks
     setArticles((prev) =>
@@ -1506,10 +1981,9 @@ export default function App() {
       `Distribution bimensuelle de granulés`,
       `Quantité: ${quantity} kg déduite du stock d'intrants`
     );
-    alert("Nourriture distribuée avec succès ! Le stock d'intrants a été déduit en temps réel.");
   };
 
-  // 7. Harvest & Sell Fish
+  // 9. Harvest & Sell Fish
   const handleHarvestFish = async (bassinId: string, harvestWeightKg: number, revenueAmount: number) => {
     setFishBassins((prev) =>
       prev.map((b) => {
@@ -1598,7 +2072,6 @@ export default function App() {
       `Récolte et vente du bassin aquacole`,
       `Poids vendu: ${harvestWeightKg} kg, Revenu: ${revenueAmount} ${settings.currency}`
     );
-    alert("Bassin récolté et revenus de vente crédités dans les finances !");
   };
 
   // 7. Harvest Crop Campaign
@@ -1702,7 +2175,6 @@ export default function App() {
       `Récolte de la campagne agricole`,
       `Rendement obtenu: ${actualYieldTons} tonnes, Vente récolte: ${salesRevenue} ${settings.currency}`
     );
-    alert("Parcelle récoltée et remise en jachère. Les revenus agricoles ont été ajoutés !");
   };
 
   // 8. Manual Stock Adjustments
@@ -1805,7 +2277,6 @@ export default function App() {
       `Ajustement manuel de l'article`,
       `Quantité: ${quantityToAdd > 0 ? '+' : ''}${quantityToAdd}, Motif: ${reason}`
     );
-    alert("Stock ajusté avec succès !");
   };
 
   // 9. Generate Purchase Task from Low Stock alert
@@ -1838,10 +2309,11 @@ export default function App() {
             source_module: newTask.sourceModule,
             source_entity_type: 'stock_item',
             source_entity_id: newTask.sourceElementId ?? article.id,
+            start_at: toUtcIso(newTask.startDate, '08:00'),
             priority: newTask.priority,
             status: newTask.status,
-            due_at: new Date(`${newTask.dueDate}T12:00:00Z`).toISOString(),
-            reminder_at: new Date(`${newTask.dueDate}T06:00:00Z`).toISOString(),
+            due_at: toUtcIso(newTask.dueDate, '17:00'),
+            reminder_at: toUtcIso(newTask.dueDate, '06:00'),
             assigned_to: authUser?.id ? Number(authUser.id) : undefined,
           },
           authToken
@@ -1860,7 +2332,6 @@ export default function App() {
       `Génération automatique d'une tâche d'approvisionnement`,
       `Article: ${article.name}, Assigner à: ${settings.managerName}`
     );
-    alert(`Tâche d'achat créée dans l'agenda pour réapprovisionner l'article ${article.name} !`);
   };
 
   // 10. Manual accounting transaction
@@ -1907,7 +2378,6 @@ export default function App() {
       `Enregistrement d'un mouvement comptable manuel`,
       `${tx.type === 'income' ? 'Revenu' : 'Dépense'} : ${tx.amount} ${settings.currency} (${tx.description})`
     );
-    alert("Mouvement comptable ajouté !");
   };
 
   // 11. Complete scheduled vaccination or treatment
@@ -2002,7 +2472,6 @@ export default function App() {
       }
     }
 
-    alert("Opération sanitaire appliquée ! Les stocks médicaux ont été déduits et le coût a été enregistré.");
   };
 
   // 12. Create a manual work task
@@ -2028,9 +2497,10 @@ export default function App() {
             source_module: newTask.sourceModule,
             source_entity_type: newTask.sourceEntityType ?? null,
             source_entity_id: newTask.sourceElementId ?? null,
+            start_at: toUtcIso(newTask.startDate, '08:00'),
             priority: newTask.priority,
             status: newTask.status,
-            due_at: new Date(`${newTask.dueDate}T12:00:00Z`).toISOString(),
+            due_at: toUtcIso(newTask.dueDate, '17:00'),
             reminder_at: newTask.reminderAt ?? null,
             assigned_to: authUser?.id ? Number(authUser.id) : undefined,
           },
@@ -2046,7 +2516,6 @@ export default function App() {
     }
 
     addAuditLog('Tâches', `Création manuelle de la tâche : ${newTask.title}`, `Assigné à : ${newTask.assignedTo}`);
-    alert("Tâche créée et ajoutée à l'agenda !");
   };
 
   // 13. Toggle task status (Check square)
@@ -2119,29 +2588,77 @@ export default function App() {
   const handleDeleteLot = async (lotId: string) => {
     const currentLot = lots.find((lot) => lot.id === lotId);
     if (!currentLot) return;
-    const isLinked = eggProductions.some((item) => item.lotId === lotId) || treatments.some((item) => item.lotId === lotId);
-    if (isLinked) {
-      setLots((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, status: 'archived' } : lot)));
-      if (authToken && /^\d+$/.test(String(lotId))) {
-        try {
-          await patchJson('/pondeuses/' + lotId, { status: 'archived' }, authToken);
-        } catch (error) {
-          console.error('Lot archive sync failed:', error);
-        }
-      }
-      addAuditLog('Élevage', `Archivage du lot ${currentLot.name}`, 'Archivage automatique car le lot est lié à la traçabilité.');
-      alert("Ce lot reste lié à la production ou au sanitaire. Il a été archivé au lieu d'être supprimé.");
-      return;
-    }
-    setLots((prev) => prev.filter((lot) => lot.id !== lotId));
+    const hasHistory = eggProductions.some((item) => item.lotId === lotId)
+      || eggSales.some((item) => item.lotId === lotId)
+      || animalFeedings.some((item) => item.lotId === lotId)
+      || animalWeighings.some((item) => item.lotId === lotId)
+      || animalFeedPlans.some((item) => item.lotId === lotId)
+      || treatments.some((item) => item.lotId === lotId);
+
     if (authToken && /^\d+$/.test(String(lotId))) {
       try {
-        await deleteJson('/pondeuses/' + lotId, authToken);
+        const response = await deleteJson<{
+          action?: 'archived' | 'deleted';
+          batch?: Record<string, unknown>;
+          financial_transaction?: Record<string, unknown> | null;
+        }>('/pondeuses/' + lotId, authToken);
+        const payload = response.data && typeof response.data === 'object'
+          ? (response.data as {
+            action?: 'archived' | 'deleted';
+            batch?: Record<string, unknown>;
+            financial_transaction?: Record<string, unknown> | null;
+          })
+          : null;
+
+        if (payload?.action === 'archived' && payload.batch) {
+          const mappedLot = mapLots([payload.batch])[0];
+          if (mappedLot) {
+            setLots((prev) => prev.map((lot) => (lot.id === lotId ? mappedLot : lot)));
+          }
+          addAuditLog('Élevage', `Archivage du lot ${currentLot.name}`, 'Clôture métier automatique pour préserver la traçabilité.');
+        } else {
+          setLots((prev) => prev.filter((lot) => lot.id !== lotId));
+          addAuditLog('Élevage', `Suppression du lot ${currentLot.name}`, `Suppression autorisée sans historique bloquant.`);
+        }
+
+        if (payload?.financial_transaction) {
+          const mappedTransaction = mapTransactions([payload.financial_transaction])[0];
+          if (mappedTransaction) {
+            setTransactions((prev) => [mappedTransaction, ...prev.filter((item) => item.id !== mappedTransaction.id)]);
+          }
+        }
       } catch (error) {
         console.error('Lot delete sync failed:', error);
+        pushNotice('error', 'Suppression impossible', error instanceof Error ? error.message : 'Le lot n’a pas pu être clôturé.');
       }
+      return;
     }
-    addAuditLog('Élevage', `Suppression du lot ${currentLot.name}`);
+
+    if (hasHistory || currentLot.currentCount > 0) {
+      const remainingAnimals = Math.max(0, currentLot.currentCount);
+      const removalAmount = remainingAnimals * (currentLot.unitCost ?? 0);
+      setLots((prev) => prev.map((lot) => (
+        lot.id === lotId ? { ...lot, status: 'archived', currentCount: 0 } : lot
+      )));
+      if (remainingAnimals > 0 && removalAmount > 0) {
+        const transaction: FinanceTransaction = {
+          id: generateId('tx'),
+          type: 'expense',
+          category: 'Sortie Animaux',
+          amount: removalAmount,
+          date: getTodayDate(),
+          description: `Clôture du lot ${currentLot.name} : sortie de ${remainingAnimals} animaux valorisée à ${removalAmount.toLocaleString('fr-FR')} ${settings.currency}`,
+          sourceModule: 'Élevage',
+          sourceElementId: lotId,
+        };
+        setTransactions((prev) => [transaction, ...prev]);
+      }
+      addAuditLog('Élevage', `Archivage du lot ${currentLot.name}`, 'Clôture locale conservant la traçabilité.');
+      return;
+    }
+
+    setLots((prev) => prev.filter((lot) => lot.id !== lotId));
+    addAuditLog('Élevage', `Suppression du lot ${currentLot.name}`, 'Suppression locale sans historique.');
   };
 
   const handleUpdateEggProduction = (productionId: string, updates: Partial<EggProduction>) => {
@@ -2248,22 +2765,74 @@ export default function App() {
     addAuditLog('Pisciculture', `Modification du bassin ${currentBassin.name}`, JSON.stringify({ ...currentBassin, ...updates }), JSON.stringify(currentBassin));
   };
 
-  const handleDeleteBassin = async (bassinId: string) => {
+const handleDeleteBassin = async (bassinId: string) => {
     const currentBassin = fishBassins.find((item) => item.id === bassinId);
     if (!currentBassin) return;
-    if (currentBassin.currentCount > 0 && currentBassin.status === 'active') {
-      alert("Suppression impossible: le bassin est encore en production. Récoltez ou désactivez-le d'abord.");
-      return;
-    }
-    setFishBassins((prev) => prev.filter((item) => item.id !== bassinId));
     if (authToken && /^\d+$/.test(String(bassinId))) {
       try {
-        await deleteJson('/pisciculture/' + bassinId, authToken);
+        const response = await deleteJson<{
+          action?: 'archived' | 'deleted';
+          pond?: Record<string, unknown>;
+          financial_transaction?: Record<string, unknown> | null;
+        }>('/pisciculture/' + bassinId, authToken);
+        const payload = response.data && typeof response.data === 'object'
+          ? (response.data as {
+            action?: 'archived' | 'deleted';
+            pond?: Record<string, unknown>;
+            financial_transaction?: Record<string, unknown> | null;
+          })
+          : null;
+
+        if (payload?.action === 'archived' && payload.pond) {
+          const mappedPond = mapFishBassins([payload.pond])[0];
+          if (mappedPond) {
+            setFishBassins((prev) => prev.map((item) => (item.id === bassinId ? mappedPond : item)));
+          }
+          addAuditLog('Pisciculture', `Clôture du bassin ${currentBassin.name}`, 'Archivage automatique pour préserver l’historique.');
+        } else {
+          setFishBassins((prev) => prev.filter((item) => item.id !== bassinId));
+          addAuditLog('Pisciculture', `Suppression du bassin ${currentBassin.name}`, 'Suppression autorisée sans historique bloquant.');
+        }
+
+        if (payload?.financial_transaction) {
+          const mappedTransaction = mapTransactions([payload.financial_transaction])[0];
+          if (mappedTransaction) {
+            setTransactions((prev) => [mappedTransaction, ...prev.filter((item) => item.id !== mappedTransaction.id)]);
+          }
+        }
       } catch (error) {
         console.error('Fish pond delete sync failed:', error);
+        pushNotice('error', 'Suppression impossible', error instanceof Error ? error.message : 'Le bassin n’a pas pu être clôturé.');
       }
+      return;
     }
-    addAuditLog('Pisciculture', `Suppression du bassin ${currentBassin.name}`);
+
+    if (currentBassin.currentCount > 0 || currentBassin.status === 'active') {
+      const remainingFish = Math.max(0, currentBassin.currentCount);
+      const removalAmount = remainingFish * (currentBassin.unitCost ?? 0);
+      setFishBassins((prev) => prev.map((item) => (
+        item.id === bassinId ? { ...item, status: 'inactive', currentCount: 0 } : item
+      )));
+
+      if (remainingFish > 0 && removalAmount > 0) {
+        const transaction: FinanceTransaction = {
+          id: generateId('tx'),
+          type: 'expense',
+          category: 'Sortie Poissons',
+          amount: removalAmount,
+          date: getTodayDate(),
+          description: `Suppression du bassin ${currentBassin.name} : sortie de ${remainingFish} poissons valorisée à ${removalAmount.toLocaleString('fr-FR')} ${settings.currency}`,
+          sourceModule: 'Pisciculture',
+          sourceElementId: bassinId,
+        };
+        setTransactions((prev) => [transaction, ...prev]);
+      }
+      addAuditLog('Pisciculture', `Clôture du bassin ${currentBassin.name}`, `Sortie comptable automatique de ${remainingFish} poissons.`);
+      return;
+    }
+
+    setFishBassins((prev) => prev.filter((item) => item.id !== bassinId));
+    addAuditLog('Pisciculture', `Suppression du bassin ${currentBassin.name}`, 'Suppression locale sans historique.');
   };
 
   const handleAddParcelle = (data: Omit<CultureParcelle, 'id'>) => {
@@ -2284,7 +2853,8 @@ export default function App() {
     if (!currentParcelle) return;
     const hasCampaign = campaigns.some((item) => item.parcelleId === parcelleId && item.status !== 'cancelled');
     if (hasCampaign) {
-      alert("Suppression impossible: une campagne culturale est encore liée à cette parcelle.");
+      console.warn('Plot deletion blocked: active campaign still linked', parcelleId);
+      pushNotice('warning', 'Suppression refusée', 'Une campagne culturale reste liée à cette parcelle.');
       return;
     }
     setParcelles((prev) => prev.filter((item) => item.id !== parcelleId));
@@ -2374,24 +2944,60 @@ export default function App() {
     addAuditLog('Cultures', `Modification de la campagne ${currentCampaign.cropType}`, JSON.stringify({ ...currentCampaign, ...updates }), JSON.stringify(currentCampaign));
   };
 
-  const handleDeleteCampaign = async (campaignId: string) => {
+const handleDeleteCampaign = async (campaignId: string) => {
     const currentCampaign = campaigns.find((item) => item.id === campaignId);
     if (!currentCampaign) return;
-    if (currentCampaign.status === 'harvested' || currentCampaign.revenues > 0) {
-      alert("Suppression impossible: cette campagne a déjà généré une récolte ou un revenu.");
+    if (authToken && /^\d+$/.test(String(campaignId))) {
+      try {
+        const response = await deleteJson<{
+          action?: 'cancelled' | 'deleted';
+          crop?: Record<string, unknown>;
+        }>('/cultures/' + campaignId, authToken);
+        const payload = response.data && typeof response.data === 'object'
+          ? (response.data as {
+            action?: 'cancelled' | 'deleted';
+            crop?: Record<string, unknown>;
+          })
+          : null;
+
+        if (payload?.action === 'cancelled' && payload.crop) {
+          const mappedCampaign = mapCampaigns([payload.crop])[0];
+          if (mappedCampaign) {
+            setCampaigns((prev) => prev.map((item) => (item.id === campaignId ? mappedCampaign : item)));
+          }
+          setParcelles((prev) => prev.map((item) => (
+            item.id === currentCampaign.parcelleId ? { ...item, status: 'preparing' } : item
+          )));
+          addAuditLog('Cultures', `Annulation de la campagne ${currentCampaign.cropType}`, 'Clôture métier sans suppression de l’historique.');
+        } else {
+          setCampaigns((prev) => prev.filter((item) => item.id !== campaignId));
+          setParcelles((prev) => prev.map((item) => (
+            item.id === currentCampaign.parcelleId ? { ...item, status: 'preparing' } : item
+          )));
+          addAuditLog('Cultures', `Suppression de la campagne ${currentCampaign.cropType}`);
+        }
+      } catch (error) {
+        console.error('Campaign delete sync failed:', error);
+        pushNotice('error', 'Suppression impossible', error instanceof Error ? error.message : 'La campagne n’a pas pu être supprimée.');
+      }
       return;
     }
+
+    if (currentCampaign.status === 'harvested' || currentCampaign.revenues > 0 || currentCampaign.expenses > 0) {
+      setCampaigns((prev) => prev.map((item) => (
+        item.id === campaignId ? { ...item, status: 'cancelled' } : item
+      )));
+      setParcelles((prev) => prev.map((item) => (
+        item.id === currentCampaign.parcelleId ? { ...item, status: 'preparing' } : item
+      )));
+      addAuditLog('Cultures', `Annulation de la campagne ${currentCampaign.cropType}`, 'Clôture locale conservant les traces.');
+      return;
+    }
+
     setCampaigns((prev) => prev.filter((item) => item.id !== campaignId));
     setParcelles((prev) => prev.map((item) => (
       item.id === currentCampaign.parcelleId ? { ...item, status: 'preparing' } : item
     )));
-    if (authToken && /^\d+$/.test(String(campaignId))) {
-      try {
-        await deleteJson('/cultures/' + campaignId, authToken);
-      } catch (error) {
-        console.error('Campaign delete sync failed:', error);
-      }
-    }
     addAuditLog('Cultures', `Suppression de la campagne ${currentCampaign.cropType}`);
   };
 
@@ -2451,7 +3057,8 @@ export default function App() {
     if (!currentBuilding) return;
     const hasLots = lots.some((lot) => lot.buildingId === buildingId && lot.status === 'active');
     if (hasLots) {
-      alert("Suppression impossible: des lots actifs occupent encore cette infrastructure.");
+      console.warn('Building deletion blocked: active lots still assigned', buildingId);
+      pushNotice('warning', 'Suppression refusée', 'Des lots actifs occupent encore cette infrastructure.');
       return;
     }
     setBuildings((prev) => prev.filter((item) => item.id !== buildingId));
@@ -2593,23 +3200,56 @@ export default function App() {
     addAuditLog('Stocks', `Modification de l'article ${currentArticle.name}`, JSON.stringify({ ...currentArticle, ...updates }), JSON.stringify(currentArticle));
   };
 
-  const handleDeleteStockArticle = async (articleId: string) => {
+const handleDeleteStockArticle = async (articleId: string) => {
     const currentArticle = articles.find((item) => item.id === articleId);
     if (!currentArticle) return;
     const hasMovements = movements.some((item) => item.articleId === articleId);
     if (hasMovements) {
-      alert("Suppression impossible: cet article possède déjà des mouvements de stock et doit rester traçable.");
+      console.warn('Stock article deletion blocked: stock movements exist', articleId);
+      pushNotice('warning', 'Suppression refusée', 'Cet article possède déjà des mouvements et doit rester traçable.');
       return;
     }
-    setArticles((prev) => prev.filter((item) => item.id !== articleId));
     if (authToken && /^\d+$/.test(String(articleId))) {
       try {
-        await deleteJson('/stocks/' + articleId, authToken);
+        const response = await deleteJson<{ financial_transaction?: Record<string, unknown> | null }>('/stocks/' + articleId, authToken);
+        const payload = response.data && typeof response.data === 'object'
+          ? (response.data as { financial_transaction?: Record<string, unknown> | null })
+          : null;
+
+        if (payload?.financial_transaction) {
+          const mappedTransaction = mapTransactions([payload.financial_transaction])[0];
+          if (mappedTransaction) {
+            setTransactions((prev) => [mappedTransaction, ...prev.filter((item) => item.id !== mappedTransaction.id)]);
+          }
+        }
+        setArticles((prev) => prev.filter((item) => item.id !== articleId));
       } catch (error) {
         console.error('Stock article delete sync failed:', error);
+        pushNotice('error', 'Suppression impossible', error instanceof Error ? error.message : 'L’article n’a pas pu être supprimé.');
+      }
+      return;
+    }
+
+    setArticles((prev) => prev.filter((item) => item.id !== articleId));
+    {
+      const remainingQuantity = currentArticle.quantity;
+      const residualValue = remainingQuantity * (currentArticle.unitCost ?? 0);
+
+      if (remainingQuantity > 0 && residualValue > 0) {
+        const transaction: FinanceTransaction = {
+          id: generateId('tx'),
+          type: 'expense',
+          category: 'Perte Stock',
+          amount: residualValue,
+          date: getTodayDate(),
+          description: `Suppression de l'article ${currentArticle.name} : perte de ${remainingQuantity.toLocaleString('fr-FR')} ${currentArticle.unit} valorisée à ${residualValue.toLocaleString('fr-FR')} ${settings.currency}`,
+          sourceModule: 'Stocks',
+          sourceElementId: articleId,
+        };
+        setTransactions((prev) => [transaction, ...prev]);
       }
     }
-    addAuditLog('Stocks', `Suppression de l'article ${currentArticle.name}`);
+    addAuditLog('Stocks', `Suppression de l'article ${currentArticle.name}`, `Sortie comptable automatique de ${currentArticle.quantity.toLocaleString('fr-FR')} ${currentArticle.unit}.`);
   };
 
   const handleAddTreatment = (data: Omit<SanitaryTreatment, 'id' | 'status'>) => {
@@ -2649,7 +3289,8 @@ export default function App() {
     const currentTreatment = treatments.find((item) => item.id === treatmentId);
     if (!currentTreatment) return;
     if (currentTreatment.status === 'completed') {
-      alert("Suppression impossible: ce traitement a déjà été exécuté et reste lié au journal sanitaire.");
+      console.warn('Treatment deletion blocked: treatment already completed', treatmentId);
+      pushNotice('warning', 'Suppression refusée', 'Ce traitement a déjà été exécuté et reste lié au journal sanitaire.');
       return;
     }
     setTreatments((prev) => prev.filter((item) => item.id !== treatmentId));
@@ -2710,7 +3351,8 @@ export default function App() {
     const currentTransaction = transactions.find((item) => item.id === transactionId);
     if (!currentTransaction) return;
     if (currentTransaction.sourceModule !== 'Finances') {
-      alert("Modification bloquée: cette écriture provient d'un autre module métier et doit être corrigée depuis sa source.");
+      console.warn('Transaction update blocked: source module is not Finances', transactionId);
+      pushNotice('warning', 'Modification bloquée', 'Cette écriture provient d’un autre module métier et doit être corrigée depuis sa source.');
       return;
     }
     setTransactions((prev) => prev.map((item) => (item.id === transactionId ? { ...item, ...updates } : item)));
@@ -2738,7 +3380,8 @@ export default function App() {
     const currentTransaction = transactions.find((item) => item.id === transactionId);
     if (!currentTransaction) return;
     if (currentTransaction.sourceModule !== 'Finances') {
-      alert("Suppression bloquée: cette écriture est générée par un workflow métier et doit être supprimée depuis le module d'origine.");
+      console.warn('Transaction deletion blocked: source module is not Finances', transactionId);
+      pushNotice('warning', 'Suppression bloquée', 'Cette écriture est générée par un workflow métier et doit être supprimée depuis le module d’origine.');
       return;
     }
     setTransactions((prev) => prev.filter((item) => item.id !== transactionId));
@@ -2813,10 +3456,11 @@ export default function App() {
             source_module: newTask.sourceModule,
             source_entity_type: 'alert',
             source_entity_id: newTask.sourceElementId ?? alertObj.id,
+            start_at: toUtcIso(newTask.startDate, '08:00'),
             priority: newTask.priority,
             status: newTask.status,
-            due_at: new Date(`${newTask.dueDate}T12:00:00Z`).toISOString(),
-            reminder_at: new Date(`${newTask.dueDate}T06:00:00Z`).toISOString(),
+            due_at: toUtcIso(newTask.dueDate, '17:00'),
+            reminder_at: toUtcIso(newTask.dueDate, '06:00'),
             assigned_to: authUser?.id ? Number(authUser.id) : undefined,
           },
           authToken
@@ -2831,7 +3475,6 @@ export default function App() {
       `Génération d'une tâche de résolution corrective`,
       `Alerte concernée: ${alertObj.title}`
     );
-    alert("Tâche corrective urgente ajoutée à l'agenda !");
   };
 
   // 16. Reset database
@@ -2852,7 +3495,6 @@ export default function App() {
     setAuditLogs([]);
     setSettings(initialSettings);
     addAuditLog('Système', 'Réinitialisation complète des données locales');
-    alert("Les données locales ont été réinitialisées.");
   };
 
   // Interconnection Quick Simulators (Dashboard bindings)
@@ -2915,7 +3557,8 @@ export default function App() {
     if (activeBassin) {
       handleHarvestFish(activeBassin.id, 1000, 1200000);
     } else {
-      alert("Tous les bassins sont déjà récoltés. Réinitialisez la base de données dans les paramètres pour recommencer la simulation.");
+      console.warn('Fish harvest simulation skipped: no active pond available');
+      pushNotice('info', 'Simulation ignorée', 'Tous les bassins sont déjà récoltés dans les données actuelles.');
     }
   };
 
@@ -3119,6 +3762,45 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
+      {notices.length > 0 ? (
+        <div className="pointer-events-none fixed right-4 top-4 z-[80] flex w-full max-w-sm flex-col gap-3">
+          {notices.map((notice) => {
+            const toneClasses = notice.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+              : notice.type === 'warning'
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : notice.type === 'error'
+                  ? 'border-rose-200 bg-rose-50 text-rose-900'
+                  : 'border-sky-200 bg-sky-50 text-sky-900';
+
+            const icon = notice.type === 'success'
+              ? <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              : notice.type === 'warning'
+                ? <AlertTriangle className="h-4 w-4 text-amber-600" />
+                : notice.type === 'error'
+                  ? <ShieldAlert className="h-4 w-4 text-rose-600" />
+                  : <WifiOff className="h-4 w-4 text-sky-600" />;
+
+            return (
+              <div
+                key={notice.id}
+                className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-lg shadow-slate-900/10 ${toneClasses}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">{icon}</div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">{notice.title}</p>
+                    {notice.description ? (
+                      <p className="mt-1 text-xs leading-5 opacity-90">{notice.description}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
       {/* Syncing overlay */}
       {false && isSyncing && (
         <div className="fixed inset-0 bg-slate-950/80 z-50 flex flex-col items-center justify-center text-white space-y-4">
@@ -3446,15 +4128,29 @@ export default function App() {
         {/* Core Screen View Port */}
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
-            
+            <Suspense
+              fallback={
+                <div className="flex min-h-[320px] items-center justify-center">
+                  <div className="rounded-2xl border border-slate-100 bg-white px-5 py-4 shadow-sm">
+                    <div className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                      <LoaderCircle className="h-5 w-5 animate-spin text-emerald-600" />
+                      Chargement du module...
+                    </div>
+                  </div>
+                </div>
+              }
+            >
             {currentView === 'dashboard' && (
               <DashboardView
                 lots={lots}
                 eggProductions={eggProductions}
+                eggSales={eggSales}
+                feedings={animalFeedings}
                 fishBassins={fishBassins}
                 parcelles={parcelles}
                 articles={articles}
                 transactions={transactions}
+                treatments={treatments}
                 tasks={tasks}
                 alerts={alerts}
                 currency={settings.currency}
@@ -3471,9 +4167,15 @@ export default function App() {
                 buildings={buildings}
                 articles={articles}
                 feedings={animalFeedings}
+                feedPlans={animalFeedPlans}
+                weighings={animalWeighings}
+                eggSales={eggSales}
+                treatments={treatments}
                 currency={settings.currency}
                 onAddLot={handleAddLot}
+                onCreateFeedPlan={handleCreateFeedPlan}
                 onRecordFeeding={handleRecordFeeding}
+                onRecordWeighing={handleRecordWeighing}
                 onReportMortality={handleReportMortality}
                 onUpdateLot={handleUpdateLot}
                 onDeleteLot={handleDeleteLot}
@@ -3621,7 +4323,22 @@ export default function App() {
             )}
 
             {currentView === 'rapports' && (
-              <ReportsView role={role} />
+              <ReportsView
+                role={role}
+                lots={lots}
+                eggProductions={eggProductions}
+                eggSales={eggSales}
+                feedings={animalFeedings}
+                fishBassins={fishBassins}
+                parcelles={parcelles}
+                campaigns={campaigns}
+                articles={articles}
+                movements={movements}
+                transactions={transactions}
+                treatments={treatments}
+                currency={settings.currency}
+                areaUnit={settings.areaUnit}
+              />
             )}
 
             {currentView === 'audit' && (
@@ -3639,7 +4356,7 @@ export default function App() {
                 onCreateOwner={handleCreateOwner}
               />
             )}
-
+            </Suspense>
           </div>
         </main>
       </div>

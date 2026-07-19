@@ -21,6 +21,7 @@ class StoreTaskRequest extends FormRequest
             'source_module' => ['nullable', 'string', 'max:255'],
             'source_entity_type' => ['nullable', 'string', 'max:255'],
             'source_entity_id' => ['nullable', 'string', 'max:255'],
+            'start_at' => ['nullable', 'date', 'before_or_equal:due_at'],
             'priority' => ['required', Rule::in(['low', 'normal', 'high', 'critical'])],
             'status' => ['required', Rule::in(['todo', 'in_progress', 'completed', 'overdue', 'cancelled'])],
             'due_at' => ['nullable', 'date'],
@@ -29,4 +30,3 @@ class StoreTaskRequest extends FormRequest
         ];
     }
 }
-

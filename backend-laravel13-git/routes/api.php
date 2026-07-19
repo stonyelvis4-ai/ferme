@@ -107,6 +107,8 @@ Route::prefix('v1')->group(function () {
                 Route::post('/pondeuses/productions', [PondeusesController::class, 'production']);
                 Route::post('/pondeuses/sales', [PondeusesController::class, 'sale']);
                 Route::post('/pondeuses/feedings', [PondeusesController::class, 'feeding']);
+                Route::post('/pondeuses/weighings', [PondeusesController::class, 'weighing']);
+                Route::post('/pondeuses/feed-plans', [PondeusesController::class, 'feedPlan']);
                 Route::post('/cultures', [CulturesController::class, 'store']);
                 Route::patch('/cultures/{culture}', [CulturesController::class, 'update']);
                 Route::delete('/cultures/{culture}', [CulturesController::class, 'destroy']);

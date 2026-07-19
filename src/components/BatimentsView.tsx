@@ -4,9 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import { Building2, Users, AlertTriangle, Lock, Wrench, Plus } from 'lucide-react';
+import { Building2, Users, AlertTriangle, Lock, Plus } from 'lucide-react';
 import { Building, Lot, UserRole } from '../types';
 import AdminEntityActions from './AdminEntityActions';
+import FormDialog from './FormDialog';
 
 interface BatimentsViewProps {
   role: UserRole;
@@ -25,24 +26,73 @@ export default function BatimentsView({
   onUpdateBuilding,
   onDeleteBuilding
 }: BatimentsViewProps) {
+  const buildingTypeOptions: Array<{ value: Building['type']; label: string; hint: string }> = [
+    { value: 'poulailler', label: 'Poulailler', hint: 'Lots de volailles et circuits d elevage.' },
+    { value: 'etable', label: 'Etable', hint: 'Bovins, ovins, caprins ou porcs.' },
+    { value: 'pisciculture', label: 'Pisciculture', hint: 'Bassins, bacs ou zones aquacoles.' },
+    { value: 'magasin', label: 'Magasin', hint: 'Intrants, aliments et consommables.' },
+    { value: 'autre', label: 'Autre', hint: 'Infrastructure technique ou usage mixte.' }
+  ];
+
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [name, setName] = useState('');
   const [type, setType] = useState<Building['type']>('poulailler');
   const [capacity, setCapacity] = useState(1000);
   const [notes, setNotes] = useState('');
+  const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
+  const [editBuildingName, setEditBuildingName] = useState('');
+
   const usageLabel = type === 'magasin' ? 'stockage / intrants' : type === 'pisciculture' ? 'zone aquacole' : 'hebergement / production';
+  const selectedTypeOption = buildingTypeOptions.find((option) => option.value === type) ?? buildingTypeOptions[0];
 
   const handleCreateBuilding = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || capacity <= 0) return;
+
     onAddBuilding({ name, type, capacity, notes });
     setName('');
+    setType('poulailler');
+    setCapacity(1000);
+    setNotes('');
     setShowCreateForm(false);
+  };
+
+  const handleSubmitBuildingEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBuildingId || !editBuildingName.trim()) return;
+
+    onUpdateBuilding(editingBuildingId, { name: editBuildingName.trim() });
+    setEditingBuildingId(null);
+    setEditBuildingName('');
   };
 
   return (
     <div id="batiments-view" className="space-y-6">
-      <div className="flex justify-between items-center">
+      <FormDialog
+        open={editingBuildingId !== null}
+        title="Renommer le batiment"
+        subtitle="Utilisez un nom clair pour faciliter les affectations et les rapports."
+        confirmLabel="Enregistrer"
+        confirmDisabled={!editBuildingName.trim()}
+        onCancel={() => {
+          setEditingBuildingId(null);
+          setEditBuildingName('');
+        }}
+        onSubmit={handleSubmitBuildingEdit}
+      >
+        <label className="space-y-1.5">
+          <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du batiment</span>
+          <input
+            autoFocus
+            value={editBuildingName}
+            onChange={(e) => setEditBuildingName(e.target.value)}
+            placeholder="Ex. Poulailler A1"
+            className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+          />
+        </label>
+      </FormDialog>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-sans tracking-tight flex items-center gap-2">
             <Building2 className="w-5 h-5 text-emerald-600" />
@@ -69,7 +119,7 @@ export default function BatimentsView({
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Infrastructure</span>
               <span className="mt-1 block text-sm font-semibold text-emerald-900">{name || 'Nom en attente'}</span>
-              <p className="mt-1 text-[11px] text-emerald-800">Type: {type}</p>
+              <p className="mt-1 text-[11px] text-emerald-800">Type: {selectedTypeOption.label}</p>
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Capacite prevue</span>
@@ -82,33 +132,38 @@ export default function BatimentsView({
               <p className="mt-1 text-[11px] text-emerald-800">Aide le classement dans les autres modules.</p>
             </div>
           </div>
+
           <label className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du batiment</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Poulailler A1" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
             <span className="block text-[10px] text-slate-500">Nom visible dans les affectations.</span>
           </label>
+
           <label className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Type</span>
-          <select value={type} onChange={(e) => setType(e.target.value as Building['type'])} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
-            <option value="poulailler">Poulailler</option>
-            <option value="étable">Etable</option>
-            <option value="pisciculture">Pisciculture</option>
-            <option value="magasin">Magasin</option>
-            <option value="autre">Autre</option>
-          </select>
-            <span className="block text-[10px] text-slate-500">Usage principal du lieu.</span>
+            <select value={type} onChange={(e) => setType(e.target.value as Building['type'])} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
+              {buildingTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <span className="block text-[10px] text-slate-500">{selectedTypeOption.hint}</span>
           </label>
+
           <label className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Capacite</span>
             <input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} placeholder="Ex. 1000" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
-            <span className="block text-[10px] text-slate-500">Nombre maximal de sujets.</span>
+            <span className="block text-[10px] text-slate-500">Nombre maximal de sujets ou unite de stockage.</span>
           </label>
+
           <label className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Notes</span>
-            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex. Zone ventilée" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
-            <span className="block text-[10px] text-slate-500">Observation facultative.</span>
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex. Zone ventilee, acces limite en saison des pluies" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            <span className="block text-[10px] text-slate-500">Observation facultative utile pour la logistique ou la securite.</span>
           </label>
-          <div className="flex gap-2">
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <button type="button" onClick={() => setShowCreateForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
             <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Creer</button>
           </div>
@@ -182,9 +237,8 @@ export default function BatimentsView({
                     <AdminEntityActions
                       compact
                       onEdit={() => {
-                        const nextName = window.prompt('Nom du batiment', building.name);
-                        if (!nextName) return;
-                        onUpdateBuilding(building.id, { name: nextName });
+                        setEditingBuildingId(building.id);
+                        setEditBuildingName(building.name);
                       }}
                       onDelete={() => {
                         if (window.confirm(`Supprimer le batiment ${building.name} ?`)) {

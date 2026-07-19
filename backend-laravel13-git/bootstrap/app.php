@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'auth' => \App\Http\Middleware\Authenticate::class,
             'api.cookie.token' => \App\Http\Middleware\PromoteApiTokenCookie::class,
             'tenant' => \App\Http\Middleware\EnsureFarmTenant::class,
             'owner.readonly' => \App\Http\Middleware\EnsureOwnerReadOnly::class,

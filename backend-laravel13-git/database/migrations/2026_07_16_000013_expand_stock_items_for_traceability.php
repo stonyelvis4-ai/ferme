@@ -2,11 +2,25 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private function stockReferenceUniqueExists(): bool
+    {
+        $indexes = DB::select("PRAGMA index_list('stock_items')");
+
+        foreach ($indexes as $index) {
+            if (($index->name ?? null) === 'stock_items_farm_id_reference_unique') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function up(): void
     {
         if (! Schema::hasTable('stock_categories')) {
@@ -100,17 +114,23 @@ return new class extends Migration
             }
         });
 
-        Schema::table('stock_items', function (Blueprint $table) {
-            $table->unique(['farm_id', 'reference']);
-        });
+        if (! $this->stockReferenceUniqueExists()) {
+            Schema::table('stock_items', function (Blueprint $table) {
+                $table->unique(['farm_id', 'reference']);
+            });
+        }
 
-        if (Schema::hasColumn('stock_items', 'current_quantity')) {
+        $driver = Config::get('database.default');
+        $connection = DB::connection($driver);
+        $isSqlite = $connection->getDriverName() === 'sqlite';
+
+        if (! $isSqlite && Schema::hasColumn('stock_items', 'current_quantity')) {
             DB::statement('ALTER TABLE stock_items MODIFY current_quantity DECIMAL(14,3) NOT NULL DEFAULT 0');
         }
-        if (Schema::hasColumn('stock_items', 'minimum_threshold')) {
+        if (! $isSqlite && Schema::hasColumn('stock_items', 'minimum_threshold')) {
             DB::statement('ALTER TABLE stock_items MODIFY minimum_threshold DECIMAL(14,3) NOT NULL DEFAULT 0');
         }
-        if (Schema::hasColumn('stock_movements', 'quantity')) {
+        if (! $isSqlite && Schema::hasColumn('stock_movements', 'quantity')) {
             DB::statement('ALTER TABLE stock_movements MODIFY quantity DECIMAL(14,3) NOT NULL');
         }
 
@@ -163,28 +183,44 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('stock_items', function (Blueprint $table) {
-            $table->dropUnique(['farm_id', 'reference']);
-            $table->dropConstrainedForeignId('category_id');
-            $table->dropConstrainedForeignId('supplier_id');
-            $table->dropColumn([
-                'reference',
-                'description',
-                'brand',
-                'batch_number',
-                'purchase_date',
-                'manufacturing_date',
-                'expiration_date',
-                'storage_location',
-                'maximum_stock',
-                'purchase_total_cost',
-                'currency',
-                'image_path',
-                'notes',
-                'is_active',
-                'business_module',
-                'related_type',
-                'related_id',
-            ]);
+            if (Schema::hasColumn('stock_items', 'category_id')) {
+                $table->dropConstrainedForeignId('category_id');
+            }
+            if (Schema::hasColumn('stock_items', 'supplier_id')) {
+                $table->dropConstrainedForeignId('supplier_id');
+            }
+        });
+
+        if ($this->stockReferenceUniqueExists()) {
+            Schema::table('stock_items', function (Blueprint $table) {
+                $table->dropUnique(['farm_id', 'reference']);
+            });
+        }
+
+        Schema::table('stock_items', function (Blueprint $table) {
+            $columns = array_values(array_filter([
+                Schema::hasColumn('stock_items', 'reference') ? 'reference' : null,
+                Schema::hasColumn('stock_items', 'description') ? 'description' : null,
+                Schema::hasColumn('stock_items', 'brand') ? 'brand' : null,
+                Schema::hasColumn('stock_items', 'batch_number') ? 'batch_number' : null,
+                Schema::hasColumn('stock_items', 'purchase_date') ? 'purchase_date' : null,
+                Schema::hasColumn('stock_items', 'manufacturing_date') ? 'manufacturing_date' : null,
+                Schema::hasColumn('stock_items', 'expiration_date') ? 'expiration_date' : null,
+                Schema::hasColumn('stock_items', 'storage_location') ? 'storage_location' : null,
+                Schema::hasColumn('stock_items', 'maximum_stock') ? 'maximum_stock' : null,
+                Schema::hasColumn('stock_items', 'purchase_total_cost') ? 'purchase_total_cost' : null,
+                Schema::hasColumn('stock_items', 'currency') ? 'currency' : null,
+                Schema::hasColumn('stock_items', 'image_path') ? 'image_path' : null,
+                Schema::hasColumn('stock_items', 'notes') ? 'notes' : null,
+                Schema::hasColumn('stock_items', 'is_active') ? 'is_active' : null,
+                Schema::hasColumn('stock_items', 'business_module') ? 'business_module' : null,
+                Schema::hasColumn('stock_items', 'related_type') ? 'related_type' : null,
+                Schema::hasColumn('stock_items', 'related_id') ? 'related_id' : null,
+            ]));
+
+            if ($columns !== []) {
+                $table->dropColumn($columns);
+            }
         });
 
         Schema::dropIfExists('suppliers');

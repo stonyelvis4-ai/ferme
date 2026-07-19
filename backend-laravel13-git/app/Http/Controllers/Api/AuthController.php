@@ -82,7 +82,7 @@ class AuthController extends Controller
         return response()
             ->json([
                 'message' => 'Compte administrateur créé.',
-                'token' => 'cookie-session',
+                'token' => $token,
                 'user' => $user,
             ], 201)
             ->cookie($this->makeApiTokenCookie($token));
@@ -139,7 +139,7 @@ class AuthController extends Controller
         return response()
             ->json([
                 'message' => 'Connexion réussie.',
-                'token' => 'cookie-session',
+                'token' => $token,
                 'user' => $user,
             ])
             ->cookie($this->makeApiTokenCookie($token));

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Fish,
   Droplet,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { FishBassin, StockArticle, UserRole } from '../types';
 import AdminEntityActions from './AdminEntityActions';
+import FormDialog from './FormDialog';
 
 interface PiscicultureViewProps {
   role: UserRole;
@@ -52,10 +53,34 @@ export default function PiscicultureView({
   const [harvestBassinId, setHarvestBassinId] = useState<string | null>(null);
   const [harvestWeightKg, setHarvestWeightKg] = useState(0);
   const [harvestRevenue, setHarvestRevenue] = useState(500000);
+  const [editingBassinId, setEditingBassinId] = useState<string | null>(null);
+  const [editBassinName, setEditBassinName] = useState('');
+  const [editBassinSpecies, setEditBassinSpecies] = useState('');
   const acquisitionCost = newInitialCount * newUnitCost;
 
-  // Filter food articles in stock
-  const foodArticles = articles.filter((a) => a.category === 'feed' && a.name.toLowerCase().includes('poisson'));
+  const foodArticles = articles.filter((article) => {
+    const haystack = `${article.category ?? ''} ${article.categoryLabel ?? ''} ${article.name}`.toLowerCase();
+    return article.isActive !== false && (
+      (haystack.includes('poisson') && (haystack.includes('aliment') || haystack.includes('feed') || haystack.includes('provende'))) ||
+      haystack.includes('aquaculture')
+    );
+  });
+  const fallbackFoodArticles = articles.filter((article) => {
+    const haystack = `${article.category ?? ''} ${article.categoryLabel ?? ''} ${article.name}`.toLowerCase();
+    return article.isActive !== false && (haystack.includes('aliment') || haystack.includes('feed') || haystack.includes('provende'));
+  });
+  const availableFoodArticles = foodArticles.length > 0 ? foodArticles : fallbackFoodArticles;
+
+  useEffect(() => {
+    if (availableFoodArticles.length === 0) {
+      if (feedArticleId) setFeedArticleId('');
+      return;
+    }
+
+    if (!feedArticleId || !availableFoodArticles.some((article) => article.id === feedArticleId)) {
+      setFeedArticleId(availableFoodArticles[0].id);
+    }
+  }, [availableFoodArticles, feedArticleId]);
 
   const handleFeedSubmit = (bassinId: string) => {
     if (!feedArticleId || feedQuantity <= 0) return;
@@ -87,10 +112,23 @@ export default function PiscicultureView({
   };
 
   const handleEditBassin = (bassin: FishBassin) => {
-    const name = window.prompt('Nom du bassin', bassin.name);
-    if (!name) return;
-    const species = window.prompt('Espèce de poisson', bassin.species) ?? bassin.species;
-    onUpdateBassin(bassin.id, { name, species });
+    setEditingBassinId(bassin.id);
+    setEditBassinName(bassin.name);
+    setEditBassinSpecies(bassin.species);
+  };
+
+  const handleSubmitBassinEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBassinId || !editBassinName.trim()) return;
+
+    onUpdateBassin(editingBassinId, {
+      name: editBassinName.trim(),
+      species: editBassinSpecies.trim() || 'Tilapia'
+    });
+
+    setEditingBassinId(null);
+    setEditBassinName('');
+    setEditBassinSpecies('');
   };
 
   const formatCurrency = (val: number) => {
@@ -102,8 +140,44 @@ export default function PiscicultureView({
 
   return (
     <div id="pisciculture-view" className="space-y-6">
+      <FormDialog
+        open={editingBassinId !== null}
+        title="Modifier le bassin"
+        subtitle="Mettez a jour le nom et l'espece pour garder un suivi aquacole coherent."
+        confirmLabel="Enregistrer"
+        confirmDisabled={!editBassinName.trim()}
+        onCancel={() => {
+          setEditingBassinId(null);
+          setEditBassinName('');
+          setEditBassinSpecies('');
+        }}
+        onSubmit={handleSubmitBassinEdit}
+      >
+        <div className="grid grid-cols-1 gap-4">
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du bassin</span>
+            <input
+              autoFocus
+              value={editBassinName}
+              onChange={(e) => setEditBassinName(e.target.value)}
+              placeholder="Ex. Bassin Tilapia A"
+              className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Espece</span>
+            <input
+              value={editBassinSpecies}
+              onChange={(e) => setEditBassinSpecies(e.target.value)}
+              placeholder="Ex. Tilapia"
+              className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+        </div>
+      </FormDialog>
+
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-sans tracking-tight flex items-center gap-2">
             <Fish className="w-5 h-5 text-sky-500" />
@@ -147,7 +221,7 @@ export default function PiscicultureView({
               <p className="mt-1 text-[11px] text-sky-800">Effectif initial × prix par alevin.</p>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
           <label className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Nom du bassin</span>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ex. Bassin Tilapia A" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100" />
@@ -173,7 +247,7 @@ export default function PiscicultureView({
             <input type="date" value={newStockingDate} onChange={(e) => setNewStockingDate(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100" />
             <span className="block text-[10px] text-slate-500">Date d'entrée des alevins.</span>
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <button type="button" onClick={() => setShowCreateForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
             <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white">Créer</button>
           </div>
@@ -286,7 +360,7 @@ export default function PiscicultureView({
                   {selectedBassinId === bassin.id ? (
                     <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-3.5 animate-fade-in text-xs">
                       <h4 className="font-bold text-slate-800">Distribuer de la nourriture</h4>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[10px] text-slate-500 mb-0.5">Aliment en stock</label>
                           <select
@@ -295,14 +369,14 @@ export default function PiscicultureView({
                             onChange={(e) => setFeedArticleId(e.target.value)}
                             className="w-full border border-slate-300 bg-white rounded-xl p-2 text-xs text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                           >
-                            <option value="">Sélectionner</option>
-                            {foodArticles.map((art) => (
+                            <option value="">{availableFoodArticles.length === 0 ? 'Aucun aliment disponible' : 'Sélectionner'}</option>
+                            {availableFoodArticles.map((art) => (
                               <option key={art.id} value={art.id}>
                                 {art.name} ({art.quantity} kg dispo)
                               </option>
                             ))}
                           </select>
-                          <p className="mt-1 text-[10px] text-slate-500">Intrant à déduire.</p>
+                          <p className="mt-1 text-[10px] text-slate-500">{availableFoodArticles.length === 0 ? "Ajoutez un intrant d'alimentation dans le stock pour nourrir ce bassin." : 'Intrant à déduire.'}</p>
                         </div>
                         <div>
                           <label className="block text-[10px] text-slate-500 mb-0.5">Quantité (kg)</label>
@@ -318,9 +392,9 @@ export default function PiscicultureView({
                           <p className="mt-1 text-[10px] text-slate-500">Quantité distribuée.</p>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center bg-sky-50 border border-sky-100 p-2 rounded text-[10px] text-sky-800 leading-normal">
+                      <div className="flex flex-col gap-2 bg-sky-50 border border-sky-100 p-2 rounded text-[10px] text-sky-800 leading-normal sm:flex-row sm:justify-between sm:items-center">
                         <span>💡 Le stock d'aliment va diminuer de {feedQuantity} kg automatiquement.</span>
-                        <div className="flex gap-1">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:gap-1">
                           <button
                             type="button"
                             onClick={() => setSelectedBassinId(null)}
@@ -341,7 +415,7 @@ export default function PiscicultureView({
                   ) : harvestBassinId === bassin.id ? (
                     <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-3 animate-fade-in text-xs">
                       <h4 className="font-bold text-slate-800">Récolter et enregistrer la vente</h4>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[10px] text-slate-500 mb-0.5">Poids récolté (kg)</label>
                           <input
@@ -370,9 +444,9 @@ export default function PiscicultureView({
                           <p className="mt-1 text-[10px] text-slate-500">Montant encaissé.</p>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 p-2 rounded text-[10px] text-emerald-800 leading-normal">
+                      <div className="flex flex-col gap-2 bg-emerald-50 border border-emerald-100 p-2 rounded text-[10px] text-emerald-800 leading-normal sm:flex-row sm:justify-between sm:items-center">
                         <span>Cette action va cloturer le bassin, enregistrer {harvestWeightKg || 0} kg de recolte et generer un revenu de {formatCurrency(harvestRevenue)}.</span>
-                        <div className="flex gap-1">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:gap-1">
                           <button
                             type="button"
                             onClick={() => setHarvestBassinId(null)}
@@ -392,14 +466,14 @@ export default function PiscicultureView({
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                       <button
                         onClick={() => {
                           setSelectedBassinId(bassin.id);
-                          setFeedArticleId(foodArticles[0]?.id || '');
                           setHarvestBassinId(null);
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-[10px] font-semibold text-white shadow-lg shadow-sky-900/15 transition hover:-translate-y-0.5 hover:bg-sky-700"
+                        disabled={availableFoodArticles.length === 0}
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-[10px] font-semibold text-white shadow-lg shadow-sky-900/15 transition hover:-translate-y-0.5 hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
                       >
                         <Zap className="w-3 h-3" /> Nourrir
                       </button>

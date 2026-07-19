@@ -51,6 +51,11 @@ export default function SettingsView({
   onChangePassword,
   onCreateOwner
 }: SettingsViewProps) {
+  const currencyOptions = [
+    { value: 'FCFA', label: 'Franc CFA (FCFA)', hint: 'Adapte a la comptabilite locale ouest-africaine.' },
+    { value: 'EUR', label: 'Euro (EUR)', hint: 'Utile si vos achats ou ventes sont en zone euro.' },
+    { value: 'USD', label: 'Dollar US (USD)', hint: 'Pratique pour les fournisseurs ou partenaires internationaux.' }
+  ];
   const [name, setName] = useState(settings.name);
   const [location, setLocation] = useState(settings.location);
   const [managerName, setManagerName] = useState(settings.managerName);
@@ -73,6 +78,7 @@ export default function SettingsView({
   const [files, setFiles] = useState<{ name: string; size: string; date: string }[]>([]);
 
   const [newFileName, setNewFileName] = useState('');
+  const selectedCurrencyOption = currencyOptions.find((option) => option.value === currency) ?? currencyOptions[0];
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +100,6 @@ export default function SettingsView({
       alarmSoundKey
     });
 
-    alert("Paramètres de la ferme enregistrés avec succès !");
   };
 
   const handleFileUpload = (e: React.FormEvent) => {
@@ -111,7 +116,6 @@ export default function SettingsView({
     ]);
 
     setNewFileName('');
-    alert("Pièce jointe ajoutée avec succès au registre de la ferme !");
   };
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
@@ -179,8 +183,8 @@ export default function SettingsView({
               </div>
               <div>
                 <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Paramètre financier</span>
-                <span className="mt-1 block text-sm font-semibold text-emerald-900">{currency}</span>
-                <p className="mt-1 text-[11px] text-emerald-800">Cette devise sera utilisée dans les modules connectés.</p>
+                <span className="mt-1 block text-sm font-semibold text-emerald-900">{selectedCurrencyOption.label}</span>
+                <p className="mt-1 text-[11px] text-emerald-800">{selectedCurrencyOption.hint}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -268,16 +272,18 @@ export default function SettingsView({
                   onChange={(e) => setCurrency(e.target.value)}
                   className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-50 disabled:cursor-not-allowed"
                 >
-                  <option value="FCFA">Franc CFA (FCFA)</option>
-                  <option value="EUR">Euro (â‚¬)</option>
-                  <option value="USD">Dollar US ($)</option>
+                  {currencyOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
-                <p className="mt-1 text-[10px] text-slate-500">Devise utilisée pour les coûts et revenus.</p>
+                <p className="mt-1 text-[10px] text-slate-500">{selectedCurrencyOption.hint}</p>
               </div>
             </div>
 
             {role === 'admin' ? (
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="submit"
                   className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:-translate-y-0.5 hover:border-emerald-800 hover:bg-emerald-700"
@@ -374,7 +380,7 @@ export default function SettingsView({
                 </select>
               </div>
 
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Volume de l'alarme</label>
                   <p className="text-[11px] text-slate-500">Ajustez le niveau sonore global de l'alarme.</p>
@@ -395,7 +401,7 @@ export default function SettingsView({
               />
 
               {role === 'admin' && (
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     disabled={!alarmSoundEnabled}
@@ -448,6 +454,9 @@ export default function SettingsView({
                 </div>
 
                 <form onSubmit={handleOwnerSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3 text-xs text-emerald-900">
+                    Le proprietaire aura un acces en lecture seule sur cette ferme uniquement.
+                  </div>
                   <div>
                     <label className="block font-semibold text-slate-600 mb-1">Nom du proprietaire</label>
                     <input
@@ -458,6 +467,7 @@ export default function SettingsView({
                       placeholder="Ex. Jean Proprietaire"
                       className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     />
+                    <p className="mt-1 text-[10px] text-slate-500">Nom affiche dans la liste des comptes rattaches.</p>
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-600 mb-1">Email du proprietaire</label>
@@ -469,6 +479,7 @@ export default function SettingsView({
                       placeholder="Ex. proprietaire@ferme.ci"
                       className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     />
+                    <p className="mt-1 text-[10px] text-slate-500">Cette adresse servira a la connexion du proprietaire.</p>
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-600 mb-1">Mot de passe initial</label>
@@ -481,8 +492,9 @@ export default function SettingsView({
                       placeholder="Minimum 8 caracteres"
                       className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     />
+                    <p className="mt-1 text-[10px] text-slate-500">Choisissez un mot de passe temporaire a communiquer en prive.</p>
                   </div>
-                  <div className="flex justify-end">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                     <button
                       type="submit"
                       className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:-translate-y-0.5 hover:border-emerald-800 hover:bg-emerald-700"
@@ -509,7 +521,7 @@ export default function SettingsView({
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="********"
                   />
                   <p className="mt-1 text-[10px] text-slate-500">Mot de passe utilisé actuellement.</p>
                 </div>
@@ -520,7 +532,7 @@ export default function SettingsView({
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="********"
                   />
                   <p className="mt-1 text-[10px] text-slate-500">Minimum 8 caractères.</p>
                 </div>
@@ -531,12 +543,12 @@ export default function SettingsView({
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder="********"
                   />
                   <p className="mt-1 text-[10px] text-slate-500">Doit être identique au nouveau mot de passe.</p>
                 </div>
               </div>
-              <div className="flex justify-end">
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="submit"
                   className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:-translate-y-0.5 hover:border-emerald-800 hover:bg-emerald-700"
@@ -576,7 +588,7 @@ export default function SettingsView({
 
               {role === 'admin' ? (
                 <form onSubmit={handleFileUpload} className="space-y-3">
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <input
                       type="text"
                       placeholder="Nom du fichier (Ex: reçu_NPK.pdf)"
@@ -592,7 +604,7 @@ export default function SettingsView({
                     </button>
                   </div>
                   <div className="border border-dashed border-slate-200 bg-slate-50/50 p-3 rounded-xl text-center text-[11px] text-slate-400 transition-colors">
-                    📁 Zone de dépôt réservée aux justificatifs réels de la ferme
+                    Zone de depot reservee aux justificatifs reels de la ferme
                   </div>
                 </form>
               ) : (

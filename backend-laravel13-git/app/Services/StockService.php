@@ -113,7 +113,7 @@ class StockService
         return $item->fresh(['categoryRelation', 'supplier']);
     }
 
-    public function deleteItem(StockItem $item): void
+public function deleteItem(StockItem $item): ?FinancialTransaction
     {
         if ($item->movements()->exists()) {
             throw ValidationException::withMessages([
@@ -121,7 +121,51 @@ class StockService
             ]);
         }
 
-        $item->delete();
+        return DB::transaction(function () use ($item): ?FinancialTransaction {
+            $financialTransaction = null;
+            $remainingQuantity = (float) $item->current_quantity;
+            $residualValue = round($remainingQuantity * (float) ($item->unit_cost ?? 0), 2);
+
+            if ($remainingQuantity > 0 && $residualValue > 0) {
+                $financialTransaction = $this->financeService->createTransaction([
+                    'farm_id' => $item->farm_id,
+                    'type' => 'expense',
+                    'amount' => $residualValue,
+                    'category' => 'Perte Stock',
+                    'description' => sprintf(
+                        'Suppression de l article %s : perte de %s %s valorisee a %.2f',
+                        $item->name,
+                        rtrim(rtrim(number_format($remainingQuantity, 3, '.', ''), '0'), '.'),
+                        $item->unit,
+                        $residualValue
+                    ),
+                    'source_module' => 'stocks',
+                    'source_entity_type' => 'stock_item_deletion',
+                    'source_entity_id' => (string) $item->id,
+                    'occurred_at' => now(),
+                ]);
+            }
+
+            $this->auditService->record([
+                'farm_id' => $item->farm_id,
+                'user_id' => request()->user()?->id,
+                'module' => 'stocks',
+                'entity_type' => 'stock_item',
+                'entity_id' => (string) $item->id,
+                'action' => 'stock_item_deleted',
+                'old_value' => json_encode($item->toArray()),
+                'new_value' => json_encode([
+                    'remaining_quantity' => $remainingQuantity,
+                    'financial_transaction_id' => $financialTransaction?->id,
+                    'residual_value' => $residualValue,
+                ]),
+                'source' => 'web',
+            ]);
+
+            $item->delete();
+
+            return $financialTransaction;
+        });
     }
 
     public function recordMovement(array $data): StockMovement

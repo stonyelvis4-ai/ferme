@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Alert, UserRole } from '../types';
 import AdminEntityActions from './AdminEntityActions';
+import FormDialog from './FormDialog';
 
 interface AlertsViewProps {
   role: UserRole;
@@ -47,28 +48,47 @@ export default function AlertsView({
   onUpdateAlert,
   onDeleteAlert
 }: AlertsViewProps) {
+  const [showAlertDialog, setShowAlertDialog] = React.useState(false);
+  const [editingAlertId, setEditingAlertId] = React.useState<string | null>(null);
+  const [alertDraft, setAlertDraft] = React.useState({ title: '', description: '' });
   const activeAlerts = alerts.filter((a) => !a.read);
   const urgentAlerts = activeAlerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning');
   const criticalAlertsCount = activeAlerts.filter((alert) => alert.severity === 'critical').length;
   const warningAlertsCount = activeAlerts.filter((alert) => alert.severity === 'warning').length;
 
   const handleCreateAlert = () => {
-    const title = window.prompt('Titre de l\'alerte');
-    if (!title) return;
-    const description = window.prompt('Description de l\'alerte', '') ?? '';
-    onAddAlert({
-      title,
-      description,
-      severity: 'warning',
-      sourceModule: 'General'
-    });
+    setEditingAlertId(null);
+    setAlertDraft({ title: '', description: '' });
+    setShowAlertDialog(true);
   };
 
   const handleEditAlert = (alert: Alert) => {
-    const title = window.prompt('Titre de l\'alerte', alert.title);
-    if (!title) return;
-    const description = window.prompt('Description de l\'alerte', alert.description) ?? alert.description;
-    onUpdateAlert(alert.id, { title, description });
+    setEditingAlertId(alert.id);
+    setAlertDraft({ title: alert.title, description: alert.description });
+    setShowAlertDialog(true);
+  };
+
+  const handleSubmitAlertDialog = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!alertDraft.title.trim()) return;
+
+    if (editingAlertId) {
+      onUpdateAlert(editingAlertId, {
+        title: alertDraft.title.trim(),
+        description: alertDraft.description.trim(),
+      });
+    } else {
+      onAddAlert({
+        title: alertDraft.title.trim(),
+        description: alertDraft.description.trim(),
+        severity: 'warning',
+        sourceModule: 'General'
+      });
+    }
+
+    setShowAlertDialog(false);
+    setEditingAlertId(null);
+    setAlertDraft({ title: '', description: '' });
   };
 
   return (
@@ -170,6 +190,43 @@ export default function AlertsView({
           </div>
         </div>
       )}
+
+      <FormDialog
+        open={showAlertDialog}
+        title={editingAlertId ? "Modifier l'alerte" : "Creer une alerte"}
+        subtitle="Renseignez un titre clair et une description utile pour guider la correction."
+        confirmLabel={editingAlertId ? 'Enregistrer les changements' : "Creer l'alerte"}
+        confirmDisabled={!alertDraft.title.trim()}
+        onCancel={() => {
+          setShowAlertDialog(false);
+          setEditingAlertId(null);
+          setAlertDraft({ title: '', description: '' });
+        }}
+        onSubmit={handleSubmitAlertDialog}
+      >
+        <div className="grid grid-cols-1 gap-4">
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Titre</span>
+            <input
+              autoFocus
+              value={alertDraft.title}
+              onChange={(e) => setAlertDraft((prev) => ({ ...prev, title: e.target.value }))}
+              placeholder="Ex. Rupture aliment croissance"
+              className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Description</span>
+            <textarea
+              rows={4}
+              value={alertDraft.description}
+              onChange={(e) => setAlertDraft((prev) => ({ ...prev, description: e.target.value }))}
+              placeholder="Precisez le contexte, le risque et l'action attendue."
+              className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+            />
+          </label>
+        </div>
+      </FormDialog>
 
       {/* Grid of Alerts */}
       <div className="space-y-4">

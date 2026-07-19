@@ -10,7 +10,10 @@ import {
   Campaign,
   CultureParcelle,
   EggProduction,
+  EggSale,
   AnimalFeeding,
+  AnimalFeedPlan,
+  AnimalWeighing,
   FarmSettings,
   FinanceTransaction,
   FishBassin,
@@ -35,7 +38,7 @@ const toNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 
-const toDate = (value: unknown, fallback = new Date().toISOString().split('T')[0]) => {
+const toDate = (value: unknown, fallback = '') => {
   if (!value) return fallback;
   const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return fallback;
@@ -174,6 +177,23 @@ export function mapEggProductions(data: unknown[]): EggProduction[] {
     });
 }
 
+export function mapEggSales(data: unknown[]): EggSale[] {
+  return data.map((item, index) => {
+    const sale = item as Record<string, unknown>;
+    return {
+      id: toText(sale.id, `egg-sale-${index + 1}`),
+      date: toDate(sale.sale_date ?? sale.date),
+      lotId: toText(sale.layer_batch_id ?? sale.lotId, ''),
+      customerName: toText(sale.customer_name ?? sale.customerName, ''),
+      traysSold: toNumber(sale.trays_sold ?? sale.traysSold, 0),
+      eggsSold: toNumber(sale.eggs_sold ?? sale.eggsSold, 0),
+      unitPrice: toNumber(sale.unit_price ?? sale.unitPrice, 0),
+      amountPaid: toNumber(sale.amount_paid ?? sale.amountPaid, 0),
+      remainingDue: toNumber(sale.remaining_due ?? sale.remainingDue, 0),
+    };
+  });
+}
+
 export function mapAnimalFeedings(data: unknown[]): AnimalFeeding[] {
   return data.map((item, index) => {
     const feeding = item as Record<string, unknown>;
@@ -193,6 +213,48 @@ export function mapAnimalFeedings(data: unknown[]): AnimalFeeding[] {
       unitCost: toNumber(feeding.unit_cost ?? feeding.unitCost, 0),
       totalCost: toNumber(feeding.total_cost ?? feeding.totalCost, 0),
       notes: toText(feeding.notes, ''),
+    };
+  });
+}
+
+export function mapAnimalWeighings(data: unknown[]): AnimalWeighing[] {
+  return data.map((item, index) => {
+    const weighing = item as Record<string, unknown>;
+    const batch = (weighing.batch ?? {}) as Record<string, unknown>;
+
+    return {
+      id: toText(weighing.id, `weigh-${index + 1}`),
+      lotId: toText(weighing.layer_batch_id ?? weighing.lotId, ''),
+      lotName: toText(batch.name ?? weighing.lot_name ?? weighing.lotName, ''),
+      date: toDate(weighing.weighing_date ?? weighing.date),
+      sampleSize: weighing.sample_size ?? weighing.sampleSize ? toNumber(weighing.sample_size ?? weighing.sampleSize, 0) : undefined,
+      averageWeightKg: toNumber(weighing.average_weight_kg ?? weighing.averageWeightKg, 0),
+      totalWeightKg: toNumber(weighing.total_weight_kg ?? weighing.totalWeightKg, 0),
+      weightGainKg: toNumber(weighing.weight_gain_kg ?? weighing.weightGainKg, 0),
+      notes: toText(weighing.notes, ''),
+    };
+  });
+}
+
+export function mapAnimalFeedPlans(data: unknown[]): AnimalFeedPlan[] {
+  return data.map((item, index) => {
+    const plan = item as Record<string, unknown>;
+    const stockItem = (plan.stock_item ?? plan.stockItem ?? {}) as Record<string, unknown>;
+    const batch = (plan.batch ?? {}) as Record<string, unknown>;
+
+    return {
+      id: toText(plan.id, `plan-${index + 1}`),
+      lotId: toText(plan.layer_batch_id ?? plan.lotId, ''),
+      lotName: toText(batch.name ?? plan.lot_name ?? plan.lotName, ''),
+      articleId: toText(plan.stock_item_id ?? plan.articleId, ''),
+      articleName: toText(stockItem.name ?? plan.article_name ?? plan.articleName, ''),
+      planName: labelOrFallback(plan.plan_name ?? plan.planName, 'Plan alimentation'),
+      rationPerHeadKg: toNumber(plan.ration_per_head_kg ?? plan.rationPerHeadKg, 0),
+      feedingsPerDay: toNumber(plan.feedings_per_day ?? plan.feedingsPerDay, 1),
+      targetDailyQuantityKg: toNumber(plan.target_daily_quantity_kg ?? plan.targetDailyQuantityKg, 0),
+      startDate: toDate(plan.start_date ?? plan.startDate),
+      notes: toText(plan.notes, ''),
+      isActive: Boolean(plan.is_active ?? plan.isActive ?? true),
     };
   });
 }
@@ -411,7 +473,9 @@ export function mapTasks(data: unknown[], users: AuthUser[] = []): Task[] {
     const task = item as Record<string, unknown>;
     const assigneeId = task.assigned_to ?? task.assignedTo;
     const assignee = users.find((user) => String(user.id) === String(assigneeId));
+    const startAt = task.start_at ?? task.startAt;
     const dueAt = task.due_at ?? task.dueAt;
+    const fallbackDate = toDate(startAt ?? dueAt ?? task.created_at, '');
     const reminderAt = task.reminder_at ?? task.reminderAt;
     const rawFarmId = task.farm_id ?? task.farmId;
 
@@ -423,8 +487,8 @@ export function mapTasks(data: unknown[], users: AuthUser[] = []): Task[] {
       sourceElementId: toText(task.source_entity_id ?? task.sourceElementId, ''),
       sourceEntityType: toText(task.source_entity_type ?? task.sourceEntityType, ''),
       farmId: rawFarmId === null || rawFarmId === undefined ? undefined : (rawFarmId as string | number),
-      startDate: toDate(task.created_at ?? task.startDate ?? dueAt),
-      dueDate: toDate(dueAt),
+      startDate: toDate(startAt ?? task.startDate ?? task.created_at ?? dueAt, fallbackDate),
+      dueDate: toDate(dueAt ?? task.endAt ?? task.dueDate ?? startAt, fallbackDate),
       dueAt: dueAt ? toDateTime(dueAt) : undefined,
       reminderAt: reminderAt ? toDateTime(reminderAt) : undefined,
       priority: (toText(task.priority, 'normal') as Task['priority']) || 'normal',

@@ -9,6 +9,7 @@ use App\Models\CropHarvest;
 use App\Models\EggProduction;
 use App\Models\LayerBatch;
 use App\Models\Alert;
+use App\Models\LayerWeighing;
 use App\Models\StockItem;
 use App\Models\Task;
 
@@ -205,6 +206,25 @@ class AlertService
                 'title' => 'Taux de ponte faible',
                 'description' => sprintf('Le taux de ponte du lot est %.2f%% pour un seuil de %.2f%%.', $rate, $threshold),
                 'source_module' => 'pondeuses',
+                'status' => 'open',
+            ]
+        );
+    }
+
+    public function createLayerGrowthAlert(LayerBatch $batch, LayerWeighing $weighing, float $gain): Alert
+    {
+        return Alert::firstOrCreate(
+            [
+                'farm_id' => $batch->farm_id,
+                'type' => 'layer_growth_low',
+                'source_entity_type' => 'layer_weighing',
+                'source_entity_id' => (string) $weighing->id,
+            ],
+            [
+                'severity' => 'medium',
+                'title' => 'Croissance animale insuffisante',
+                'description' => sprintf('Le lot %s enregistre un gain moyen de %.3f kg, ce qui necessite un controle de l alimentation et du sanitaire.', $batch->name, $gain),
+                'source_module' => 'elevage',
                 'status' => 'open',
             ]
         );

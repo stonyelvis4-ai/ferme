@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sprout, Plus, Map, Layers, Lock, Scissors } from 'lucide-react';
 import { CultureParcelle, Campaign, UserRole } from '../types';
 import AdminEntityActions from './AdminEntityActions';
+import FormDialog from './FormDialog';
 
 interface CulturesViewProps {
   role: UserRole;
@@ -48,7 +49,22 @@ export default function CulturesView({
   const [campaignVariety, setCampaignVariety] = useState('Standard');
   const [campaignStartDate, setCampaignStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [campaignYield, setCampaignYield] = useState(3);
-  const selectedCampaignParcelle = parcelles.find((item) => item.id === campaignParcelleId);
+  const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
+  const [editingEntityType, setEditingEntityType] = useState<'parcelle' | 'campaign' | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const availableParcelles = parcelles;
+  const selectedCampaignParcelle = availableParcelles.find((item) => item.id === campaignParcelleId);
+
+  useEffect(() => {
+    if (availableParcelles.length === 0) {
+      if (campaignParcelleId) setCampaignParcelleId('');
+      return;
+    }
+
+    if (!campaignParcelleId || !availableParcelles.some((parcelle) => parcelle.id === campaignParcelleId)) {
+      setCampaignParcelleId(availableParcelles[0].id);
+    }
+  }, [availableParcelles, campaignParcelleId]);
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'decimal', maximumFractionDigits: 0 }).format(val) + ' ' + currency;
@@ -81,9 +97,51 @@ export default function CulturesView({
     setShowCampaignForm(false);
   };
 
+  const handleSubmitEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEntityId || !editingEntityType || !editValue.trim()) return;
+
+    if (editingEntityType === 'parcelle') {
+      onUpdateParcelle(editingEntityId, { name: editValue.trim() });
+    } else {
+      onUpdateCampaign(editingEntityId, { variety: editValue.trim() });
+    }
+
+    setEditingEntityId(null);
+    setEditingEntityType(null);
+    setEditValue('');
+  };
+
   return (
     <div id="cultures-view" className="space-y-6">
-      <div className="flex justify-between items-center">
+      <FormDialog
+        open={editingEntityId !== null}
+        title={editingEntityType === 'parcelle' ? 'Modifier la parcelle' : 'Modifier la campagne'}
+        subtitle={editingEntityType === 'parcelle' ? 'Ajustez le nom visible dans le plan de l exploitation.' : 'Mettez a jour la variete pour les suivis agronomiques et rapports.'}
+        confirmLabel="Enregistrer"
+        confirmDisabled={!editValue.trim()}
+        onCancel={() => {
+          setEditingEntityId(null);
+          setEditingEntityType(null);
+          setEditValue('');
+        }}
+        onSubmit={handleSubmitEdit}
+      >
+        <label className="space-y-1.5">
+          <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">
+            {editingEntityType === 'parcelle' ? 'Nom de la parcelle' : 'Variete'}
+          </span>
+          <input
+            autoFocus
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            placeholder={editingEntityType === 'parcelle' ? 'Ex. Champ Sud P1' : 'Ex. Composite jaune'}
+            className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
+          />
+        </label>
+      </FormDialog>
+
+      <div className="flex flex-col gap-3 xl:flex-row xl:justify-between xl:items-center">
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-sans tracking-tight flex items-center gap-2">
             <Sprout className="w-5 h-5 text-lime-600" />
@@ -94,7 +152,7 @@ export default function CulturesView({
           </p>
         </div>
         {role === 'admin' ? (
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <button type="button" onClick={() => setShowParcelleForm((prev) => !prev)} className="inline-flex items-center gap-2 rounded-full bg-lime-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-lime-900/15 transition hover:-translate-y-0.5 hover:bg-lime-700">
               <Plus className="w-4 h-4" /> Creer une parcelle
             </button>
@@ -145,7 +203,7 @@ export default function CulturesView({
               <input value={parcelleSoil} onChange={(e) => setParcelleSoil(e.target.value)} placeholder="Ex. Argileux" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
               <span className="block text-[10px] text-slate-500">Texture ou observation du sol.</span>
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
               <button type="button" onClick={() => setShowParcelleForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
               <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-lime-600 px-4 py-2 text-xs font-semibold text-white">Creer</button>
             </div>
@@ -176,11 +234,11 @@ export default function CulturesView({
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <label className="space-y-1.5">
               <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Parcelle</span>
-              <select value={campaignParcelleId} onChange={(e) => setCampaignParcelleId(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100">
-                <option value="">Parcelle</option>
-                {parcelles.map((parcelle) => <option key={parcelle.id} value={parcelle.id}>{parcelle.name}</option>)}
+              <select value={campaignParcelleId} onChange={(e) => setCampaignParcelleId(e.target.value)} disabled={availableParcelles.length === 0} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100">
+                <option value="">{availableParcelles.length === 0 ? 'Aucune parcelle disponible' : 'Parcelle'}</option>
+                {availableParcelles.map((parcelle) => <option key={parcelle.id} value={parcelle.id}>{parcelle.name}</option>)}
               </select>
-              <span className="block text-[10px] text-slate-500">Terrain affecte a la culture.</span>
+              <span className="block text-[10px] text-slate-500">{availableParcelles.length === 0 ? "Créez d'abord une parcelle pour lancer une campagne culturale." : 'Terrain affecte a la culture.'}</span>
             </label>
             <label className="space-y-1.5">
               <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Culture</span>
@@ -202,7 +260,7 @@ export default function CulturesView({
               <input type="number" min={0.1} step={0.1} value={campaignYield} onChange={(e) => setCampaignYield(Number(e.target.value))} placeholder="Ex. 3.5" className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
               <span className="block text-[10px] text-slate-500">Estimation initiale en tonne par hectare.</span>
             </label>
-            <div className="md:col-span-5 flex gap-2">
+            <div className="md:col-span-5 flex flex-col-reverse gap-2 sm:flex-row">
               <button type="button" onClick={() => setShowCampaignForm(false)} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:border-emerald-800 hover:bg-emerald-700">Annuler</button>
               <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/25 transition hover:border-emerald-800 hover:bg-emerald-700">Creer</button>
             </div>
@@ -242,9 +300,9 @@ export default function CulturesView({
                       <AdminEntityActions
                         compact
                         onEdit={() => {
-                          const name = window.prompt('Nom de la parcelle', parcelle.name);
-                          if (!name) return;
-                          onUpdateParcelle(parcelle.id, { name });
+                          setEditingEntityId(parcelle.id);
+                          setEditingEntityType('parcelle');
+                          setEditValue(parcelle.name);
                         }}
                         onDelete={() => {
                           if (window.confirm(`Supprimer la parcelle ${parcelle.name} ?`)) {
@@ -352,9 +410,9 @@ export default function CulturesView({
                           <AdminEntityActions
                             compact
                             onEdit={() => {
-                              const variety = window.prompt('Variete', camp.variety);
-                              if (!variety) return;
-                              onUpdateCampaign(camp.id, { variety });
+                              setEditingEntityId(camp.id);
+                              setEditingEntityType('campaign');
+                              setEditValue(camp.variety);
                             }}
                             onDelete={() => {
                               if (window.confirm(`Supprimer la campagne ${camp.cropType} ?`)) {

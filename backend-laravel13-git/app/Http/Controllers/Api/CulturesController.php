@@ -77,8 +77,11 @@ class CulturesController extends Controller
 
     public function destroy(Crop $culture): JsonResponse
     {
-        $culture->delete();
-        return response()->json(['message' => 'Crop deleted.']);
+        $result = $this->culturesService->deleteCrop($culture);
+        return response()->json([
+            'message' => ($result['action'] ?? 'deleted') === 'cancelled' ? 'Crop cancelled.' : 'Crop deleted.',
+            'data' => $result,
+        ]);
     }
 
     public function plot(StorePlotRequest $request): JsonResponse

@@ -17,6 +17,7 @@ class UpdateTaskRequest extends FormRequest
         return [
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'start_at' => ['sometimes', 'nullable', 'date', 'before_or_equal:due_at'],
             'priority' => ['sometimes', Rule::in(['low', 'normal', 'high', 'critical'])],
             'status' => ['sometimes', Rule::in(['todo', 'in_progress', 'completed', 'overdue', 'cancelled'])],
             'due_at' => ['nullable', 'date'],
@@ -25,4 +26,3 @@ class UpdateTaskRequest extends FormRequest
         ];
     }
 }
-

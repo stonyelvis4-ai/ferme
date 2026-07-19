@@ -6,12 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Layers\StoreEggProductionRequest;
 use App\Http\Requests\Layers\StoreEggSaleRequest;
 use App\Http\Requests\Layers\StoreLayerBatchRequest;
+use App\Http\Requests\Layers\StoreLayerFeedPlanRequest;
 use App\Http\Requests\Layers\StoreLayerFeedingRequest;
+use App\Http\Requests\Layers\StoreLayerWeighingRequest;
 use App\Http\Requests\Layers\UpdateLayerBatchRequest;
 use App\Models\EggProduction;
 use App\Models\EggSale;
 use App\Models\LayerBatch;
+use App\Models\LayerFeedPlan;
 use App\Models\LayerFeeding;
+use App\Models\LayerWeighing;
 use App\Services\LayerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,7 +34,7 @@ class PondeusesController extends Controller
             'summary' => $farmId ? $this->layerService->summaryForFarm($farmId) : [],
             'batches' => LayerBatch::query()
                 ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
-                ->withCount(['productions', 'sales', 'feedings'])
+                ->withCount(['productions', 'sales', 'feedings', 'weighings'])
                 ->latest()
                 ->get(),
             'productions' => EggProduction::query()
@@ -50,13 +54,27 @@ class PondeusesController extends Controller
                 ->latest()
                 ->limit(100)
                 ->get(),
+            'weighings' => LayerWeighing::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->with(['batch:id,name,current_count'])
+                ->latest('weighing_date')
+                ->latest()
+                ->limit(100)
+                ->get(),
+            'feed_plans' => LayerFeedPlan::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->with(['batch:id,name,current_count', 'stockItem:id,name,unit'])
+                ->latest('start_date')
+                ->latest()
+                ->limit(100)
+                ->get(),
         ]);
     }
 
     public function show(LayerBatch $pondeuse): JsonResponse
     {
         return response()->json([
-            'data' => $pondeuse->load(['productions', 'sales', 'feedings']),
+            'data' => $pondeuse->load(['productions', 'sales', 'feedings', 'weighings', 'feedPlans']),
         ]);
     }
 
@@ -76,9 +94,12 @@ class PondeusesController extends Controller
 
     public function destroy(LayerBatch $pondeuse): JsonResponse
     {
-        $pondeuse->delete();
+        $result = $this->layerService->deleteBatch($pondeuse);
 
-        return response()->json(['message' => 'Batch deleted.']);
+        return response()->json([
+            'message' => ($result['action'] ?? 'deleted') === 'archived' ? 'Batch archived.' : 'Batch deleted.',
+            'data' => $result,
+        ]);
     }
 
     public function production(StoreEggProductionRequest $request): JsonResponse
@@ -100,5 +121,19 @@ class PondeusesController extends Controller
         $feeding = $this->layerService->recordFeeding($request->validated());
 
         return response()->json(['data' => $feeding], 201);
+    }
+
+    public function weighing(StoreLayerWeighingRequest $request): JsonResponse
+    {
+        $weighing = $this->layerService->recordWeighing($request->validated());
+
+        return response()->json(['data' => $weighing], 201);
+    }
+
+    public function feedPlan(StoreLayerFeedPlanRequest $request): JsonResponse
+    {
+        $plan = $this->layerService->createFeedPlan($request->validated());
+
+        return response()->json(['data' => $plan], 201);
     }
 }

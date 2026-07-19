@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { EggProduction, Lot, UserRole } from '../types';
 import AdminEntityActions from './AdminEntityActions';
+import FormDialog from './FormDialog';
 
 interface PondeusesViewProps {
   role: UserRole;
@@ -53,13 +54,21 @@ export default function PondeusesView({
   const [saleCount, setSaleCount] = useState(0);
   const [unitPrice, setUnitPrice] = useState(0);
   const [saleDescription, setSaleDescription] = useState('');
+  const [editingProductionId, setEditingProductionId] = useState<string | null>(null);
+  const [editCompliantCount, setEditCompliantCount] = useState('0');
   const layingLots = lots.filter((l) => l.species.includes("Pondeuses"));
+  const availableLayingLots = layingLots.length > 0 ? layingLots : lots.filter((lot) => lot.status === 'active');
 
   useEffect(() => {
-    if (!lotId && layingLots.length > 0) {
-      setLotId(layingLots[0].id);
+    if (availableLayingLots.length === 0) {
+      if (lotId) setLotId('');
+      return;
     }
-  }, [layingLots, lotId]);
+
+    if (!lotId || !availableLayingLots.some((lot) => lot.id === lotId)) {
+      setLotId(availableLayingLots[0].id);
+    }
+  }, [availableLayingLots, lotId]);
 
   const handlePonteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,23 +111,57 @@ export default function PondeusesView({
   const qualityRate = totalCollected > 0 ? (totalCompliant / totalCollected) * 100 : 0;
   const lossRate = totalCollected > 0 ? (totalLosses / totalCollected) * 100 : 0;
   const lastProduction = productions.length > 0 ? productions[productions.length - 1] : null;
-  const referenceLot = layingLots.find((lot) => lot.id === lastProduction?.lotId) ?? layingLots[0];
-  const selectedLayingLot = layingLots.find((lot) => lot.id === lotId) ?? referenceLot;
+  const referenceLot = availableLayingLots.find((lot) => lot.id === lastProduction?.lotId) ?? availableLayingLots[0];
+  const selectedLayingLot = availableLayingLots.find((lot) => lot.id === lotId) ?? referenceLot;
   const lastLayingRate = lastProduction && referenceLot
     ? (lastProduction.collectedCount / Math.max(referenceLot.currentCount, 1)) * 100
     : 0;
   const saleTotal = saleCount * unitPrice;
 
   const handleEditProduction = (production: EggProduction) => {
-    const compliantValue = window.prompt('Oeufs conformes', String(production.compliantCount));
-    if (!compliantValue) return;
-    const nextCompliant = Number(compliantValue);
+    setEditingProductionId(production.id);
+    setEditCompliantCount(String(production.compliantCount));
+  };
+
+  const handleSubmitProductionEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProductionId) return;
+    const nextCompliant = Number(editCompliantCount);
     if (!Number.isFinite(nextCompliant) || nextCompliant < 0) return;
-    onUpdateEggProduction(production.id, { compliantCount: nextCompliant });
+
+    onUpdateEggProduction(editingProductionId, { compliantCount: nextCompliant });
+    setEditingProductionId(null);
+    setEditCompliantCount('0');
   };
 
   return (
     <div id="pondeuses-view" className="space-y-6">
+      <FormDialog
+        open={editingProductionId !== null}
+        title="Modifier la collecte"
+        subtitle="Ajustez le nombre d oeufs conformes pour garder la qualite tracee."
+        confirmLabel="Enregistrer"
+        confirmDisabled={Number(editCompliantCount) < 0}
+        onCancel={() => {
+          setEditingProductionId(null);
+          setEditCompliantCount('0');
+        }}
+        onSubmit={handleSubmitProductionEdit}
+      >
+        <label className="space-y-1.5">
+          <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Oeufs conformes</span>
+          <input
+            autoFocus
+            type="number"
+            min="0"
+            value={editCompliantCount}
+            onChange={(e) => setEditCompliantCount(e.target.value)}
+            placeholder="Ex. 320"
+            className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100"
+          />
+        </label>
+      </FormDialog>
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -267,13 +310,14 @@ export default function PondeusesView({
                 onChange={(e) => setLotId(e.target.value)}
                 className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100"
               >
-                {layingLots.map((l) => (
+                {availableLayingLots.length === 0 ? <option value="">Aucun lot disponible</option> : null}
+                {availableLayingLots.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name}
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[10px] text-slate-500">Lot qui a produit les œufs.</p>
+              <p className="mt-1 text-[10px] text-slate-500">{availableLayingLots.length === 0 ? "Ajoutez ou réactivez un lot pour enregistrer la ponte." : "Lot qui a produit les œufs."}</p>
             </div>
 
             <div>

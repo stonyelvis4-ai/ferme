@@ -20,6 +20,7 @@ class Task extends Model
         'source_module',
         'source_entity_type',
         'source_entity_id',
+        'start_at',
         'priority',
         'status',
         'due_at',
@@ -30,6 +31,7 @@ class Task extends Model
     protected $casts = [
         'priority' => Priority::class,
         'status' => TaskStatus::class,
+        'start_at' => 'datetime',
         'due_at' => 'datetime',
         'reminder_at' => 'datetime',
     ];

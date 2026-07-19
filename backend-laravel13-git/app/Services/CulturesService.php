@@ -47,6 +47,50 @@ class CulturesService
         return $crop;
     }
 
+    public function deleteCrop(Crop $crop): array
+    {
+        if ($crop->operations()->exists() || $crop->harvests()->exists() || $crop->sales()->exists()) {
+            $oldValue = $crop->toArray();
+            $crop->forceFill(['status' => 'cancelled'])->save();
+
+            $this->auditService->record([
+                'farm_id' => $crop->farm_id,
+                'user_id' => request()->user()?->id,
+                'module' => 'cultures',
+                'entity_type' => 'crop',
+                'entity_id' => (string) $crop->id,
+                'action' => 'crop_cancelled',
+                'old_value' => json_encode($oldValue),
+                'new_value' => json_encode(['status' => 'cancelled']),
+                'source' => 'web',
+            ]);
+
+            return [
+                'action' => 'cancelled',
+                'crop' => $crop->fresh(),
+            ];
+        }
+
+        $this->auditService->record([
+            'farm_id' => $crop->farm_id,
+            'user_id' => request()->user()?->id,
+            'module' => 'cultures',
+            'entity_type' => 'crop',
+            'entity_id' => (string) $crop->id,
+            'action' => 'crop_deleted',
+            'old_value' => json_encode($crop->toArray()),
+            'source' => 'web',
+        ]);
+
+        $snapshot = $crop->toArray();
+        $crop->delete();
+
+        return [
+            'action' => 'deleted',
+            'crop' => $snapshot,
+        ];
+    }
+
     public function createPlot(array $data): Plot
     {
         return Plot::create([

@@ -42,6 +42,18 @@ export interface EggProduction {
   stockCount: number;
 }
 
+export interface EggSale {
+  id: string;
+  date: string;
+  lotId: string;
+  customerName?: string;
+  traysSold: number;
+  eggsSold: number;
+  unitPrice: number;
+  amountPaid: number;
+  remainingDue: number;
+}
+
 export interface AnimalFeeding {
   id: string;
   lotId: string;
@@ -55,6 +67,33 @@ export interface AnimalFeeding {
   unitCost: number;
   totalCost: number;
   notes?: string;
+}
+
+export interface AnimalWeighing {
+  id: string;
+  lotId: string;
+  lotName?: string;
+  date: string;
+  sampleSize?: number;
+  averageWeightKg: number;
+  totalWeightKg: number;
+  weightGainKg: number;
+  notes?: string;
+}
+
+export interface AnimalFeedPlan {
+  id: string;
+  lotId: string;
+  lotName?: string;
+  articleId?: string;
+  articleName?: string;
+  planName: string;
+  rationPerHeadKg: number;
+  feedingsPerDay: number;
+  targetDailyQuantityKg: number;
+  startDate: string;
+  notes?: string;
+  isActive: boolean;
 }
 
 export interface FishBassin {

@@ -52,6 +52,96 @@ class PiscicultureService
         return $pond;
     }
 
+    public function deletePond(FishPond $pond): array
+    {
+        return DB::transaction(function () use ($pond) {
+            $financialTransaction = null;
+            $oldValue = $pond->toArray();
+            $remainingFish = max(0, (int) $pond->current_estimated_count);
+            $unitCost = (float) ($pond->unit_cost ?? 0);
+            $residualValue = round($remainingFish * $unitCost, 2);
+            $hasHistory = $pond->stockings()->exists()
+                || $pond->monitorings()->exists()
+                || $pond->harvests()->exists()
+                || $pond->sales()->exists();
+
+            if ($remainingFish > 0 && $residualValue > 0) {
+                $financialTransaction = $this->financeService->createTransaction([
+                    'farm_id' => $pond->farm_id,
+                    'type' => 'expense',
+                    'amount' => $residualValue,
+                    'category' => 'Sortie Poissons',
+                    'description' => sprintf(
+                        'Suppression du bassin %s : sortie de %d poissons valorisee a %.2f',
+                        $pond->name,
+                        $remainingFish,
+                        $residualValue
+                    ),
+                    'source_module' => 'pisciculture',
+                    'source_entity_type' => 'fish_pond_deletion',
+                    'source_entity_id' => (string) $pond->id,
+                    'occurred_at' => now(),
+                ]);
+            }
+
+            if ($hasHistory || $remainingFish > 0) {
+                $pond->forceFill([
+                    'status' => 'inactive',
+                    'current_estimated_count' => 0,
+                    'biomass_kg' => 0,
+                ])->save();
+
+                $this->auditService->record([
+                    'farm_id' => $pond->farm_id,
+                    'user_id' => request()->user()?->id,
+                    'module' => 'pisciculture',
+                    'entity_type' => 'fish_pond',
+                    'entity_id' => (string) $pond->id,
+                    'action' => 'pond_archived',
+                    'old_value' => json_encode($oldValue),
+                    'new_value' => json_encode([
+                        'status' => 'inactive',
+                        'remaining_fish' => $remainingFish,
+                        'financial_transaction_id' => $financialTransaction?->id,
+                        'residual_value' => $residualValue,
+                    ]),
+                    'source' => 'web',
+                ]);
+
+                return [
+                    'action' => 'archived',
+                    'pond' => $pond->fresh(),
+                    'financial_transaction' => $financialTransaction,
+                ];
+            }
+
+            $this->auditService->record([
+                'farm_id' => $pond->farm_id,
+                'user_id' => request()->user()?->id,
+                'module' => 'pisciculture',
+                'entity_type' => 'fish_pond',
+                'entity_id' => (string) $pond->id,
+                'action' => 'pond_deleted',
+                'old_value' => json_encode($oldValue),
+                'new_value' => json_encode([
+                    'remaining_fish' => $remainingFish,
+                    'financial_transaction_id' => $financialTransaction?->id,
+                    'residual_value' => $residualValue,
+                ]),
+                'source' => 'web',
+            ]);
+
+            $snapshot = $pond->toArray();
+            $pond->delete();
+
+            return [
+                'action' => 'deleted',
+                'pond' => $snapshot,
+                'financial_transaction' => $financialTransaction,
+            ];
+        });
+    }
+
     public function recordStocking(array $data): FishStocking
     {
         return DB::transaction(function () use ($data) {

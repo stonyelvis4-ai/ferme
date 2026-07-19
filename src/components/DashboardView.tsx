@@ -21,10 +21,13 @@ import {
 import {
   Lot,
   EggProduction,
+  EggSale,
+  AnimalFeeding,
   FishBassin,
   CultureParcelle,
   StockArticle,
   FinanceTransaction,
+  SanitaryTreatment,
   Task,
   Alert
 } from '../types';
@@ -32,10 +35,13 @@ import {
 interface DashboardViewProps {
   lots: Lot[];
   eggProductions: EggProduction[];
+  eggSales: EggSale[];
+  feedings: AnimalFeeding[];
   fishBassins: FishBassin[];
   parcelles: CultureParcelle[];
   articles: StockArticle[];
   transactions: FinanceTransaction[];
+  treatments: SanitaryTreatment[];
   tasks: Task[];
   alerts: Alert[];
   currency: string;
@@ -46,16 +52,26 @@ interface DashboardViewProps {
 export default function DashboardView({
   lots,
   eggProductions,
+  eggSales,
+  feedings,
   fishBassins,
   parcelles,
   articles,
   transactions,
+  treatments,
   tasks,
   alerts,
   currency,
   areaUnit,
   onNavigate
 }: DashboardViewProps) {
+  const normalizeModuleKey = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
   const income = transactions
     .filter((transaction) => transaction.type === 'income')
     .reduce((sum, transaction) => sum + transaction.amount, 0);
@@ -82,6 +98,116 @@ export default function DashboardView({
   const overdueTasksCount = tasks.filter((task) => task.status === 'overdue').length;
   const activeAlerts = alerts.filter((alert) => !alert.read);
   const stockAlerts = articles.filter((article) => article.quantity <= (article.minimumStock ?? article.minThreshold ?? 0)).length;
+  const stockValue = articles.reduce((sum, article) => sum + Math.max(article.quantity, 0) * (article.unitCost ?? 0), 0);
+  const formatCurrency = (value: number) =>
+    `${new Intl.NumberFormat('fr-FR', {
+      style: 'decimal',
+      maximumFractionDigits: 0
+    }).format(value)} ${currency}`;
+  const layingLots = lots.filter((lot) => normalizeModuleKey(lot.species).includes('pondeuses'));
+  const layingLotIds = new Set(layingLots.map((lot) => lot.id));
+  const livestockLots = lots.filter((lot) => !layingLotIds.has(lot.id));
+  const livestockLotIds = new Set(livestockLots.map((lot) => lot.id));
+
+  const transactionTotalsByModule = transactions.reduce<Record<string, { income: number; expense: number }>>((acc, transaction) => {
+    const key = normalizeModuleKey(transaction.sourceModule || 'general');
+    if (!acc[key]) {
+      acc[key] = { income: 0, expense: 0 };
+    }
+    acc[key][transaction.type] += transaction.amount;
+    return acc;
+  }, {});
+
+  const getTransactionTotals = (...keys: string[]) =>
+    keys.reduce(
+      (totals, key) => {
+        const current = transactionTotalsByModule[normalizeModuleKey(key)] ?? { income: 0, expense: 0 };
+        return {
+          income: totals.income + current.income,
+          expense: totals.expense + current.expense
+        };
+      },
+      { income: 0, expense: 0 }
+    );
+
+  const feedingTotals = feedings.reduce<Record<string, { quantity: number; cost: number }>>((acc, feeding) => {
+    if (!acc[feeding.lotId]) {
+      acc[feeding.lotId] = { quantity: 0, cost: 0 };
+    }
+    acc[feeding.lotId].quantity += feeding.quantity;
+    acc[feeding.lotId].cost += feeding.totalCost;
+    return acc;
+  }, {});
+
+  const sanitaryTotals = treatments
+    .filter((treatment) => treatment.status === 'completed')
+    .reduce<Record<string, number>>((acc, treatment) => {
+      acc[treatment.lotId] = (acc[treatment.lotId] ?? 0) + treatment.cost;
+      return acc;
+    }, {});
+
+  const eggRevenue = getTransactionTotals('Pondeuses').income;
+  const eggSalesCount = eggSales.reduce((sum, sale) => sum + sale.eggsSold, 0);
+  const eggFeedCost = layingLots.reduce((sum, lot) => sum + (feedingTotals[lot.id]?.cost ?? 0), 0);
+  const eggFeedQuantity = layingLots.reduce((sum, lot) => sum + (feedingTotals[lot.id]?.quantity ?? 0), 0);
+  const eggSanitaryCost = layingLots.reduce((sum, lot) => sum + (sanitaryTotals[lot.id] ?? 0), 0);
+  const eggAcquisitionCost = layingLots.reduce((sum, lot) => sum + (lot.acquisitionCost ?? lot.initialCount * (lot.unitCost ?? 0)), 0);
+  const eggDirectCost = eggAcquisitionCost + eggFeedCost + eggSanitaryCost;
+  const eggMargin = eggRevenue - eggDirectCost;
+
+  const livestockRevenue = getTransactionTotals('Élevage').income;
+  const livestockFeedCost = livestockLots.reduce((sum, lot) => sum + (feedingTotals[lot.id]?.cost ?? 0), 0);
+  const livestockFeedQuantity = livestockLots.reduce((sum, lot) => sum + (feedingTotals[lot.id]?.quantity ?? 0), 0);
+  const livestockSanitaryCost = livestockLots.reduce((sum, lot) => sum + (sanitaryTotals[lot.id] ?? 0), 0);
+  const livestockAcquisitionCost = livestockLots.reduce((sum, lot) => sum + (lot.acquisitionCost ?? lot.initialCount * (lot.unitCost ?? 0)), 0);
+  const livestockDirectCost = livestockAcquisitionCost + livestockFeedCost + livestockSanitaryCost;
+  const livestockMargin = livestockRevenue - livestockDirectCost;
+
+  const fishTotals = getTransactionTotals('Pisciculture');
+  const cropsTotals = getTransactionTotals('Cultures');
+
+  const activityPerformance = [
+    {
+      key: 'pondeuses',
+      label: 'Pondeuses',
+      revenue: eggRevenue,
+      directCost: eggDirectCost,
+      margin: eggMargin,
+      accent: 'amber',
+      detail: `${eggSalesCount.toLocaleString('fr-FR')} oeufs vendus, ${eggFeedQuantity.toFixed(1)} kg d'aliment distribués`,
+      helper: `${layingLots.length} lot(s) suivis, coût sanitaire ${formatCurrency(eggSanitaryCost)}`
+    },
+    {
+      key: 'élevage',
+      label: 'Élevage',
+      revenue: livestockRevenue,
+      directCost: livestockDirectCost,
+      margin: livestockMargin,
+      accent: 'emerald',
+      detail: `${livestockLots.length} lot(s) hors pondeuses, ${livestockFeedQuantity.toFixed(1)} kg distribués`,
+      helper: `${treatments.filter((treatment) => livestockLotIds.has(treatment.lotId) && treatment.status === 'completed').length} soin(s) clôturés`
+    },
+    {
+      key: 'pisciculture',
+      label: 'Pisciculture',
+      revenue: fishTotals.income,
+      directCost: fishTotals.expense,
+      margin: fishTotals.income - fishTotals.expense,
+      accent: 'sky',
+      detail: `${activeBassinsCount} bassin(s) actifs, ${totalFishCount.toLocaleString('fr-FR')} poissons suivis`,
+      helper: `Suivi via écritures comptables et récoltes enregistrées`
+    },
+    {
+      key: 'cultures',
+      label: 'Cultures',
+      revenue: cropsTotals.income,
+      directCost: cropsTotals.expense,
+      margin: cropsTotals.income - cropsTotals.expense,
+      accent: 'lime',
+      detail: `${cultivatedPlots.length} parcelle(s) cultivées sur ${cultivatedArea.toFixed(1)} ${areaUnit}`,
+      helper: `Campagnes actives et récoltes valorisées en comptabilité`
+    }
+  ];
 
   const expenseBreakdown = Object.entries(
     transactions
@@ -96,12 +222,6 @@ export default function DashboardView({
 
   const totalExpenseAmount = expenseBreakdown.reduce((sum, item) => sum + item.amount, 0);
 
-  const formatCurrency = (value: number) =>
-    `${new Intl.NumberFormat('fr-FR', {
-      style: 'decimal',
-      maximumFractionDigits: 0
-    }).format(value)} ${currency}`;
-
   const isEmpty =
     lots.length === 0 &&
     eggProductions.length === 0 &&
@@ -111,6 +231,33 @@ export default function DashboardView({
     transactions.length === 0 &&
     tasks.length === 0 &&
     alerts.length === 0;
+
+  const accentClassNames: Record<string, { chip: string; panel: string; text: string; button: string }> = {
+    amber: {
+      chip: 'bg-amber-50 text-amber-700',
+      panel: 'border-amber-100 bg-amber-50/40',
+      text: 'text-amber-700',
+      button: 'hover:border-amber-300'
+    },
+    emerald: {
+      chip: 'bg-emerald-50 text-emerald-700',
+      panel: 'border-emerald-100 bg-emerald-50/40',
+      text: 'text-emerald-700',
+      button: 'hover:border-emerald-300'
+    },
+    sky: {
+      chip: 'bg-sky-50 text-sky-700',
+      panel: 'border-sky-100 bg-sky-50/40',
+      text: 'text-sky-700',
+      button: 'hover:border-sky-300'
+    },
+    lime: {
+      chip: 'bg-lime-50 text-lime-700',
+      panel: 'border-lime-100 bg-lime-50/40',
+      text: 'text-lime-700',
+      button: 'hover:border-lime-300'
+    }
+  };
 
   return (
     <div id="dashboard-view" className="space-y-6">
@@ -244,6 +391,70 @@ export default function DashboardView({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-sans text-base font-bold tracking-tight text-slate-900">
+                  Rentabilité par activité
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Lecture économique des charges directes déjà tracées dans FERM+.
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-right">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Valeur stock</div>
+                <div className="text-sm font-bold text-slate-900">{formatCurrency(stockValue)}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {activityPerformance.map((activity) => {
+                const accent = accentClassNames[activity.accent];
+                const marginPositive = activity.margin >= 0;
+
+                return (
+                  <button
+                    key={activity.key}
+                    type="button"
+                    onClick={() => onNavigate(activity.key)}
+                    className={`rounded-2xl border p-4 text-left shadow-sm transition-all ${accent.panel} ${accent.button}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${accent.chip}`}>
+                          {activity.label}
+                        </span>
+                        <p className="mt-3 text-sm font-semibold text-slate-900">{activity.detail}</p>
+                      </div>
+                      <span className={`text-xs font-bold ${marginPositive ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {marginPositive ? 'Marge positive' : 'Marge à corriger'}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-3">
+                      <div className="rounded-xl border border-white/70 bg-white/80 p-3">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Revenus</div>
+                        <div className="mt-1 text-sm font-bold text-slate-900">{formatCurrency(activity.revenue)}</div>
+                      </div>
+                      <div className="rounded-xl border border-white/70 bg-white/80 p-3">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Charges</div>
+                        <div className="mt-1 text-sm font-bold text-slate-900">{formatCurrency(activity.directCost)}</div>
+                      </div>
+                      <div className="rounded-xl border border-white/70 bg-white/80 p-3">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Marge</div>
+                        <div className={`mt-1 text-sm font-bold ${marginPositive ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {formatCurrency(activity.margin)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className={`mt-3 text-xs ${accent.text}`}>{activity.helper}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
           <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
             <div className="mb-6 flex items-center justify-between">
               <div>

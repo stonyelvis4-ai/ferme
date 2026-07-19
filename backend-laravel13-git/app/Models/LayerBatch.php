@@ -55,4 +55,14 @@ class LayerBatch extends Model
     {
         return $this->hasMany(LayerFeeding::class, 'layer_batch_id');
     }
+
+    public function weighings(): HasMany
+    {
+        return $this->hasMany(LayerWeighing::class, 'layer_batch_id');
+    }
+
+    public function feedPlans(): HasMany
+    {
+        return $this->hasMany(LayerFeedPlan::class, 'layer_batch_id');
+    }
 }

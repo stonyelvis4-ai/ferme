@@ -7,7 +7,7 @@ return [
 
     'allowed_origins' => array_values(array_filter(array_map(
         static fn (string $origin) => trim($origin),
-        explode(',', (string) env('CORS_ALLOWED_ORIGINS', env('APP_FRONTEND_URL', 'http://localhost:3000')))
+        explode(',', (string) env('CORS_ALLOWED_ORIGINS', env('APP_FRONTEND_URL', 'http://localhost:3000,http://127.0.0.1:3000')))
     ))),
 
     'allowed_origins_patterns' => [],

@@ -81,9 +81,12 @@ class PiscicultureController extends Controller
 
     public function destroy(FishPond $pisciculture): JsonResponse
     {
-        $pisciculture->delete();
+        $result = $this->piscicultureService->deletePond($pisciculture);
 
-        return response()->json(['message' => 'Pond deleted.']);
+        return response()->json([
+            'message' => ($result['action'] ?? 'deleted') === 'archived' ? 'Pond archived.' : 'Pond deleted.',
+            'data' => $result,
+        ]);
     }
 
     public function stocking(StoreFishStockingRequest $request): JsonResponse
