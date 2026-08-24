@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/api': {
-          target: env.VITE_FERM_API_PROXY_TARGET || 'http://127.0.0.1:8000',
+          target: env.VITE_FERM_API_PROXY_TARGET || 'http://127.0.0.1:8012',
           changeOrigin: true,
           secure: false,
         },

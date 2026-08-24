@@ -1,6 +1,8 @@
 node_modules/
 build/
 dist/
+deploy-build/
+deploy-build-*.zip
 coverage/
 .DS_Store
 *.log

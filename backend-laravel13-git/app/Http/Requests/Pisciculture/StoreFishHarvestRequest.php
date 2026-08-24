@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Pisciculture;
 
+use App\Http\Requests\Concerns\UsesAuthenticatedFarmContext;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreFishHarvestRequest extends FormRequest
 {
+    use UsesAuthenticatedFarmContext;
+
     public function authorize(): bool
     {
         return true;

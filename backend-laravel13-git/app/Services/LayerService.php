@@ -12,6 +12,7 @@ use App\Models\LayerWeighing;
 use App\Models\SanitaryTreatment;
 use App\Models\StockItem;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class LayerService
 {
@@ -276,8 +277,13 @@ class LayerService
             $eggsSold = $data['eggs_sold'] ?? ($trays * 30);
             $unitPrice = $data['unit_price'];
             $grossAmount = $trays * $unitPrice;
-            $amountPaid = $data['amount_paid'] ?? $grossAmount;
-            $remainingDue = $data['remaining_due'] ?? max(0, $grossAmount - $amountPaid);
+            $amountPaid = (float) ($data['amount_paid'] ?? $grossAmount);
+            if ($amountPaid < 0 || $amountPaid > $grossAmount) {
+                throw ValidationException::withMessages([
+                    'amount_paid' => 'Le montant payé doit être compris entre zéro et le montant brut de la vente.',
+                ]);
+            }
+            $remainingDue = round(max(0, $grossAmount - $amountPaid), 2);
 
             $movement = $this->stockService->recordMovement([
                 'farm_id' => $data['farm_id'],

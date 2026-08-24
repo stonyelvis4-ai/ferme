@@ -23,7 +23,7 @@ npm run dev
 
 Le frontend tourne par defaut sur `http://localhost:3000`.
 
-Pour une mise en production, voir aussi [docs/o2switch-deploiement.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-deploiement.md).
+Pour une mise en production, voir aussi [docs/o2switch-deploiement.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-deploiement.md) et [docs/o2switch-securite-production.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-securite-production.md).
 
 ## Backend Laravel
 

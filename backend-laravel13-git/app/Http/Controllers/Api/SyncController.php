@@ -35,8 +35,13 @@ class SyncController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $farmId = (int) ($request->user()?->farm_id ?? 0);
+        abort_if($farmId <= 0, 403, 'Aucune ferme active pour cette session.');
+
+        $request->merge(['farm_id' => $farmId]);
+
         $data = $request->validate([
-            'farm_id' => ['nullable', 'integer', 'exists:farms,id'],
+            'farm_id' => ['required', 'integer', 'exists:farms,id'],
             'module' => ['required', 'string', 'max:255'],
             'entity_type' => ['nullable', 'string', 'max:255'],
             'entity_id' => ['nullable', 'string', 'max:255'],
@@ -59,8 +64,10 @@ class SyncController extends Controller
         return response()->json(['data' => $entry], 201);
     }
 
-    public function process(SyncQueueEntry $entry): JsonResponse
+    public function process(Request $request, SyncQueueEntry $entry): JsonResponse
     {
+        $this->authorizeEntry($request, $entry);
+
         $processed = $this->syncService->markProcessed($entry);
 
         return response()->json(['data' => $processed]);
@@ -68,6 +75,8 @@ class SyncController extends Controller
 
     public function fail(Request $request, SyncQueueEntry $entry): JsonResponse
     {
+        $this->authorizeEntry($request, $entry);
+
         $data = $request->validate([
             'error_message' => ['required', 'string'],
         ]);
@@ -75,5 +84,13 @@ class SyncController extends Controller
         $failed = $this->syncService->markFailed($entry, $data['error_message']);
 
         return response()->json(['data' => $failed]);
+    }
+
+    private function authorizeEntry(Request $request, SyncQueueEntry $entry): void
+    {
+        $farmId = (int) ($request->user()?->farm_id ?? 0);
+
+        abort_if($farmId <= 0, 403, 'Aucune ferme active pour cette session.');
+        abort_if((int) ($entry->farm_id ?? 0) !== $farmId, 404);
     }
 }

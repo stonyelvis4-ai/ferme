@@ -217,7 +217,7 @@ export default function CulturesView({
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Campagne</span>
               <span className="mt-1 block text-sm font-semibold text-emerald-900">{campaignCropType || 'Culture a choisir'}</span>
-              <p className="mt-1 text-[11px] text-emerald-800">Variete: {campaignVariety || 'non precisee'}</p>
+              <p className="mt-1 text-[11px] text-emerald-800">Variete: {campaignVariety || 'a preciser'}</p>
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Parcelle liee</span>
@@ -238,7 +238,7 @@ export default function CulturesView({
                 <option value="">{availableParcelles.length === 0 ? 'Aucune parcelle disponible' : 'Parcelle'}</option>
                 {availableParcelles.map((parcelle) => <option key={parcelle.id} value={parcelle.id}>{parcelle.name}</option>)}
               </select>
-              <span className="block text-[10px] text-slate-500">{availableParcelles.length === 0 ? "Créez d'abord une parcelle pour lancer une campagne culturale." : 'Terrain affecte a la culture.'}</span>
+              <span className="block text-[10px] text-slate-500">{availableParcelles.length === 0 ? "Creez d'abord une parcelle pour lancer une campagne culturale." : 'Terrain affecte a la culture.'}</span>
             </label>
             <label className="space-y-1.5">
               <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Culture</span>
@@ -276,8 +276,8 @@ export default function CulturesView({
 
         {parcelles.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-8 text-center">
-            <p className="text-sm font-semibold text-slate-700">Aucune parcelle enregistree pour cette ferme.</p>
-            <p className="mt-2 text-xs text-slate-500">Les parcelles et plans culturaux s'afficheront ici des leur creation.</p>
+            <p className="text-sm font-semibold text-slate-700">Aucune parcelle enregistrée pour cette ferme.</p>
+            <p className="mt-2 text-xs text-slate-500">Ajoutez vos zones de culture pour structurer les campagnes, les rendements et les rapports agronomiques.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -304,11 +304,10 @@ export default function CulturesView({
                           setEditingEntityType('parcelle');
                           setEditValue(parcelle.name);
                         }}
-                        onDelete={() => {
-                          if (window.confirm(`Supprimer la parcelle ${parcelle.name} ?`)) {
-                            onDeleteParcelle(parcelle.id);
-                          }
-                        }}
+                        onDelete={() => onDeleteParcelle(parcelle.id)}
+                        confirmDeleteTitle="Supprimer cette parcelle ?"
+                        confirmDeleteDescription={`La parcelle "${parcelle.name}" sera retiree si aucune campagne active ne lui reste rattachee.`}
+                        confirmDeleteActionLabel="Supprimer la parcelle"
                       />
                     )}
                   </div>
@@ -328,7 +327,7 @@ export default function CulturesView({
         {campaigns.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
             <p className="text-sm font-semibold text-slate-700">Aucune campagne culturale active.</p>
-            <p className="mt-2 text-xs text-slate-500">Les semis, operations et recoltes apparaitront ici quand une culture sera lancee.</p>
+            <p className="mt-2 text-xs text-slate-500">Les semis, opérations et récoltes apparaîtront ici quand une culture sera lancée.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -414,11 +413,10 @@ export default function CulturesView({
                               setEditingEntityType('campaign');
                               setEditValue(camp.variety);
                             }}
-                            onDelete={() => {
-                              if (window.confirm(`Supprimer la campagne ${camp.cropType} ?`)) {
-                                onDeleteCampaign(camp.id);
-                              }
-                            }}
+                            onDelete={() => onDeleteCampaign(camp.id)}
+                            confirmDeleteTitle="Supprimer cette campagne culturale ?"
+                            confirmDeleteDescription={`La campagne "${camp.cropType}" sera retiree du planning si elle n'est pas deja verrouillee par ses operations.`}
+                            confirmDeleteActionLabel="Supprimer la campagne"
                           />
                         </div>
                       )}
@@ -433,3 +431,4 @@ export default function CulturesView({
     </div>
   );
 }
+

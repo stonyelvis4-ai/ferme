@@ -2,11 +2,14 @@
 
 namespace App\Http\Requests\Finance;
 
+use App\Http\Requests\Concerns\UsesAuthenticatedFarmContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreFinancialTransactionRequest extends FormRequest
 {
+    use UsesAuthenticatedFarmContext;
+
     public function authorize(): bool
     {
         return true;
@@ -28,4 +31,3 @@ class StoreFinancialTransactionRequest extends FormRequest
         ];
     }
 }
-

@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Layers;
 
+use App\Http\Requests\Concerns\UsesAuthenticatedFarmContext;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreLayerBatchRequest extends FormRequest
 {
+    use UsesAuthenticatedFarmContext;
+
     public function authorize(): bool
     {
         return true;

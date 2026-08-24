@@ -3,11 +3,14 @@
 namespace App\Http\Requests\Stock;
 
 use App\Enums\Role;
+use App\Http\Requests\Concerns\UsesAuthenticatedFarmContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreStockMovementRequest extends FormRequest
 {
+    use UsesAuthenticatedFarmContext;
+
     public function authorize(): bool
     {
         return $this->user()?->role === Role::Admin;

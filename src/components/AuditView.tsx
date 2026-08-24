@@ -73,7 +73,7 @@ export default function AuditView({ auditLogs }: AuditViewProps) {
         <div className="overflow-x-auto">
           {auditLogs.length === 0 ? (
             <div className="p-10 text-center">
-              <p className="text-sm font-semibold text-slate-700">Aucune trace d'audit disponible.</p>
+              <p className="text-sm font-semibold text-slate-700">Aucune trace d'audit disponible pour le moment.</p>
               <p className="mt-2 text-xs text-slate-500">
                 Les connexions, modifications et actions métier sécurisées seront historisées ici automatiquement.
               </p>

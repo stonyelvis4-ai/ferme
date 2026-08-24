@@ -10,6 +10,7 @@ use App\Models\FarmSetting;
 use App\Models\Plot;
 use App\Models\StockItem;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class CulturesService
 {
@@ -93,9 +94,13 @@ class CulturesService
 
     public function createPlot(array $data): Plot
     {
+        if (! empty($data['crop_id'])) {
+            $this->cropForFarm((int) $data['farm_id'], (int) $data['crop_id']);
+        }
+
         return Plot::create([
             'farm_id' => $data['farm_id'],
-            'crop_id' => $data['crop_id'],
+            'crop_id' => $data['crop_id'] ?? null,
             'name' => $data['name'],
             'area' => $data['area'],
             'soil_type' => $data['soil_type'],
@@ -105,11 +110,33 @@ class CulturesService
         ]);
     }
 
+    public function updatePlot(Plot $plot, array $data): Plot
+    {
+        $plot->fill($data);
+        $plot->save();
+
+        return $plot->fresh();
+    }
+
+    public function deletePlot(Plot $plot): array
+    {
+        if ($plot->operations()->exists() || $plot->harvests()->exists()) {
+            $plot->forceFill(['status' => 'archived'])->save();
+
+            return ['action' => 'archived', 'plot' => $plot->fresh()];
+        }
+
+        $snapshot = $plot->toArray();
+        $plot->delete();
+
+        return ['action' => 'deleted', 'plot' => $snapshot];
+    }
+
     public function recordOperation(array $data): CropOperation
     {
         return DB::transaction(function () use ($data) {
-            $crop = Crop::query()->findOrFail($data['crop_id']);
-            $plot = Plot::query()->findOrFail($data['plot_id']);
+            $crop = $this->cropForFarm((int) $data['farm_id'], (int) $data['crop_id']);
+            $plot = $this->plotForCrop($crop, (int) $data['plot_id']);
             $totalCost = (float) ($data['total_cost'] ?? (($data['quantity'] ?? 0) * ($data['unit_cost'] ?? 0)));
 
             $operation = CropOperation::create([
@@ -168,8 +195,8 @@ class CulturesService
     public function recordHarvest(array $data): CropHarvest
     {
         return DB::transaction(function () use ($data) {
-            $crop = Crop::query()->findOrFail($data['crop_id']);
-            $plot = Plot::query()->findOrFail($data['plot_id']);
+            $crop = $this->cropForFarm((int) $data['farm_id'], (int) $data['crop_id']);
+            $plot = $this->plotForCrop($crop, (int) $data['plot_id']);
             $settings = FarmSetting::query()->where('farm_id', $data['farm_id'])->first();
             $losses = (float) ($data['losses_kg'] ?? 0);
             $sellable = max(0, (float) $data['harvested_kg'] - $losses);
@@ -231,13 +258,25 @@ class CulturesService
     public function recordSale(array $data): CropSale
     {
         return DB::transaction(function () use ($data) {
-            $crop = Crop::query()->findOrFail($data['crop_id']);
+            $crop = $this->cropForFarm((int) $data['farm_id'], (int) $data['crop_id']);
+
+            if (! empty($data['crop_harvest_id'])) {
+                CropHarvest::query()
+                    ->where('farm_id', $data['farm_id'])
+                    ->where('crop_id', $crop->id)
+                    ->findOrFail($data['crop_harvest_id']);
+            }
             $stockItem = $this->getOrCreateCropStockItem($data['farm_id']);
             $unitPrice = $data['unit_price'] ?? $this->defaultCropPrice($data['farm_id']);
             $kilograms = (float) $data['kilograms_sold'];
             $grossAmount = round($kilograms * (float) $unitPrice, 2);
-            $amountPaid = $data['amount_paid'] ?? $grossAmount;
-            $remainingDue = $data['remaining_due'] ?? max(0, $grossAmount - (float) $amountPaid);
+            $amountPaid = (float) ($data['amount_paid'] ?? $grossAmount);
+            if ($amountPaid < 0 || $amountPaid > $grossAmount) {
+                throw ValidationException::withMessages([
+                    'amount_paid' => 'Le montant payé doit être compris entre zéro et le montant brut de la vente.',
+                ]);
+            }
+            $remainingDue = round(max(0, $grossAmount - $amountPaid), 2);
 
             $movement = $this->stockService->recordMovement([
                 'farm_id' => $data['farm_id'],
@@ -344,5 +383,20 @@ class CulturesService
     private function defaultCropPrice(int $farmId): float
     {
         return (float) (FarmSetting::query()->where('farm_id', $farmId)->value('crop_kg_default_price') ?? 0);
+    }
+
+    private function cropForFarm(int $farmId, int $cropId): Crop
+    {
+        return Crop::query()
+            ->where('farm_id', $farmId)
+            ->findOrFail($cropId);
+    }
+
+    private function plotForCrop(Crop $crop, int $plotId): Plot
+    {
+        return Plot::query()
+            ->where('farm_id', $crop->farm_id)
+            ->where('crop_id', $crop->id)
+            ->findOrFail($plotId);
     }
 }

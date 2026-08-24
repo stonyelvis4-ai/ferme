@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Infrastructure;
 
+use App\Http\Requests\Concerns\UsesAuthenticatedFarmContext;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateBuildingRequest extends FormRequest
 {
+    use UsesAuthenticatedFarmContext;
+
     public function authorize(): bool
     {
         return true;

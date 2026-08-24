@@ -175,6 +175,18 @@ public function deleteItem(StockItem $item): ?FinancialTransaction
             ->where('farm_id', $farmId)
             ->findOrFail($data['stock_item_id']);
 
+        $operationId = trim((string) ($data['operation_id'] ?? ''));
+        if ($operationId !== '') {
+            $existingMovement = StockMovement::query()
+                ->where('farm_id', $farmId)
+                ->where('operation_id', $operationId)
+                ->first();
+
+            if ($existingMovement) {
+                return $existingMovement;
+            }
+        }
+
         $quantity = (float) $data['quantity'];
 
         if ($data['type'] === 'out' && (float) $item->current_quantity < $quantity) {
@@ -216,6 +228,24 @@ public function deleteItem(StockItem $item): ?FinancialTransaction
 
         if ($nextQuantity <= (float) $item->minimum_threshold) {
             $this->alertService->createLowStockAlert($item->fresh());
+        }
+
+        if ($movement->type === 'out' && strtolower((string) $movement->source_module) === 'pisciculture') {
+            $totalCost = round($quantity * (float) ($item->unit_cost ?? $movement->unit_cost ?? 0), 2);
+            if ($totalCost > 0) {
+                $this->financeService->createTransaction([
+                    'farm_id' => $farmId,
+                    'type' => 'expense',
+                    'amount' => $totalCost,
+                    'category' => 'Alimentation piscicole',
+                    'description' => sprintf('Aliment distribué au bassin %s', $movement->source_entity_id ?? 'inconnu'),
+                    'source_module' => 'pisciculture',
+                    'source_entity_type' => $movement->source_entity_type ?? 'fish_pond',
+                    'source_entity_id' => $movement->source_entity_id,
+                    'operation_id' => $movement->operation_id,
+                    'occurred_at' => now(),
+                ]);
+            }
         }
 
         return $movement;

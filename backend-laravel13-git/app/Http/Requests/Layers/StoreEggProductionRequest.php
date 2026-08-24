@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Layers;
 
+use App\Http\Requests\Concerns\UsesAuthenticatedFarmContext;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreEggProductionRequest extends FormRequest
 {
+    use UsesAuthenticatedFarmContext;
+
     public function authorize(): bool
     {
         return true;
@@ -26,4 +29,3 @@ class StoreEggProductionRequest extends FormRequest
         ];
     }
 }
-

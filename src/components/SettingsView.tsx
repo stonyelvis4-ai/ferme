@@ -14,7 +14,9 @@ import {
   KeyRound,
   Siren,
   UserPlus,
-  Users
+  Users,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { FarmSettings, UserRole } from '../types';
 import { AuthUser } from '../services/fermApi';
@@ -52,7 +54,7 @@ export default function SettingsView({
   onCreateOwner
 }: SettingsViewProps) {
   const currencyOptions = [
-    { value: 'FCFA', label: 'Franc CFA (FCFA)', hint: 'Adapte a la comptabilite locale ouest-africaine.' },
+    { value: 'FCFA', label: 'Franc CFA (FCFA)', hint: 'Adapté à la comptabilité locale ouest-africaine.' },
     { value: 'EUR', label: 'Euro (EUR)', hint: 'Utile si vos achats ou ventes sont en zone euro.' },
     { value: 'USD', label: 'Dollar US (USD)', hint: 'Pratique pour les fournisseurs ou partenaires internationaux.' }
   ];
@@ -74,6 +76,8 @@ export default function SettingsView({
   const [ownerName, setOwnerName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerPassword, setOwnerPassword] = useState('');
+  const [showOwnerPassword, setShowOwnerPassword] = useState(false);
+  const [showAdminPasswords, setShowAdminPasswords] = useState(false);
 
   const [files, setFiles] = useState<{ name: string; size: string; date: string }[]>([]);
 
@@ -438,7 +442,7 @@ export default function SettingsView({
                 <div className="space-y-2">
                   {owners.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                      Aucun proprietaire n'est encore rattache a cette ferme.
+                      Aucun proprietaire n est encore rattache a cette ferme.
                     </div>
                   ) : (
                     owners.map((owner) => (
@@ -464,7 +468,7 @@ export default function SettingsView({
                       required
                       value={ownerName}
                       onChange={(e) => setOwnerName(e.target.value)}
-                      placeholder="Ex. Jean Proprietaire"
+                      placeholder="Ex. Jean Propriétaire"
                       className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     />
                     <p className="mt-1 text-[10px] text-slate-500">Nom affiche dans la liste des comptes rattaches.</p>
@@ -483,16 +487,26 @@ export default function SettingsView({
                   </div>
                   <div>
                     <label className="block font-semibold text-slate-600 mb-1">Mot de passe initial</label>
-                    <input
-                      type="password"
-                      required
-                      minLength={8}
-                      value={ownerPassword}
-                      onChange={(e) => setOwnerPassword(e.target.value)}
-                      placeholder="Minimum 8 caracteres"
-                      className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-                    />
-                    <p className="mt-1 text-[10px] text-slate-500">Choisissez un mot de passe temporaire a communiquer en prive.</p>
+                    <div className="relative">
+                      <input
+                        type={showOwnerPassword ? 'text' : 'password'}
+                        required
+                        minLength={12}
+                        value={ownerPassword}
+                        onChange={(e) => setOwnerPassword(e.target.value)}
+                        placeholder="12 caracteres minimum"
+                        className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 pr-12 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowOwnerPassword((previous) => !previous)}
+                        aria-label={showOwnerPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                        className="absolute inset-y-0 right-3 inline-flex items-center justify-center text-slate-400 transition hover:text-emerald-600"
+                      >
+                        {showOwnerPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <p className="mt-1 text-[10px] text-slate-500">12 caracteres minimum avec majuscule, minuscule, chiffre et symbole.</p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                     <button
@@ -516,35 +530,67 @@ export default function SettingsView({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Mot de passe actuel</label>
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-                    placeholder="********"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showAdminPasswords ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 pr-12 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                      placeholder="********"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPasswords((previous) => !previous)}
+                      aria-label={showAdminPasswords ? 'Masquer les mots de passe' : 'Afficher les mots de passe'}
+                      className="absolute inset-y-0 right-3 inline-flex items-center justify-center text-slate-400 transition hover:text-emerald-600"
+                    >
+                      {showAdminPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   <p className="mt-1 text-[10px] text-slate-500">Mot de passe utilisé actuellement.</p>
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Nouveau mot de passe</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-                    placeholder="********"
-                  />
-                  <p className="mt-1 text-[10px] text-slate-500">Minimum 8 caractères.</p>
+                  <div className="relative">
+                    <input
+                      type={showAdminPasswords ? 'text' : 'password'}
+                      minLength={12}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 pr-12 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                      placeholder="********"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPasswords((previous) => !previous)}
+                      aria-label={showAdminPasswords ? 'Masquer les mots de passe' : 'Afficher les mots de passe'}
+                      className="absolute inset-y-0 right-3 inline-flex items-center justify-center text-slate-400 transition hover:text-emerald-600"
+                    >
+                      {showAdminPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-500">12 caracteres minimum avec majuscule, minuscule, chiffre et symbole.</p>
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-600 mb-1">Confirmation</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-                    placeholder="********"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showAdminPasswords ? 'text' : 'password'}
+                      minLength={12}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 pr-12 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                      placeholder="********"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPasswords((previous) => !previous)}
+                      aria-label={showAdminPasswords ? 'Masquer les mots de passe' : 'Afficher les mots de passe'}
+                      className="absolute inset-y-0 right-3 inline-flex items-center justify-center text-slate-400 transition hover:text-emerald-600"
+                    >
+                      {showAdminPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   <p className="mt-1 text-[10px] text-slate-500">Doit être identique au nouveau mot de passe.</p>
                 </div>
               </div>
@@ -609,7 +655,7 @@ export default function SettingsView({
                 </form>
               ) : (
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-center text-slate-400 text-xs italic">
-                  Aucun droit d'importation de fichiers pour le propriétaire.
+                  Aucun droit d importation de fichiers pour le proprietaire.
                 </div>
               )}
             </div>

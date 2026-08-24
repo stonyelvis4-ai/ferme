@@ -69,6 +69,7 @@ import {
   clearStoredAuthToken,
   getStoredAuthToken,
   getStoredAuthUser,
+  googleAuth,
   loadWorkspaceSnapshot,
   login,
   logout,
@@ -625,7 +626,7 @@ export default function App() {
   const [passwordConfirm, setPasswordConfirm] = useState<string>('');
 
   // Connectivity state
-  const [isOffline, setIsOffline] = useState<boolean>(false);
+  const [isOffline, setIsOffline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? !navigator.onLine : false));
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Global Search bar
@@ -848,7 +849,7 @@ export default function App() {
         normalizedMessage.includes('unauthorized') ||
         normalizedMessage.includes('forbidden')
       ) {
-        resetToLogin(error instanceof Error ? error.message : 'Session expirÃ©e.');
+        resetToLogin(error instanceof Error ? error.message : 'Session expiree.');
         return;
       }
 
@@ -913,8 +914,26 @@ export default function App() {
     if (!authReady || !authToken) return;
 
     let cancelled = false;
+    const handleBrowserOnline = () => {
+      setIsSyncing(true);
+      void flushPendingSync()
+        .catch((error) => {
+          console.error('Reconnect sync failed:', error);
+          if (!cancelled) {
+            setAuditLogs((prev) =>
+              prev.map((log) => (log.syncStatus === 'pending' ? { ...log, syncStatus: 'error' } : log))
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setIsSyncing(false);
+        });
+    };
+    const handleBrowserOffline = () => {
+      if (!cancelled) setIsOffline(true);
+    };
     const refreshWorkspace = () => {
-      if (cancelled || document.visibilityState === 'hidden') return;
+      if (cancelled || document.visibilityState === 'hidden' || !navigator.onLine) return;
 
       setIsSyncing(true);
       void hydrateWorkspace(authToken, { silent: true }).finally(() => {
@@ -927,14 +946,16 @@ export default function App() {
 
     const intervalId = window.setInterval(refreshWorkspace, 30000);
     window.addEventListener('focus', refreshWorkspace);
-    window.addEventListener('online', refreshWorkspace);
+    window.addEventListener('online', handleBrowserOnline);
+    window.addEventListener('offline', handleBrowserOffline);
     document.addEventListener('visibilitychange', refreshWhenVisible);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
       window.removeEventListener('focus', refreshWorkspace);
-      window.removeEventListener('online', refreshWorkspace);
+      window.removeEventListener('online', handleBrowserOnline);
+      window.removeEventListener('offline', handleBrowserOffline);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1013,7 +1034,6 @@ export default function App() {
     setAuthTokenState(token);
     setAuthUser(user);
     setRole(user.role);
-    setAllowRegisterAdmin(false);
     setAuthError('');
     void hydrateWorkspace(token);
   };
@@ -1042,7 +1062,7 @@ export default function App() {
     event.preventDefault();
     if (registerPassword !== registerConfirmPassword) {
       setAuthError('Les mots de passe ne correspondent pas.');
-      
+      return;
     }
 
     setAuthBusy(true);
@@ -1067,6 +1087,34 @@ export default function App() {
     }
   };
 
+  const handleGoogleCredential = async (credential: string) => {
+    setAuthBusy(true);
+    setAuthError('');
+
+    try {
+      const response = await googleAuth({
+        credential,
+        intent: authMode === 'register' ? 'register' : 'login',
+      });
+      const user = (response.user ?? response.data?.user) as AuthUser | undefined;
+      const token = (response.token ?? response.data?.token) as string | undefined;
+      if (!user) {
+        throw new Error("Réponse d'authentification Google invalide.");
+      }
+      handleAuthSuccess(token ?? 'cookie-session', user);
+    } catch (error) {
+      setAuthError(
+        error instanceof Error
+          ? error.message
+          : authMode === 'register'
+            ? 'Inscription Google impossible.'
+            : 'Connexion Google impossible.'
+      );
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       if (authToken) {
@@ -1079,6 +1127,7 @@ export default function App() {
       setAuthTokenState('');
       setAuthUser(null);
       setRole('admin');
+      setAllowRegisterAdmin(true);
       setAuthReady(true);
     }
   };
@@ -1249,69 +1298,24 @@ export default function App() {
   };
 
   // Connectivity Sync Handler
-  const handleToggleOffline = async () => {
-    if (isOffline) {
-      setIsSyncing(true);
-      try {
-        if (authToken) {
-          const localCache = readWorkspaceCache(authUser?.id);
-          if (activeFarmId) {
-            const syncResult = await syncLocalCacheToServer(authToken, activeFarmId, localCache);
-            if (syncResult.pendingCache) {
-              writeWorkspaceCache(authUser?.id, syncResult.pendingCache);
-            } else if (syncResult.syncedCount > 0) {
-              clearWorkspaceCache(authUser?.id);
-            }
-          }
-          await hydrateWorkspace(authToken, { silent: true });
-        }
+  const flushPendingSync = async () => {
+    if (!authToken) return;
 
-        setIsOffline(false);
-        setAuditLogs((prev) =>
-          prev.map((log) => (log.syncStatus === 'pending' ? { ...log, syncStatus: 'synced' } : log))
-        );
-        pushNotice('success', 'Synchronisation relancée', 'Les données locales ont été resynchronisées en arrière-plan.');
-      } catch (error) {
-        console.error('Reconnect sync failed:', error);
-        setAuditLogs((prev) =>
-          prev.map((log) => (log.syncStatus === 'pending' ? { ...log, syncStatus: 'error' } : log))
-        );
-        pushNotice('error', 'Synchronisation incomplète', 'Certaines opérations locales n’ont pas encore pu être renvoyées au serveur.');
-      } finally {
-        setIsSyncing(false);
+    const localCache = readWorkspaceCache(authUser?.id);
+    if (activeFarmId) {
+      const syncResult = await syncLocalCacheToServer(authToken, activeFarmId, localCache);
+      if (syncResult.pendingCache) {
+        writeWorkspaceCache(authUser?.id, syncResult.pendingCache);
+      } else if (syncResult.syncedCount > 0) {
+        clearWorkspaceCache(authUser?.id);
       }
-      return;
-      /*
-        // Trigger a success notification
-        const newAlert: Alert = {
-          id: generateId('alt'),
-          title: "Synchronisation réussie",
-          description: "La PWA s'est reconnectée avec succès. Toutes les données locales ont été synchronisées avec le serveur central de Fermé+.",
-          severity: 'info',
-          date: new Date().toISOString(),
-          read: false,
-          sourceModule: "Synchronisation"
-        };
-        setAlerts((prev) => [newAlert, ...prev]);
-        
-        // Log sync event
-        const newLog: AuditLog = {
-          id: generateId('aud'),
-          user: 'Admin',
-          module: 'Système',
-          action: 'Synchronisation globale réussie des modifications locales',
-          newValue: 'Base de données reconnectée',
-          timestamp: new Date().toISOString(),
-          device: 'Safari Desktop',
-          syncStatus: 'synced'
-        };
-        setAuditLogs((prev) => [...prev, newLog]);
-      }, 2000);
-      */
-    } else {
-      setIsOffline(true);
-      pushNotice('info', 'Mode hors ligne', 'Les nouvelles opérations seront conservées localement jusqu’à la prochaine reconnexion.');
     }
+
+    await hydrateWorkspace(authToken, { silent: true });
+    setIsOffline(false);
+    setAuditLogs((prev) =>
+      prev.map((log) => (log.syncStatus === 'pending' ? { ...log, syncStatus: 'synced' } : log))
+    );
   };
 
   // Moteur d'Interconnexion: Core Operations
@@ -1848,7 +1852,7 @@ export default function App() {
     const newTx: FinanceTransaction = {
       id: txId,
       type: 'income',
-      category: 'Vente Oeufs',
+      category: 'Vente Œufs',
       amount: revenue,
       date: getTodayDate(),
       description: `${customerName} (${count} œufs à ${unitPrice} ${settings.currency}/u)`,
@@ -1947,14 +1951,6 @@ export default function App() {
         console.warn('Fish feeding sync skipped: invalid backend ids', { bassinId, articleId });
       } else {
       try {
-        const nextQuantity = Math.max((articles.find((art) => art.id === articleId)?.quantity ?? 0) - quantity, 0);
-        await patchJson(
-          `/stocks/${backendArticleId}`,
-          {
-            current_quantity: nextQuantity,
-          },
-          authToken
-        );
         await postJson(
           '/stocks/movements',
           {
@@ -2451,21 +2447,6 @@ export default function App() {
             },
             authToken
           );
-          await postJson(
-            '/finances',
-            {
-              farm_id: Number(activeFarmId),
-              type: 'expense',
-              amount: tr.cost,
-              category: 'Sanitaire',
-              description: `Administration médicale : ${tr.name}`,
-              source_module: 'Sanitaire',
-              source_entity_type: 'sanitary_treatment',
-              source_entity_id: treatmentId,
-              occurred_at: new Date().toISOString(),
-            },
-            authToken
-          );
         } catch (error) {
           console.error('Sanitary finance sync failed:', error);
         }
@@ -2835,20 +2816,52 @@ const handleDeleteBassin = async (bassinId: string) => {
     addAuditLog('Pisciculture', `Suppression du bassin ${currentBassin.name}`, 'Suppression locale sans historique.');
   };
 
-  const handleAddParcelle = (data: Omit<CultureParcelle, 'id'>) => {
+  const handleAddParcelle = async (data: Omit<CultureParcelle, 'id'>) => {
     const parcelle: CultureParcelle = { ...data, id: generateId('parcelle') };
     setParcelles((prev) => [...prev, parcelle]);
+    if (authToken && activeFarmId) {
+      try {
+        const response = await postJson('/cultures/plots', {
+          farm_id: Number(activeFarmId),
+          crop_id: null,
+          name: data.name,
+          area: data.area,
+          soil_type: data.soilType,
+          status: data.status,
+        }, authToken);
+        const backendId = response.data && typeof response.data === 'object'
+          ? String((response.data as Record<string, unknown>).id ?? '')
+          : '';
+        if (backendId) {
+          setParcelles((prev) => prev.map((item) => item.id === parcelle.id ? { ...item, id: backendId } : item));
+        }
+      } catch (error) {
+        console.error('Plot create sync failed:', error);
+      }
+    }
     addAuditLog('Cultures', `Création de la parcelle ${parcelle.name}`, `${parcelle.area} ${settings.areaUnit}`);
   };
 
-  const handleUpdateParcelle = (parcelleId: string, updates: Partial<CultureParcelle>) => {
+  const handleUpdateParcelle = async (parcelleId: string, updates: Partial<CultureParcelle>) => {
     const currentParcelle = parcelles.find((item) => item.id === parcelleId);
     if (!currentParcelle) return;
     setParcelles((prev) => prev.map((item) => (item.id === parcelleId ? { ...item, ...updates } : item)));
+    if (authToken && /^\d+$/.test(String(parcelleId))) {
+      try {
+        await patchJson('/cultures/plots/' + parcelleId, {
+          ...(updates.name !== undefined ? { name: updates.name } : {}),
+          ...(updates.area !== undefined ? { area: updates.area } : {}),
+          ...(updates.soilType !== undefined ? { soil_type: updates.soilType } : {}),
+          ...(updates.status !== undefined ? { status: updates.status } : {}),
+        }, authToken);
+      } catch (error) {
+        console.error('Plot update sync failed:', error);
+      }
+    }
     addAuditLog('Cultures', `Modification de la parcelle ${currentParcelle.name}`, JSON.stringify({ ...currentParcelle, ...updates }), JSON.stringify(currentParcelle));
   };
 
-  const handleDeleteParcelle = (parcelleId: string) => {
+  const handleDeleteParcelle = async (parcelleId: string) => {
     const currentParcelle = parcelles.find((item) => item.id === parcelleId);
     if (!currentParcelle) return;
     const hasCampaign = campaigns.some((item) => item.parcelleId === parcelleId && item.status !== 'cancelled');
@@ -2858,6 +2871,13 @@ const handleDeleteBassin = async (bassinId: string) => {
       return;
     }
     setParcelles((prev) => prev.filter((item) => item.id !== parcelleId));
+    if (authToken && /^\d+$/.test(String(parcelleId))) {
+      try {
+        await deleteJson('/cultures/plots/' + parcelleId, authToken);
+      } catch (error) {
+        console.error('Plot delete sync failed:', error);
+      }
+    }
     addAuditLog('Cultures', `Suppression de la parcelle ${currentParcelle.name}`);
   };
 
@@ -3252,9 +3272,35 @@ const handleDeleteStockArticle = async (articleId: string) => {
     addAuditLog('Stocks', `Suppression de l'article ${currentArticle.name}`, `Sortie comptable automatique de ${currentArticle.quantity.toLocaleString('fr-FR')} ${currentArticle.unit}.`);
   };
 
-  const handleAddTreatment = (data: Omit<SanitaryTreatment, 'id' | 'status'>) => {
+  const handleAddTreatment = async (data: Omit<SanitaryTreatment, 'id' | 'status'>) => {
     const treatment: SanitaryTreatment = { ...data, id: generateId('tr'), status: 'planned' };
     setTreatments((prev) => [...prev, treatment]);
+
+    if (authToken && activeFarmId) {
+      try {
+        const response = await postJson('/sanitary', {
+          farm_id: Number(activeFarmId),
+          layer_batch_id: /^\d+$/.test(String(data.lotId)) ? Number(data.lotId) : null,
+          type: data.type,
+          name: data.name,
+          planned_date: data.date,
+          dosage: data.dosage,
+          product_id: /^\d+$/.test(String(data.productId)) ? Number(data.productId) : null,
+          quantity_used: data.quantityUsed,
+          status: 'planned',
+          cost: data.cost,
+        }, authToken);
+        const backendId = response.data && typeof response.data === 'object'
+          ? String((response.data as Record<string, unknown>).id ?? '')
+          : '';
+        if (backendId) {
+          setTreatments((prev) => prev.map((item) => item.id === treatment.id ? { ...item, id: backendId } : item));
+        }
+      } catch (error) {
+        console.error('Sanitary treatment create sync failed:', error);
+      }
+    }
+
     addAuditLog('Sanitaire', `Création du traitement ${treatment.name}`, treatment.date);
   };
 
@@ -3756,6 +3802,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
         setRegisterConfirmPassword={setRegisterConfirmPassword}
         onLogin={handleLogin}
         onRegister={handleRegisterAdmin}
+        onGoogleCredential={handleGoogleCredential}
       />
     );
   }
@@ -3800,16 +3847,6 @@ const handleDeleteStockArticle = async (articleId: string) => {
           })}
         </div>
       ) : null}
-
-      {/* Syncing overlay */}
-      {false && isSyncing && (
-        <div className="fixed inset-0 bg-slate-950/80 z-50 flex flex-col items-center justify-center text-white space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent"></div>
-          <span className="font-bold text-sm tracking-wide">Synchronisation des données en cours...</span>
-          <p className="text-xs text-slate-400">Rapprochement des modifications locales de la PWA au serveur cloud de Fermé+.</p>
-        </div>
-      )}
-
       {/* Sidebar Navigation */}
       <aside
         id="app-sidebar"
@@ -4008,28 +4045,27 @@ const handleDeleteStockArticle = async (articleId: string) => {
 
           {/* Right Header Panel */}
           <div className="flex items-center gap-4">
-            {/* Offline indicator badge */}
-            <button
-              onClick={handleToggleOffline}
-              className={`text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all border ${
+            {/* Background sync indicator */}
+            <div
+              className={`text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${
                 !isOffline
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100/50'
-                  : 'bg-rose-50 text-rose-700 border-rose-100 hover:bg-rose-100/50'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                  : 'bg-rose-50 text-rose-700 border-rose-100'
               }`}
-              title="Cliquez pour basculer en ligne / hors ligne"
+              aria-live="polite"
             >
               {!isOffline ? (
                 <>
-                  <Wifi className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-                  <span className="hidden sm:inline">En Ligne (Sync OK)</span>
+                  <Wifi className={`w-3.5 h-3.5 text-emerald-600 ${isSyncing ? 'animate-pulse' : ''}`} />
+                  <span className="hidden sm:inline">{isSyncing ? 'Synchronisation...' : 'Synchronisation active'}</span>
                 </>
               ) : (
                 <>
                   <WifiOff className="w-3.5 h-3.5 text-rose-600" />
-                  <span className="hidden sm:inline">Hors ligne</span>
+                  <span className="hidden sm:inline">Connexion perdue</span>
                 </>
               )}
-            </button>
+            </div>
 
             {/* Quick user role selector dropdown */}
             <div className="flex items-center gap-2 border border-slate-100 p-1.5 rounded-xl text-xs">
@@ -4060,7 +4096,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
                     ? 'border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
                     : 'border border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100'
                 }`}
-                title={alarmSilenced || alarmPlaybackBlocked ? 'Relancer l’alarme' : 'Couper l’alarme'}
+                title={alarmSilenced || alarmPlaybackBlocked ? 'Relancer l alarme' : 'Couper l alarme'}
               >
                 {alarmSilenced || alarmPlaybackBlocked ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
                 {alarmSilenced ? 'Relancer alarme' : alarmPlaybackBlocked ? 'Activer alarme' : 'Couper alarme'}
@@ -4085,7 +4121,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
               {showAlertDropdown && (
                 <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-100 rounded-2xl shadow-xl p-4 z-50 text-xs space-y-3">
                   <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-                    <span className="font-bold text-slate-800">Alertes Récentes ({unreadAlerts.length})</span>
+                    <span className="font-bold text-slate-800">Alertes récentes ({unreadAlerts.length})</span>
                     <button
                       onClick={() => {
                         setCurrentView('alertes');
@@ -4100,7 +4136,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
                   {hasRingingAlerts && (
                     <div className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-800">
                       {alarmPlaybackBlocked
-                        ? "Le navigateur a bloqué l'alarme automatique. Utilisez le bouton Activer alarme."
+                        ? "Le navigateur a bloqué l'alarme automatique. Utilisez le bouton Activer l'alarme."
                         : alarmSilenced
                           ? "L'alarme sonore est coupée pour le moment."
                           : "Une alarme sonore tourne en boucle tant qu'une alerte critique ou importante reste non lue."}
@@ -4134,7 +4170,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
                   <div className="rounded-2xl border border-slate-100 bg-white px-5 py-4 shadow-sm">
                     <div className="flex items-center gap-3 text-sm font-semibold text-slate-700">
                       <LoaderCircle className="h-5 w-5 animate-spin text-emerald-600" />
-                      Chargement du module...
+                      Chargement du module…
                     </div>
                   </div>
                 </div>
@@ -4200,6 +4236,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
                 role={role}
                 bassins={fishBassins}
                 articles={articles}
+                movements={movements}
                 currency={settings.currency}
                 onFeedFish={handleFeedFish}
                 onHarvestFish={handleHarvestFish}
@@ -4363,3 +4400,6 @@ const handleDeleteStockArticle = async (articleId: string) => {
     </div>
   );
 }
+
+
+

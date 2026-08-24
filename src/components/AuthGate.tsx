@@ -3,8 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
-import farmScene from '../../../prototype/assets/ferme-mixte.jpg';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (options: Record<string, unknown>) => void;
+          renderButton: (element: HTMLElement, options: Record<string, unknown>) => void;
+          prompt: () => void;
+        };
+      };
+    };
+  }
+}
 
 type AuthGateProps = {
   authMode: 'login' | 'register';
@@ -28,6 +41,7 @@ type AuthGateProps = {
   setRegisterConfirmPassword: (value: string) => void;
   onLogin: (event: React.FormEvent) => void;
   onRegister: (event: React.FormEvent) => void;
+  onGoogleCredential: (credential: string) => void | Promise<void>;
 };
 
 function LeafIcon() {
@@ -131,9 +145,23 @@ export default function AuthGate({
   setRegisterConfirmPassword,
   onLogin,
   onRegister,
+  onGoogleCredential,
 }: AuthGateProps) {
   const [cursorGlow, setCursorGlow] = useState({ x: 0, y: 0, active: false });
   const isLoginMode = authMode === 'login' || !allowRegister;
+  const googleClientId = useMemo(
+    () => ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_GOOGLE_CLIENT_ID ?? '').trim(),
+    []
+  );
+  const googleButtonId = 'ferm-google-signin-button';
+  const googleEnabled = googleClientId.length > 0;
+  const googleInitializedClientRef = useRef('');
+  const googlePromptedRef = useRef(false);
+  const googleCredentialHandlerRef = useRef(onGoogleCredential);
+
+  useEffect(() => {
+    googleCredentialHandlerRef.current = onGoogleCredential;
+  }, [onGoogleCredential]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -151,6 +179,76 @@ export default function AuthGate({
       window.removeEventListener('mouseout', handleMouseLeave);
     };
   }, []);
+
+  useEffect(() => {
+    if (!googleEnabled) return;
+
+    let cancelled = false;
+
+    const renderGoogleButton = () => {
+      if (cancelled) return;
+
+      const google = window.google?.accounts?.id;
+      const host = document.getElementById(googleButtonId);
+      if (!google || !host) return;
+
+      host.innerHTML = '';
+      if (googleInitializedClientRef.current !== googleClientId) {
+        google.initialize({
+          client_id: googleClientId,
+          callback: (response: { credential?: string }) => {
+            if (response.credential) {
+              void googleCredentialHandlerRef.current(response.credential);
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        googleInitializedClientRef.current = googleClientId;
+      }
+      google.renderButton(host, {
+        theme: 'outline',
+        size: 'large',
+        shape: 'pill',
+        width: host.clientWidth || 360,
+        text: isLoginMode ? 'signin_with' : 'continue_with',
+      });
+
+      if (isLoginMode && !googlePromptedRef.current) {
+        google.prompt();
+        googlePromptedRef.current = true;
+      }
+
+      if (!isLoginMode) {
+        googlePromptedRef.current = false;
+      }
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>('script[data-google-identity="true"]');
+    if (existingScript) {
+      if (window.google?.accounts?.id) {
+        renderGoogleButton();
+      } else {
+        existingScript.addEventListener('load', renderGoogleButton, { once: true });
+      }
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleIdentity = 'true';
+    script.addEventListener('load', renderGoogleButton, { once: true });
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [googleButtonId, googleClientId, googleEnabled, isLoginMode]);
 
   return (
     <div className="ferm-auth">
@@ -759,6 +857,37 @@ export default function AuthGate({
           background: #e2e8f0;
           color: #94a3b8;
         }
+        .auth-divider {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin: 0 0 1.1rem;
+          color: var(--text-muted);
+          font-size: 0.72rem;
+          text-transform: uppercase;
+          letter-spacing: 0.16em;
+          font-weight: 700;
+        }
+        .auth-divider::before,
+        .auth-divider::after {
+          content: "";
+          flex: 1;
+          height: 1px;
+          background: rgba(148, 163, 184, 0.35);
+        }
+        .auth-google-box {
+          border: 1.5px solid rgba(13, 148, 136, 0.12);
+          border-radius: var(--radius-sm);
+          padding: 0.95rem;
+          margin-bottom: 1.1rem;
+          background: linear-gradient(135deg, rgba(240, 253, 250, 0.92), rgba(255, 255, 255, 0.82));
+        }
+        .auth-google-help {
+          margin-top: 0.7rem;
+          font-size: 0.76rem;
+          line-height: 1.5;
+          color: var(--text-muted);
+        }
         .auth-spinner {
           width: 16px;
           height: 16px;
@@ -925,7 +1054,6 @@ export default function AuthGate({
         }
       `}</style>
 
-      <img className="auth-bg-farm" src={farmScene} alt="" aria-hidden="true" />
       <div className="auth-bg-overlay" aria-hidden="true" />
       <div className="auth-bg-grain" aria-hidden="true" />
       <div className="auth-orb auth-orb-1" aria-hidden="true" />
@@ -953,11 +1081,11 @@ export default function AuthGate({
             </p>
             <h1>Prenez la main sur votre plateforme agricole en quelques secondes.</h1>
             <p className="auth-hero-lead">
-              La création libre est réservée au premier administrateur. Les propriétaires
-              sont ensuite rattachés depuis l&apos;espace d&apos;administration.
+              Chaque administrateur peut créer son compte et FERM+ lui rattache automatiquement une ferme dédiée.
+              Les propriétaires sont ensuite ajoutés depuis l&apos;espace d&apos;administration.
             </p>
             <div className="auth-pills">
-              <span className="auth-pill">Admin unique</span>
+              <span className="auth-pill">Inscription admin ouverte</span>
               <span className="auth-pill">Propriétaires rattachés</span>
               <span className="auth-pill">Mobile prêt</span>
             </div>
@@ -968,8 +1096,8 @@ export default function AuthGate({
               <div className="auth-feature-icon" aria-hidden="true">
                 <KeyIcon />
               </div>
-              <h3>Création admin verrouillée</h3>
-              <p>1 seul compte maître</p>
+              <h3>Création admin immédiate</h3>
+              <p>1 compte admin = 1 ferme</p>
             </article>
 
             <article className="auth-feature-card">
@@ -1018,19 +1146,19 @@ export default function AuthGate({
 
             <p className="auth-label">{isLoginMode ? 'Connexion' : 'Inscription admin'}</p>
             <h2>
-              {isLoginMode ? 'Accéder à votre espace' : 'Créer le premier compte administrateur'} <span className="brand">FERM+</span>
+              {isLoginMode ? 'Accéder à votre espace' : 'Créer votre compte administrateur'} <span className="brand">FERM+</span>
             </h2>
             <p className="auth-desc">
               {isLoginMode
                 ? 'Connectez-vous avec un compte administrateur ou un compte propriétaire déjà créé.'
-                : 'Seul un administrateur peut être créé librement. Les comptes propriétaires seront ensuite rattachés à une ferme.'}
+                : 'Chaque inscription administrateur ouvre un espace ferme dédié. Les comptes propriétaires seront ensuite rattachés à cette ferme.'}
             </p>
 
             {!isLoginMode ? (
               <div className="auth-register-box">
                 <div className="auth-register-chip">
                   <UserIcon />
-                  Première configuration
+                  Configuration admin
                 </div>
 
                 <div className="auth-register-step">
@@ -1038,8 +1166,8 @@ export default function AuthGate({
                     <KeyIcon />
                   </div>
                   <div>
-                    <strong>Compte maître</strong>
-                    <span>Cet administrateur deviendra le compte principal de la plateforme.</span>
+                    <strong>Compte administrateur</strong>
+                    <span>Ce compte pilotera les modules, les stocks, la finance et les utilisateurs de sa ferme.</span>
                   </div>
                 </div>
 
@@ -1048,8 +1176,8 @@ export default function AuthGate({
                     <LeafIcon />
                   </div>
                   <div>
-                    <strong>Ferme initiale</strong>
-                    <span>FERM+ préparera automatiquement la première ferme rattachée à ce compte.</span>
+                    <strong>Ferme dédiée</strong>
+                    <span>FERM+ préparera automatiquement une ferme rattachée uniquement à ce compte.</span>
                   </div>
                 </div>
 
@@ -1059,7 +1187,7 @@ export default function AuthGate({
                   </div>
                   <div>
                     <strong>Accès sécurisé</strong>
-                    <span>L&apos;email et le mot de passe serviront ensuite sur ordinateur comme sur mobile.</span>
+                    <span>Vous pouvez soit definir un mot de passe FERM+, soit creer le compte directement avec Google.</span>
                   </div>
                 </div>
               </div>
@@ -1069,8 +1197,8 @@ export default function AuthGate({
               <InfoIcon />
               <span>
                 {isLoginMode
-                  ? 'L’inscription administrateur est déjà verrouillée pour cette plateforme.'
-                  : 'Le premier administrateur crée la ferme puis rattache les propriétaires depuis le back-office.'}
+                  ? 'Connectez-vous avec votre compte administrateur ou créez-en un nouveau si besoin.'
+                  : 'Chaque nouvel administrateur obtient automatiquement sa propre ferme puis peut rattacher ses propriétaires.'}
               </span>
             </div>
 
@@ -1115,7 +1243,7 @@ export default function AuthGate({
                   />
                 </div>
                 {!isLoginMode ? (
-                  <div className="auth-field-help">Cette adresse sera rattachée au compte administrateur principal.</div>
+                  <div className="auth-field-help">Cette adresse servira à la connexion de cet administrateur.</div>
                 ) : null}
               </div>
 
@@ -1144,7 +1272,7 @@ export default function AuthGate({
                   </button>
                 </div>
                 {!isLoginMode ? (
-                  <div className="auth-field-help">Choisissez un mot de passe solide d’au moins 8 caractères.</div>
+                  <div className="auth-field-help">Utilisez au moins 12 caractères avec majuscule, minuscule, chiffre et symbole.</div>
                 ) : null}
               </div>
 
@@ -1172,6 +1300,22 @@ export default function AuthGate({
               </button>
             </form>
 
+            {googleEnabled ? (
+              <>
+                <div className="auth-divider" aria-hidden="true">
+                  <span>ou</span>
+                </div>
+                <div className="auth-google-box">
+                  <div id={googleButtonId} />
+                  <p className="auth-google-help">
+                    {isLoginMode
+                      ? 'Connexion Google en un clic pour les comptes déjà autorisés dans FERM+.'
+                      : 'L inscription administrateur peut se faire directement avec Google, sans recopier de mot de passe local.'}
+                  </p>
+                </div>
+              </>
+            ) : null}
+
             <div className="auth-admin-box">
               <div className="auth-admin-title">
                 <InfoIcon />
@@ -1180,7 +1324,7 @@ export default function AuthGate({
               <p>
                 {isLoginMode
                   ? 'Utilisez vos identifiants pour accéder aux fermes, tâches, alertes et modules métier.'
-                  : 'Le premier administrateur crée la ferme puis rattache les propriétaires depuis le back-office.'}
+                  : 'Une ferme est créée automatiquement pour ce compte, puis vous pourrez y rattacher les propriétaires.'}
               </p>
             </div>
 

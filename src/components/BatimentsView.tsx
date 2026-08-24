@@ -99,7 +99,7 @@ export default function BatimentsView({
             Module Batiments, Entrepots & Zones Techniques
           </h2>
           <p className="text-xs text-slate-500">
-            Suivi des capacites d'accueil des poulaillers, etables, hangars d'intrants et bacs.
+            Suivi des capacites d'accueil, du stockage technique et des zones operationnelles de la ferme.
           </p>
         </div>
         {role === 'admin' ? (
@@ -172,8 +172,8 @@ export default function BatimentsView({
 
       {buildings.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-700">Aucune infrastructure enregistree pour cette ferme.</p>
-          <p className="mt-2 text-xs text-slate-500">Les batiments et enclos apparaitront ici des qu'ils seront crees.</p>
+          <p className="text-sm font-semibold text-slate-700">Aucune infrastructure enregistrée pour cette ferme.</p>
+          <p className="mt-2 text-xs text-slate-500">Ajoutez vos poulaillers, etables, magasins et zones techniques pour mieux piloter les affectations et la capacite.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -240,11 +240,10 @@ export default function BatimentsView({
                         setEditingBuildingId(building.id);
                         setEditBuildingName(building.name);
                       }}
-                      onDelete={() => {
-                        if (window.confirm(`Supprimer le batiment ${building.name} ?`)) {
-                          onDeleteBuilding(building.id);
-                        }
-                      }}
+                      onDelete={() => onDeleteBuilding(building.id)}
+                      confirmDeleteTitle="Supprimer ce batiment ?"
+                      confirmDeleteDescription={`Le batiment "${building.name}" sera retire uniquement s'il ne porte plus d'activite active.`}
+                      confirmDeleteActionLabel="Supprimer le batiment"
                     />
                   )}
                 </div>
@@ -256,3 +255,4 @@ export default function BatimentsView({
     </div>
   );
 }
+

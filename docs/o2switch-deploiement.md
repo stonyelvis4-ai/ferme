@@ -2,6 +2,8 @@
 
 Ce guide cible un hebergement mutualise O2switch avec HTTPS actif.
 
+Pour le durcissement production, voir aussi [docs/o2switch-securite-production.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-securite-production.md).
+
 ## Architecture recommandee
 
 Le plus simple et le plus fiable pour FERM+ :
@@ -28,6 +30,20 @@ npm run build
 ```
 
 Publier ensuite le contenu de `dist/` dans le dossier web du sous-domaine frontend.
+
+Pour preparer automatiquement un kit de livraison local sous Windows :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\prepare-o2switch-package.ps1 -FrontendDomain app.votre-domaine.tld -ApiDomain api.votre-domaine.tld
+```
+
+Le script genere :
+
+- `deploy-build/frontend/`
+- `deploy-build/backend-laravel13-git/`
+- `deploy-build/.env.frontend.production`
+- `deploy-build/.env.backend.production`
+- `deploy-build/README-DEPLOIEMENT.txt`
 
 ## Backend Laravel
 
@@ -67,6 +83,8 @@ API_TOKEN_COOKIE_SAME_SITE=lax
 LOG_LEVEL=warning
 ```
 
+Un exemple plus strict est aussi disponible dans [backend-laravel13-git/.env.o2switch.hardened.example](/C:/MES%20PROJETS/FERM+/backend-laravel13-git/.env.o2switch.hardened.example).
+
 ## Cas le plus recommande
 
 Conserver le frontend et l'API sur deux sous-domaines du meme domaine principal :
@@ -84,6 +102,7 @@ Depuis `backend-laravel13-git/` :
 composer install --no-dev --optimize-autoloader
 php artisan key:generate --force
 php artisan migrate --force
+php artisan optimize:clear
 php artisan optimize
 ```
 
@@ -95,6 +114,8 @@ Verifier au minimum :
 - `bootstrap/cache/` accessible en ecriture
 - `APP_KEY` bien defini
 - HTTPS actif avant les tests de connexion
+- `APP_DEBUG=false`
+- aucun ancien cache Laravel actif si vous venez d'upgrader l'application
 
 ## Verification apres mise en ligne
 

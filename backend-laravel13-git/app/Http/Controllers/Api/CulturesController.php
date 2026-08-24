@@ -8,6 +8,7 @@ use App\Http\Requests\Cultures\StoreCropOperationRequest;
 use App\Http\Requests\Cultures\StoreCropRequest;
 use App\Http\Requests\Cultures\StoreCropSaleRequest;
 use App\Http\Requests\Cultures\StorePlotRequest;
+use App\Http\Requests\Cultures\UpdatePlotRequest;
 use App\Http\Requests\Cultures\UpdateCropRequest;
 use App\Models\Crop;
 use App\Models\CropHarvest;
@@ -88,6 +89,18 @@ class CulturesController extends Controller
     {
         $plot = $this->culturesService->createPlot($request->validated());
         return response()->json(['data' => $plot], 201);
+    }
+
+    public function updatePlot(UpdatePlotRequest $request, Plot $plot): JsonResponse
+    {
+        return response()->json(['data' => $this->culturesService->updatePlot($plot, $request->validated())]);
+    }
+
+    public function destroyPlot(Plot $plot): JsonResponse
+    {
+        $result = $this->culturesService->deletePlot($plot);
+
+        return response()->json(['data' => $result]);
     }
 
     public function operation(StoreCropOperationRequest $request): JsonResponse

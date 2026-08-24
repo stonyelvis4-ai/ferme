@@ -171,12 +171,12 @@ export default function SanitaireView({
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Produit stock</span>
               <span className="mt-1 block text-sm font-semibold text-emerald-900">{selectedArticle?.name || 'Produit a choisir'}</span>
-              <p className="mt-1 text-[11px] text-emerald-800">Quantite prevue: {quantityUsed} {selectedArticle?.unit || 'unites'}</p>
+              <p className="mt-1 text-[11px] text-emerald-800">Quantite prevue : {quantityUsed} {selectedArticle?.unit || 'unites'}</p>
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Impact financier</span>
               <span className="mt-1 block text-sm font-semibold text-emerald-900">{formatCurrency(cost)}</span>
-              <p className="mt-1 text-[11px] text-emerald-800">Montant repris dans la comptabilite sanitaire.</p>
+              <p className="mt-1 text-[11px] text-emerald-800">Montant repris dans la comptabilité sanitaire.</p>
             </div>
           </div>
 
@@ -237,8 +237,8 @@ export default function SanitaireView({
 
       {treatments.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-700">Aucun traitement sanitaire synchronise pour le moment.</p>
-          <p className="mt-2 text-xs text-slate-500">Les campagnes de vaccination et traitements apparaitront ici.</p>
+          <p className="text-sm font-semibold text-slate-700">Aucun traitement sanitaire enregistre pour le moment.</p>
+          <p className="mt-2 text-xs text-slate-500">Les campagnes de vaccination et traitements apparaîtront ici.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -270,7 +270,7 @@ export default function SanitaireView({
                 <div className="space-y-2.5 text-xs text-slate-600 pt-2 border-t border-slate-100">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Lot rattache :</span>
-                    <span className="font-bold text-slate-800">{lot?.name || 'Inconnu'}</span>
+                    <span className="font-bold text-slate-800">{lot?.name || 'Non affecte'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Date :</span>
@@ -287,7 +287,7 @@ export default function SanitaireView({
                     <span className="text-slate-400">Produit :</span>
                     <span className="font-semibold text-slate-700 flex items-center gap-1">
                       <Package className="w-3.5 h-3.5 text-slate-400" />
-                      {article?.name || 'Inconnu'} ({treatment.quantityUsed} {article?.unit || 'unites'})
+                      {article?.name || 'Produit non disponible'} ({treatment.quantityUsed} {article?.unit || 'unites'})
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -315,11 +315,10 @@ export default function SanitaireView({
                         setEditingTreatmentId(treatment.id);
                         setEditTreatmentName(treatment.name);
                       }}
-                      onDelete={() => {
-                        if (window.confirm(`Supprimer le traitement ${treatment.name} ?`)) {
-                          onDeleteTreatment(treatment.id);
-                        }
-                      }}
+                      onDelete={() => onDeleteTreatment(treatment.id)}
+                      confirmDeleteTitle="Supprimer ce traitement sanitaire ?"
+                      confirmDeleteDescription={`Le traitement "${treatment.name}" sera retire uniquement s'il n'est pas deja rattache au journal sanitaire.`}
+                      confirmDeleteActionLabel="Supprimer le traitement"
                     />
                   </div>
                 )}

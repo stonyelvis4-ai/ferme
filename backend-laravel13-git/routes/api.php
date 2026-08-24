@@ -39,18 +39,18 @@ Route::prefix('v1')->group(function () {
         ]);
     });
 
-    Route::post('/auth/register-admin', [AuthController::class, 'registerAdmin']);
+    Route::post('/auth/register-admin', [AuthController::class, 'registerAdmin'])->middleware('throttle:auth-register');
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
+    Route::post('/auth/google', [AuthController::class, 'google'])->middleware('throttle:auth-login');
 
-    Route::middleware(['api.cookie.token', 'auth:sanctum'])->group(function () {
+    Route::middleware(['api.cookie.token', 'auth:sanctum', 'active.account'])->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
-        Route::post('/auth/password', [AuthController::class, 'changePassword']);
+        Route::post('/auth/password', [AuthController::class, 'changePassword'])->middleware('throttle:auth-password');
 
         Route::middleware(['tenant'])->group(function () {
             Route::get('/dashboard', [DashboardController::class, 'index']);
             Route::get('/audit', [AuditController::class, 'index']);
             Route::get('/alerts', [AlertController::class, 'index']);
-            Route::post('/alerts/evaluate', [AlertRulesController::class, 'evaluate']);
             Route::get('/calendar', [CalendarController::class, 'index']);
             Route::get('/stocks', [StockController::class, 'index']);
             Route::get('/finances', [FinanceController::class, 'index']);
@@ -87,10 +87,11 @@ Route::prefix('v1')->group(function () {
                 Route::patch('/users/{user}', [UserController::class, 'update']);
                 Route::post('/users/{user}/farms', [UserController::class, 'assignFarms']);
                 Route::patch('/users/{user}/status', [UserController::class, 'updateStatus']);
-                Route::post('/users/{user}/password', [UserController::class, 'resetPassword']);
+                Route::post('/users/{user}/password', [UserController::class, 'resetPassword'])->middleware('throttle:auth-password');
                 Route::delete('/users/{user}', [UserController::class, 'destroy']);
                 Route::post('/calendar', [CalendarController::class, 'store']);
                 Route::patch('/alerts/{alert}/resolve', [AlertController::class, 'resolve']);
+                Route::post('/alerts/evaluate', [AlertRulesController::class, 'evaluate']);
                 Route::post('/alerts/sync-overdue-tasks', [AlertController::class, 'syncOverdueTasks']);
                 Route::post('/stocks', [StockController::class, 'store']);
                 Route::post('/stocks/suppliers', [StockController::class, 'storeSupplier']);
@@ -101,6 +102,7 @@ Route::prefix('v1')->group(function () {
                 Route::patch('/finances/{financialTransaction}', [FinanceController::class, 'update']);
                 Route::delete('/finances/{financialTransaction}', [FinanceController::class, 'destroy']);
                 Route::patch('/sanitary/{sanitaryTreatment}', [SanitaryController::class, 'update']);
+                Route::post('/sanitary', [SanitaryController::class, 'store']);
                 Route::post('/pondeuses', [PondeusesController::class, 'store']);
                 Route::patch('/pondeuses/{pondeuse}', [PondeusesController::class, 'update']);
                 Route::delete('/pondeuses/{pondeuse}', [PondeusesController::class, 'destroy']);
@@ -113,6 +115,8 @@ Route::prefix('v1')->group(function () {
                 Route::patch('/cultures/{culture}', [CulturesController::class, 'update']);
                 Route::delete('/cultures/{culture}', [CulturesController::class, 'destroy']);
                 Route::post('/cultures/plots', [CulturesController::class, 'plot']);
+                Route::patch('/cultures/plots/{plot}', [CulturesController::class, 'updatePlot']);
+                Route::delete('/cultures/plots/{plot}', [CulturesController::class, 'destroyPlot']);
                 Route::post('/cultures/operations', [CulturesController::class, 'operation']);
                 Route::post('/cultures/harvests', [CulturesController::class, 'harvest']);
                 Route::post('/cultures/sales', [CulturesController::class, 'sale']);

@@ -12,6 +12,18 @@ class FinanceService
 
     public function createTransaction(array $data): FinancialTransaction
     {
+        $operationId = trim((string) ($data['operation_id'] ?? ''));
+        if ($operationId !== '') {
+            $existing = FinancialTransaction::query()
+                ->where('farm_id', $data['farm_id'] ?? null)
+                ->where('operation_id', $operationId)
+                ->first();
+
+            if ($existing) {
+                return $existing;
+            }
+        }
+
         $transaction = FinancialTransaction::create($data);
 
         $this->auditService->record([

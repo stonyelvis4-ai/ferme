@@ -37,7 +37,7 @@ export default function FinancesView({
 }: FinancesViewProps) {
   const transactionCategoryOptions = {
     expense: ['Alimentation', 'Sanitaire', 'Salarial', 'Infrastructure', 'Carburant', 'Transport', 'Maintenance', 'Autre'],
-    income: ['Vente Animaux', 'Vente Oeufs', 'Vente Poissons', 'Vente Recoltes', 'Prestation', 'Subvention', 'Autre']
+    income: ['Vente Animaux', 'Vente Œufs', 'Vente Poissons', 'Vente Récoltes', 'Prestation', 'Subvention', 'Autre']
   } as const;
   const normalizeModuleKey = (value: string) =>
     value
@@ -123,6 +123,9 @@ export default function FinancesView({
     { income: 0, expense: 0 }
   );
   const recentNetCashflow = recentCashflow.income - recentCashflow.expense;
+  const financePressure = Math.abs(recentNetCashflow) + Math.max(expenses - income, 0);
+  const financeTone = profit >= 0 && recentNetCashflow >= 0 ? 'emerald' : profit >= 0 ? 'amber' : 'rose';
+  const financeHeadline = profit >= 0 && recentNetCashflow >= 0 ? 'Trésorerie saine' : profit >= 0 ? 'Équilibre à consolider' : 'Pression financière';
 
   const moduleSummaries = Object.values(
     transactions.reduce<Record<string, {
@@ -202,8 +205,8 @@ export default function FinancesView({
     <div id="finances-view" className="space-y-6">
       <FormDialog
         open={editingTransactionId !== null}
-        title="Modifier l'ecriture"
-        subtitle="Mettez a jour la description et le montant sans ouvrir de fenetre systeme."
+        title="Modifier l'écriture"
+        subtitle="Mettez à jour la description et le montant sans ouvrir de fenêtre système."
         confirmLabel="Enregistrer"
         confirmDisabled={!editTransactionDescription.trim() || Number(editTransactionAmount) <= 0}
         onCancel={() => {
@@ -266,47 +269,110 @@ export default function FinancesView({
         )}
       </div>
 
-      {/* Margins scoreboard */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm">
+      <section className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_34%),linear-gradient(135deg,_#ffffff_0%,_#f8fafc_48%,_#ecfdf5_100%)] p-6 shadow-sm">
+        <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-emerald-200/20 blur-3xl" />
+        <div className="relative z-10 space-y-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                financeTone === 'emerald'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : financeTone === 'amber'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-rose-100 text-rose-800'
+              }`}>
+                {financeHeadline}
+              </span>
+              <div>
+                <h3 className="text-2xl font-black tracking-tight text-slate-950">Cockpit financier</h3>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+                  Lecture instantanee des encaissements, charges, marge et tension de tresorerie de la ferme.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
+              <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Résultat net</div>
+                <div className={`mt-2 text-xl font-black ${profit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(profit)}</div>
+                <div className="mt-1 text-[11px] text-slate-500">Revenus moins charges</div>
+              </div>
+              <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Flux 30 jours</div>
+                <div className={`mt-2 text-xl font-black ${recentNetCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(recentNetCashflow)}</div>
+                <div className="mt-1 text-[11px] text-slate-500">Dynamique recente</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Encaissements</span>
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="mt-2 text-2xl font-black text-slate-900">{formatCurrency(income)}</div>
+              <p className="mt-1 text-xs text-slate-500">Revenus cumules de la ferme.</p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Charges engagees</span>
+                <TrendingDown className="h-4 w-4 text-rose-600" />
+              </div>
+              <div className="mt-2 text-2xl font-black text-slate-900">{formatCurrency(expenses)}</div>
+              <p className="mt-1 text-xs text-slate-500">Sorties deja comptabilisees.</p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Pression</span>
+                <DollarSign className={`h-4 w-4 ${financeTone === 'emerald' ? 'text-emerald-600' : financeTone === 'amber' ? 'text-amber-600' : 'text-rose-600'}`} />
+              </div>
+              <div className="mt-2 text-2xl font-black text-slate-900">{formatCurrency(financePressure)}</div>
+              <p className="mt-1 text-xs text-slate-500">Lecture simple du niveau de tension financier.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-white border border-slate-100 p-5 rounded-[24px] shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <span className="text-xs text-slate-400 font-medium uppercase tracking-wider block">Revenus Cumulés</span>
           <div className="mt-2.5 flex items-baseline gap-2">
-            <h3 className="text-2xl font-bold text-slate-800 font-mono">{formatCurrency(income)}</h3>
+            <h3 className="text-3xl font-black text-slate-800 font-mono">{formatCurrency(income)}</h3>
             <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center">
               <TrendingUp className="w-2.5 h-2.5 mr-0.5" /> +100%
             </span>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm">
+        <div className="bg-white border border-slate-100 p-5 rounded-[24px] shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <span className="text-xs text-slate-400 font-medium uppercase tracking-wider block">Charges Directes</span>
           <div className="mt-2.5 flex items-baseline gap-2">
-            <h3 className="text-2xl font-bold text-slate-800 font-mono">{formatCurrency(expenses)}</h3>
+            <h3 className="text-3xl font-black text-slate-800 font-mono">{formatCurrency(expenses)}</h3>
             <span className="bg-rose-50 text-rose-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center">
               <TrendingDown className="w-2.5 h-2.5 mr-0.5" /> Engagé
             </span>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm">
+        <div className="bg-white border border-slate-100 p-5 rounded-[24px] shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <span className="text-xs text-slate-400 font-medium uppercase tracking-wider block">Résultat Financier</span>
           <div className="mt-2.5">
-            <h3 className={`text-2xl font-bold font-mono ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            <h3 className={`text-3xl font-black font-mono ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
               {formatCurrency(profit)}
             </h3>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm">
+        <div className="bg-white border border-slate-100 p-5 rounded-[24px] shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <span className="text-xs text-slate-400 font-medium uppercase tracking-wider block">Taux de Marge</span>
           <div className="mt-2.5">
-            <h3 className="text-2xl font-bold text-slate-800 font-mono">{marginPct}%</h3>
+            <h3 className="text-3xl font-black text-slate-800 font-mono">{marginPct}%</h3>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.45fr,0.95fr]">
-        <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <section className="rounded-[26px] border border-slate-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-slate-900">Analyse par activité</h3>
@@ -323,7 +389,7 @@ export default function FinancesView({
           <div className="space-y-3">
             {moduleSummaries.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center text-xs text-slate-400">
-                Aucune écriture disponible pour l'analyse par activité.
+                Aucune ecriture disponible pour l analyse par activite.
               </div>
             ) : (
               moduleSummaries.map((module) => {
@@ -333,7 +399,7 @@ export default function FinancesView({
                   : 0;
 
                 return (
-                  <div key={module.key} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                  <div key={module.key} className="rounded-[22px] border border-slate-100 bg-slate-50/60 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
@@ -350,15 +416,15 @@ export default function FinancesView({
                     </div>
 
                     <div className="mt-4 grid grid-cols-3 gap-3">
-                      <div className="rounded-xl border border-slate-100 bg-white p-3">
+                      <div className="rounded-2xl border border-slate-100 bg-white p-3">
                         <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Revenus</div>
                         <div className="mt-1 text-sm font-bold text-emerald-700">{formatCurrency(module.income)}</div>
                       </div>
-                      <div className="rounded-xl border border-slate-100 bg-white p-3">
+                      <div className="rounded-2xl border border-slate-100 bg-white p-3">
                         <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Charges</div>
                         <div className="mt-1 text-sm font-bold text-slate-900">{formatCurrency(module.expense)}</div>
                       </div>
-                      <div className="rounded-xl border border-slate-100 bg-white p-3">
+                      <div className="rounded-2xl border border-slate-100 bg-white p-3">
                         <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Solde</div>
                         <div className={`mt-1 text-sm font-bold ${balancePositive ? 'text-emerald-700' : 'text-rose-700'}`}>
                           {formatCurrency(module.balance)}
@@ -378,7 +444,7 @@ export default function FinancesView({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <section className="rounded-[26px] border border-slate-100 bg-white p-5 shadow-sm">
           <div className="mb-4">
             <h3 className="text-sm font-bold text-slate-900">Postes de charges dominants</h3>
             <p className="text-xs text-slate-500">Les catégories qui pèsent le plus sur la trésorerie globale.</p>
@@ -409,7 +475,7 @@ export default function FinancesView({
             )}
           </div>
 
-          <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <div className="mt-5 rounded-[22px] border border-slate-100 bg-slate-50 p-4">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Lecture rapide</div>
             <div className="mt-2 space-y-1 text-xs text-slate-600">
               <p>Revenus 30 jours: <span className="font-semibold text-slate-900">{formatCurrency(recentCashflow.income)}</span></p>
@@ -424,7 +490,7 @@ export default function FinancesView({
       {showAddForm && role === 'admin' && (
         <form
           onSubmit={handleSubmit}
-          className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm space-y-4 animate-fade-in"
+          className="bg-white border border-emerald-100 p-5 rounded-[26px] shadow-sm space-y-4 animate-fade-in"
         >
           <h3 className="font-bold text-slate-800 text-sm border-b border-slate-50 pb-2">
             Enregistrer une dépense ou un revenu divers
@@ -481,7 +547,7 @@ export default function FinancesView({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[10px] text-slate-500">{type === 'income' ? "Choisissez l'origine du revenu pour les rapports de marge." : "Choisissez la nature de la depense pour bien suivre les couts."}</p>
+              <p className="mt-1 text-[10px] text-slate-500">{type === 'income' ? "Choisissez l'origine du revenu pour les rapports de marge." : "Choisissez la nature de la dépense pour bien suivre les coûts."}</p>
             </div>
 
             <div>
@@ -513,12 +579,12 @@ export default function FinancesView({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Désignation / Motif *</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Désignation / motif *</label>
               <input
                 id="tx-desc-input"
                 type="text"
                 required
-                placeholder={type === 'income' ? "Ex: Vente tilapia bassin 2" : "Ex: Achat carburant groupe"}
+                placeholder={type === 'income' ? "Ex. Vente tilapia bassin 2" : "Ex. Achat carburant groupe"}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
@@ -551,7 +617,7 @@ export default function FinancesView({
       )}
 
       {/* Transactions Ledger Ledger Book */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[26px] border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-5 border-b border-slate-50 flex justify-between items-center">
           <h3 className="font-bold text-slate-900 font-sans tracking-tight text-sm">
             Grand Livre des Mouvements Comptables
@@ -562,7 +628,7 @@ export default function FinancesView({
         <div className="overflow-x-auto">
           {transactions.length === 0 ? (
             <div className="p-10 text-center">
-              <p className="text-sm font-semibold text-slate-700">Aucun mouvement financier enregistré.</p>
+              <p className="text-sm font-semibold text-slate-700">Aucun mouvement financier enregistre pour le moment.</p>
               <p className="mt-2 text-xs text-slate-500">
                 Les ventes, dépenses et ajustements comptables de la ferme apparaîtront ici automatiquement.
               </p>
@@ -620,11 +686,10 @@ export default function FinancesView({
                         <AdminEntityActions
                           compact
                           onEdit={() => handleEditTransaction(tx)}
-                          onDelete={() => {
-                            if (window.confirm(`Supprimer l'écriture "${tx.description}" ?`)) {
-                              onDeleteTransaction(tx.id);
-                            }
-                          }}
+                          onDelete={() => onDeleteTransaction(tx.id)}
+                          confirmDeleteTitle="Supprimer cette ecriture financiere ?"
+                          confirmDeleteDescription={`L'ecriture "${tx.description}" sera retiree si elle n'est pas verrouillee par un module metier source.`}
+                          confirmDeleteActionLabel="Supprimer l'ecriture"
                         />
                       </td>
                     )}

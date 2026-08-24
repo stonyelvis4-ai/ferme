@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,9 +11,10 @@ import {
   Thermometer,
   Activity,
   Lock,
-  Zap
+  Zap,
+  History
 } from 'lucide-react';
-import { FishBassin, StockArticle, UserRole } from '../types';
+import { FishBassin, StockArticle, StockMovement, UserRole } from '../types';
 import AdminEntityActions from './AdminEntityActions';
 import FormDialog from './FormDialog';
 
@@ -21,6 +22,7 @@ interface PiscicultureViewProps {
   role: UserRole;
   bassins: FishBassin[];
   articles: StockArticle[];
+  movements: StockMovement[];
   currency: string;
   onFeedFish: (bassinId: string, articleId: string, quantity: number) => void;
   onHarvestFish: (bassinId: string, harvestWeightKg: number, revenueAmount: number) => void;
@@ -33,6 +35,7 @@ export default function PiscicultureView({
   role,
   bassins,
   articles,
+  movements,
   currency,
   onFeedFish,
   onHarvestFish,
@@ -70,6 +73,19 @@ export default function PiscicultureView({
     return article.isActive !== false && (haystack.includes('aliment') || haystack.includes('feed') || haystack.includes('provende'));
   });
   const availableFoodArticles = foodArticles.length > 0 ? foodArticles : fallbackFoodArticles;
+  const feedingHistory = movements
+    .filter((movement) => movement.type === 'out' && movement.sourceModule?.toLowerCase() === 'pisciculture')
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 8);
+  const feedingHistoryTotal = feedingHistory.reduce((total, movement) => {
+    const article = articles.find((item) => item.id === movement.articleId);
+    return total + movement.quantity * (movement.unitCost ?? article?.unitCost ?? 0);
+  }, 0);
+
+  const formatMovementDate = (date: string) => {
+    const parsedDate = new Date(date);
+    return Number.isNaN(parsedDate.getTime()) ? date : parsedDate.toLocaleDateString('fr-FR');
+  };
 
   useEffect(() => {
     if (availableFoodArticles.length === 0) {
@@ -202,6 +218,57 @@ export default function PiscicultureView({
         )}
       </div>
 
+      <section className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm" aria-labelledby="feeding-history-title">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <span className="rounded-xl bg-sky-50 p-2 text-sky-600">
+              <History className="h-4 w-4" />
+            </span>
+            <div>
+              <h3 id="feeding-history-title" className="text-sm font-bold text-slate-900">Historique alimentation</h3>
+              <p className="text-[11px] text-slate-500">Chaque distribution est déduite du stock et reportée en comptabilité.</p>
+            </div>
+          </div>
+          <span className="text-xs font-semibold text-sky-700">Dernières distributions : {feedingHistoryTotal.toLocaleString('fr-FR')} {currency}</span>
+        </div>
+
+        {feedingHistory.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">
+            Aucune distribution enregistrée. Utilisez « Nourrir » sur un bassin actif pour commencer le suivi.
+          </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-xs">
+              <thead className="border-b border-slate-100 text-[10px] uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-2 py-2 font-semibold">Date</th>
+                  <th className="px-2 py-2 font-semibold">Bassin</th>
+                  <th className="px-2 py-2 font-semibold">Aliment</th>
+                  <th className="px-2 py-2 text-right font-semibold">Quantité</th>
+                  <th className="px-2 py-2 text-right font-semibold">Coût</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {feedingHistory.map((movement) => {
+                  const article = articles.find((item) => item.id === movement.articleId);
+                  const bassin = bassins.find((item) => item.id === movement.sourceElementId);
+                  const unitCost = movement.unitCost ?? article?.unitCost ?? 0;
+                  return (
+                    <tr key={movement.id} className="text-slate-600">
+                      <td className="px-2 py-2.5 whitespace-nowrap">{formatMovementDate(movement.date)}</td>
+                      <td className="px-2 py-2.5 font-medium text-slate-800">{bassin?.name ?? `Bassin ${movement.sourceElementId ?? 'inconnu'}`}</td>
+                      <td className="px-2 py-2.5">{article?.name ?? `Article ${movement.articleId}`}</td>
+                      <td className="px-2 py-2.5 text-right font-semibold">{movement.quantity} {article?.unit ?? 'kg'}</td>
+                      <td className="px-2 py-2.5 text-right font-semibold text-slate-800">{(movement.quantity * unitCost).toLocaleString('fr-FR')} {currency}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       {showCreateForm && role === 'admin' && (
         <form onSubmit={handleCreateBassin} className="bg-white border border-sky-100 p-5 rounded-2xl shadow-sm space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
@@ -258,9 +325,9 @@ export default function PiscicultureView({
       {/* Grid showing active ponds */}
       {bassins.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-700">Aucun bassin piscicole enregistré pour cette ferme.</p>
+          <p className="text-sm font-semibold text-slate-700">Aucun bassin piscicole enregistre pour cette ferme.</p>
           <p className="mt-2 text-xs text-slate-500">
-            Les bassins apparaîtront ici avec leur biomasse, leur qualité d’eau et leurs opérations d’alimentation ou de récolte.
+            Ajoutez vos bassins pour suivre l empoissonnement, l alimentation, les pertes et les recoltes dans un meme flux.
           </p>
         </div>
       ) : (
@@ -393,7 +460,7 @@ export default function PiscicultureView({
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 bg-sky-50 border border-sky-100 p-2 rounded text-[10px] text-sky-800 leading-normal sm:flex-row sm:justify-between sm:items-center">
-                        <span>💡 Le stock d'aliment va diminuer de {feedQuantity} kg automatiquement.</span>
+                        <span>?? Le stock d'aliment va diminuer de {feedQuantity} kg automatiquement.</span>
                           <div className="flex flex-col gap-2 sm:flex-row sm:gap-1">
                           <button
                             type="button"
@@ -492,11 +559,10 @@ export default function PiscicultureView({
                       <AdminEntityActions
                         compact
                         onEdit={() => handleEditBassin(bassin)}
-                        onDelete={() => {
-                          if (window.confirm(`Supprimer le bassin ${bassin.name} ?`)) {
-                            onDeleteBassin(bassin.id);
-                          }
-                        }}
+                        onDelete={() => onDeleteBassin(bassin.id)}
+                        confirmDeleteTitle="Cloturer ce bassin ?"
+                        confirmDeleteDescription={`Le bassin "${bassin.name}" sortira des listes actives, tout en conservant sa tracabilite metier et financiere.`}
+                        confirmDeleteActionLabel="Cloturer le bassin"
                       />
                     </div>
                   )}
@@ -510,4 +576,5 @@ export default function PiscicultureView({
     </div>
   );
 }
+
 

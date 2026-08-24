@@ -11,6 +11,7 @@ use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -33,6 +34,8 @@ class UserController extends Controller
 
     public function show(User $user): JsonResponse
     {
+        $this->ensureManagedUser($user, request()->user());
+
         return response()->json([
             'data' => $user->load(['assignedFarms:id,name', 'loginHistories' => fn ($q) => $q->latest()]),
         ]);
@@ -40,12 +43,13 @@ class UserController extends Controller
 
     public function update(Request $request, User $user): JsonResponse
     {
+        $this->ensureManagedUser($user, $request->user());
+
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'email' => ['sometimes', 'email'],
+            'email' => ['sometimes', 'email', Rule::unique('users', 'email')->ignore($user->id)],
             'is_active' => ['sometimes', 'boolean'],
             'account_status' => ['sometimes', 'in:active,disabled,pending'],
-            'role' => ['sometimes', 'in:admin,owner'],
         ]);
 
         $user->fill($data)->save();
@@ -65,6 +69,8 @@ class UserController extends Controller
 
     public function assignFarms(AssignUserFarmsRequest $request, User $user): JsonResponse
     {
+        $this->ensureManagedUser($user, $request->user());
+
         $farmIds = $request->validated('farm_ids');
         $farmId = (int) $farmIds[0];
         $user->assignedFarms()->sync([$farmId]);
@@ -88,9 +94,12 @@ class UserController extends Controller
 
     public function resetPassword(ResetUserPasswordRequest $request, User $user): JsonResponse
     {
+        $this->ensureManagedUser($user, $request->user());
+
         $user->forceFill([
             'password' => Hash::make($request->validated('password')),
         ])->save();
+        $user->tokens()->delete();
 
         $this->auditService->record([
             'farm_id' => $user->farm_id,
@@ -107,11 +116,17 @@ class UserController extends Controller
 
     public function updateStatus(UpdateUserStatusRequest $request, User $user): JsonResponse
     {
+        $this->ensureManagedUser($user, $request->user());
+
         $data = $request->validated();
         $user->forceFill([
             'account_status' => $data['account_status'],
             'is_active' => $data['is_active'] ?? ($data['account_status'] === 'active'),
         ])->save();
+
+        if ($user->account_status !== 'active' || ! $user->is_active) {
+            $user->tokens()->delete();
+        }
 
         $this->auditService->record([
             'farm_id' => $user->farm_id,
@@ -129,7 +144,10 @@ class UserController extends Controller
 
     public function destroy(Request $request, User $user): JsonResponse
     {
+        $this->ensureManagedUser($user, $request->user());
+
         $user->update(['is_active' => false, 'account_status' => 'disabled']);
+        $user->tokens()->delete();
 
         $this->auditService->record([
             'farm_id' => $user->farm_id,
@@ -142,5 +160,15 @@ class UserController extends Controller
         ]);
 
         return response()->json(['message' => 'User deactivated.']);
+    }
+
+    private function ensureManagedUser(User $managedUser, ?User $actor): void
+    {
+        abort_unless($actor, 401);
+
+        $actorFarmId = (int) ($actor->farm_id ?? 0);
+        $managedUserFarmId = (int) ($managedUser->farm_id ?? 0);
+
+        abort_if($actorFarmId === 0 || $managedUserFarmId === 0 || $actorFarmId !== $managedUserFarmId, 403, 'User tenant mismatch.');
     }
 }

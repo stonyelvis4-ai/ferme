@@ -55,6 +55,8 @@ export default function AlertsView({
   const urgentAlerts = activeAlerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning');
   const criticalAlertsCount = activeAlerts.filter((alert) => alert.severity === 'critical').length;
   const warningAlertsCount = activeAlerts.filter((alert) => alert.severity === 'warning').length;
+  const alertTone = criticalAlertsCount > 0 ? 'rose' : warningAlertsCount > 0 ? 'amber' : 'emerald';
+  const alertHeadline = criticalAlertsCount > 0 ? 'Intervention immédiate requise' : warningAlertsCount > 0 ? 'Surveillance renforcée' : 'Exploitation stable';
 
   const handleCreateAlert = () => {
     setEditingAlertId(null);
@@ -82,7 +84,7 @@ export default function AlertsView({
         title: alertDraft.title.trim(),
         description: alertDraft.description.trim(),
         severity: 'warning',
-        sourceModule: 'General'
+        sourceModule: 'Général'
       });
     }
 
@@ -119,18 +121,73 @@ export default function AlertsView({
         )}
       </div>
 
+      <section className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_34%),linear-gradient(135deg,_#ffffff_0%,_#fffaf0_48%,_#fff7ed_100%)] p-6 shadow-sm">
+        <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-amber-200/20 blur-3xl" />
+        <div className="relative z-10 space-y-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                alertTone === 'rose'
+                  ? 'bg-rose-100 text-rose-800'
+                  : alertTone === 'amber'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                {alertHeadline}
+              </span>
+              <div>
+                <h3 className="text-2xl font-black tracking-tight text-slate-950">Cockpit des alertes</h3>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+                  Vue priorisée des anomalies, de leur gravité et des actions correctives attendues.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
+              <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Alertes ouvertes</div>
+                <div className="mt-2 text-xl font-black text-slate-900">{activeAlerts.length}</div>
+                <div className="mt-1 text-[11px] text-slate-500">Centre d'alertes actif</div>
+              </div>
+              <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Alertes urgentes</div>
+                <div className={`mt-2 text-xl font-black ${criticalAlertsCount > 0 ? 'text-rose-700' : 'text-amber-700'}`}>{urgentAlerts.length}</div>
+                <div className="mt-1 text-[11px] text-slate-500">À traiter sans délai</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Alertes ouvertes</span>
+              <span className="mt-2 block text-2xl font-black text-slate-900">{activeAlerts.length}</span>
+              <p className="mt-1 text-xs text-slate-500">Anomalies encore visibles dans le centre d'alertes.</p>
+            </div>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Critiques</span>
+              <span className="mt-2 block text-2xl font-black text-rose-900">{criticalAlertsCount}</span>
+              <p className="mt-1 text-xs text-rose-800">Demandent une action immédiate ou un contrôle rapproché.</p>
+            </div>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Importantes</span>
+              <span className="mt-2 block text-2xl font-black text-amber-900">{warningAlertsCount}</span>
+              <p className="mt-1 text-xs text-amber-800">À transformer au besoin en tâche corrective.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Alertes ouvertes</span>
           <span className="mt-2 block text-2xl font-bold text-slate-900">{activeAlerts.length}</span>
           <p className="mt-1 text-xs text-slate-500">Anomalies encore visibles dans le centre d'alertes.</p>
         </div>
-        <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 shadow-sm">
+        <div className="hidden rounded-2xl border border-rose-100 bg-rose-50/50 p-4 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Critiques</span>
           <span className="mt-2 block text-2xl font-bold text-rose-900">{criticalAlertsCount}</span>
           <p className="mt-1 text-xs text-rose-800">Demandent une action immédiate ou un contrôle rapproché.</p>
         </div>
-        <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 shadow-sm">
+        <div className="hidden rounded-2xl border border-amber-100 bg-amber-50/50 p-4 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Importantes</span>
           <span className="mt-2 block text-2xl font-bold text-amber-900">{warningAlertsCount}</span>
           <p className="mt-1 text-xs text-amber-800">À transformer au besoin en tâche corrective.</p>
@@ -138,7 +195,7 @@ export default function AlertsView({
       </div>
 
       {hasRingingAlerts && (
-        <div className={`overflow-hidden rounded-3xl border p-5 shadow-sm ${
+        <div className={`overflow-hidden rounded-[26px] border p-5 shadow-sm ${
           alarmSilenced || alarmPlaybackBlocked
             ? 'border-amber-200 bg-gradient-to-r from-amber-50 to-white'
             : 'border-rose-200 bg-gradient-to-r from-rose-50 via-white to-amber-50'
@@ -193,9 +250,9 @@ export default function AlertsView({
 
       <FormDialog
         open={showAlertDialog}
-        title={editingAlertId ? "Modifier l'alerte" : "Creer une alerte"}
+        title={editingAlertId ? "Modifier l'alerte" : "Créer une alerte"}
         subtitle="Renseignez un titre clair et une description utile pour guider la correction."
-        confirmLabel={editingAlertId ? 'Enregistrer les changements' : "Creer l'alerte"}
+        confirmLabel={editingAlertId ? 'Enregistrer les changements' : "Créer l'alerte"}
         confirmDisabled={!alertDraft.title.trim()}
         onCancel={() => {
           setShowAlertDialog(false);
@@ -221,7 +278,7 @@ export default function AlertsView({
               rows={4}
               value={alertDraft.description}
               onChange={(e) => setAlertDraft((prev) => ({ ...prev, description: e.target.value }))}
-              placeholder="Precisez le contexte, le risque et l'action attendue."
+              placeholder="Précisez le contexte, le risque et l'action attendue."
               className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
             />
           </label>
@@ -231,7 +288,7 @@ export default function AlertsView({
       {/* Grid of Alerts */}
       <div className="space-y-4">
         {activeAlerts.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-2xl border border-slate-100 text-slate-400 text-xs">
+          <div className="text-center py-12 bg-white rounded-[26px] border border-slate-100 text-slate-400 text-xs">
             Excellente nouvelle : aucune anomalie détectée sur l'exploitation.
           </div>
         ) : (
@@ -242,7 +299,7 @@ export default function AlertsView({
             return (
               <div
                 key={alert.id}
-                className={`p-4 rounded-2xl border transition-colors relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                className={`p-4 rounded-[24px] border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
                   isCritical
                     ? 'bg-rose-50 border-rose-100 text-rose-900'
                     : isWarning
@@ -273,7 +330,7 @@ export default function AlertsView({
                   <div className="flex gap-2 shrink-0 w-full md:w-auto">
                     <button
                       onClick={() => onDismissAlert(alert.id)}
-                      className="flex-1 md:flex-none inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-50"
+                      className="flex-1 md:flex-none inline-flex items-center justify-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-50"
                     >
                       <Check className="w-3.5 h-3.5" /> Ignorer
                     </button>
@@ -286,11 +343,10 @@ export default function AlertsView({
                     <AdminEntityActions
                       compact
                       onEdit={() => handleEditAlert(alert)}
-                      onDelete={() => {
-                        if (window.confirm(`Supprimer l'alerte ${alert.title} ?`)) {
-                          onDeleteAlert(alert.id);
-                        }
-                      }}
+                      onDelete={() => onDeleteAlert(alert.id)}
+                      confirmDeleteTitle="Supprimer cette alerte ?"
+                      confirmDeleteDescription={`L'alerte "${alert.title}" sera retiree du centre d'alertes de la ferme.`}
+                      confirmDeleteActionLabel="Supprimer l'alerte"
                     />
                   </div>
                 )}

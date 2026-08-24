@@ -14,6 +14,8 @@ class UpdateTaskRequest extends FormRequest
 
     public function rules(): array
     {
+        $farmId = (int) ($this->user()?->farm_id ?? 0);
+
         return [
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -22,7 +24,7 @@ class UpdateTaskRequest extends FormRequest
             'status' => ['sometimes', Rule::in(['todo', 'in_progress', 'completed', 'overdue', 'cancelled'])],
             'due_at' => ['nullable', 'date'],
             'reminder_at' => ['nullable', 'date'],
-            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'assigned_to' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($query) => $query->where('farm_id', $farmId))],
         ];
     }
 }

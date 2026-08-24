@@ -38,6 +38,9 @@ class OwnerController extends Controller
 
     public function update(UpdateOwnerRequest $request, User $owner): JsonResponse
     {
+        abort_unless($owner->role?->value === 'owner', 404);
+        abort_unless((int) ($owner->farm_id ?? 0) === (int) ($request->user()?->farm_id ?? 0), 403);
+
         $data = $request->validated();
 
         $owner->fill([
@@ -48,6 +51,7 @@ class OwnerController extends Controller
 
         if (! empty($data['password'])) {
             $owner->password = bcrypt($data['password']);
+            $owner->tokens()->delete();
         }
 
         $owner->save();
@@ -65,4 +69,3 @@ class OwnerController extends Controller
         return response()->json(['data' => $owner]);
     }
 }
-

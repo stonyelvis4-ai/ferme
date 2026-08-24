@@ -13,7 +13,16 @@ class EnsureFarmTenant
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+        $userFarmId = (int) ($user?->farm_id ?? 0);
         $farmIds = collect();
+
+        if ($userFarmId > 0) {
+            $request->merge(['farm_id' => $userFarmId]);
+
+            if ($request->has('farm_ids') || $request->has('farm_id')) {
+                $request->merge(['farm_ids' => [$userFarmId]]);
+            }
+        }
 
         if ($request->route('farm')?->id) {
             $farmIds->push((int) $request->route('farm')->id);
@@ -31,7 +40,7 @@ class EnsureFarmTenant
             );
         }
 
-        if ($user && $user->farm_id) {
+        if ($userFarmId > 0) {
             foreach ($request->route()?->parameters() ?? [] as $parameter) {
                 if (! $parameter instanceof Model) {
                     continue;
@@ -50,7 +59,7 @@ class EnsureFarmTenant
 
         $farmIds = $farmIds->filter()->unique()->values();
 
-        if ($user && $user->farm_id && $farmIds->contains(fn (int $farmId) => (int) $user->farm_id !== $farmId)) {
+        if ($userFarmId > 0 && $farmIds->contains(fn (int $farmId) => $userFarmId !== $farmId)) {
             abort(403, 'Farm tenant mismatch.');
         }
 

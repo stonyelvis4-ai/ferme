@@ -74,11 +74,11 @@ export default function ReportsView({
   const [isExporting, setIsExporting] = useState<string | null>(null);
 
   const reportLabels = {
-    global: "Consolide de l'exploitation",
-    finances: 'Compte de resultat simplifie',
+    global: "Consolidé de l'exploitation",
+    finances: 'Compte de résultat simplifié',
     livestock: 'Performance des lots de chair',
     eggs: 'Suivi de ponte et casse',
-    fish: 'Croissance et qualite des bassins',
+    fish: 'Croissance et qualité des bassins',
     stocks: 'Mouvements des intrants',
     sanitary: 'Couverture sanitaire'
   } as const;
@@ -190,52 +190,52 @@ export default function ReportsView({
     }
   > = {
     global: {
-      title: "Consolide d'exploitation",
+      title: "Consolidé d'exploitation",
       cards: [
-        { label: 'Revenus periode', value: formatCurrency(globalIncome), tone: 'good' },
-        { label: 'Charges periode', value: formatCurrency(globalExpenses), tone: 'neutral' },
+        { label: 'Revenus période', value: formatCurrency(globalIncome), tone: 'good' },
+        { label: 'Charges période', value: formatCurrency(globalExpenses), tone: 'neutral' },
         {
-          label: 'Resultat net',
+          label: 'Résultat net',
           value: formatCurrency(globalIncome - globalExpenses),
           tone: globalIncome - globalExpenses >= 0 ? 'good' : 'alert'
         },
         { label: 'Valeur du stock', value: formatCurrency(stockValue), tone: 'neutral' }
       ],
-      insight: `${lowStockCount} article(s) sont en seuil bas sur la ferme. Le rapport consolide les principaux flux de production, stock et tresorerie.`
+      insight: `${lowStockCount} article(s) sont en seuil bas sur la ferme. Le rapport consolide les principaux flux de production, de stock et de trésorerie.`
     },
     finances: {
-      title: 'Compte de resultat simplifie',
+      title: 'Compte de résultat simplifié',
       cards: [
         { label: 'Encaissements', value: formatCurrency(globalIncome), tone: 'good' },
-        { label: 'Decaissements', value: formatCurrency(globalExpenses), tone: 'neutral' },
+        { label: 'Décaissements', value: formatCurrency(globalExpenses), tone: 'neutral' },
         {
-          label: 'Solde periode',
+          label: 'Solde période',
           value: formatCurrency(globalIncome - globalExpenses),
           tone: globalIncome - globalExpenses >= 0 ? 'good' : 'alert'
         },
         { label: 'Flux comptables', value: `${periodTransactions.length}`, tone: 'neutral' }
       ],
-      insight: 'Toutes les ecritures deja generees par les modules metier et la tresorerie manuelle sont integrees automatiquement.'
+      insight: 'Toutes les écritures déjà générées par les modules métier et la trésorerie manuelle sont intégrées automatiquement.'
     },
     livestock: {
-      title: 'Performance elevage',
+      title: 'Performance élevage',
       cards: [
         { label: 'Lots suivis', value: `${livestockLots.length}`, tone: 'neutral' },
-        { label: 'Revenus elevage', value: formatCurrency(livestockIncome), tone: 'good' },
+        { label: 'Revenus élevage', value: formatCurrency(livestockIncome), tone: 'good' },
         { label: 'Charge aliment', value: formatCurrency(livestockFeedCost), tone: 'neutral' },
-        { label: 'Mortalite cumulee', value: `${livestockMortality}`, tone: livestockMortality > 0 ? 'alert' : 'good' }
+        { label: 'Mortalité cumulée', value: `${livestockMortality}`, tone: livestockMortality > 0 ? 'alert' : 'good' }
       ],
-      insight: `Les lots hors pondeuses affichent ${formatCurrency(livestockExpenses)} de charges elevage en comptabilite sur la periode.`
+      insight: `Les lots hors pondeuses affichent ${formatCurrency(livestockExpenses)} de charges élevage en comptabilité sur la période.`
     },
     eggs: {
-      title: 'Suivi ponte et marge oeufs',
+      title: 'Suivi ponte et marge œufs',
       cards: [
-        { label: 'Oeufs collectes', value: `${eggCollected.toLocaleString('fr-FR')}`, tone: 'good' },
-        { label: 'Oeufs conformes', value: `${eggCompliant.toLocaleString('fr-FR')}`, tone: 'good' },
+        { label: 'Œufs collectés', value: `${eggCollected.toLocaleString('fr-FR')}`, tone: 'good' },
+        { label: 'Œufs conformes', value: `${eggCompliant.toLocaleString('fr-FR')}`, tone: 'good' },
         { label: 'Pertes et casse', value: `${eggBroken.toLocaleString('fr-FR')}`, tone: eggBroken > 0 ? 'alert' : 'good' },
-        { label: 'Revenus oeufs', value: formatCurrency(eggRevenue), tone: 'good' }
+        { label: 'Revenus œufs', value: formatCurrency(eggRevenue), tone: 'good' }
       ],
-      insight: `${eggSalesVolume.toLocaleString('fr-FR')} oeufs vendus sur la periode, pour ${formatCurrency(eggFeedCost)} d'aliment distribue aux lots de ponte.`
+      insight: `${eggSalesVolume.toLocaleString('fr-FR')} œufs vendus sur la période, pour ${formatCurrency(eggFeedCost)} d'aliment distribué aux lots de ponte.`
     },
     fish: {
       title: 'Performance piscicole',
@@ -245,27 +245,27 @@ export default function ReportsView({
         { label: 'Revenus pisciculture', value: formatCurrency(fishIncome), tone: 'good' },
         { label: 'Charges pisciculture', value: formatCurrency(fishExpenses), tone: 'neutral' }
       ],
-      insight: 'Les ventes et couts remontes depuis la pisciculture alimentent automatiquement cette synthese.'
+      insight: 'Les ventes et coûts remontés depuis la pisciculture alimentent automatiquement cette synthèse.'
     },
     stocks: {
       title: 'Logistique et intrants',
       cards: [
         { label: 'Articles suivis', value: `${articles.length}`, tone: 'neutral' },
-        { label: 'Mouvements periode', value: `${periodMovements.length}`, tone: 'neutral' },
+        { label: 'Mouvements période', value: `${periodMovements.length}`, tone: 'neutral' },
         { label: 'Stock sensible', value: `${lowStockCount}`, tone: lowStockCount > 0 ? 'alert' : 'good' },
-        { label: 'Capital stocke', value: formatCurrency(stockValue), tone: 'neutral' }
+        { label: 'Capital stocké', value: formatCurrency(stockValue), tone: 'neutral' }
       ],
-      insight: 'Les entrees, sorties et ajustements restent relies a la valeur du stock et aux besoins de reapprovisionnement.'
+      insight: 'Les entrées, sorties et ajustements restent reliés à la valeur du stock et aux besoins de réapprovisionnement.'
     },
     sanitary: {
       title: 'Couverture sanitaire',
       cards: [
-        { label: 'Soins realises', value: `${sanitaryCompleted}`, tone: 'good' },
-        { label: 'Soins planifies', value: `${sanitaryPlanned}`, tone: sanitaryPlanned > 0 ? 'alert' : 'neutral' },
-        { label: 'Cout sanitaire', value: formatCurrency(sanitaryCost), tone: 'neutral' },
-        { label: 'Campagnes recoltees', value: `${harvestedCampaigns}`, tone: 'neutral' }
+        { label: 'Soins réalisés', value: `${sanitaryCompleted}`, tone: 'good' },
+        { label: 'Soins planifiés', value: `${sanitaryPlanned}`, tone: sanitaryPlanned > 0 ? 'alert' : 'neutral' },
+        { label: 'Coût sanitaire', value: formatCurrency(sanitaryCost), tone: 'neutral' },
+        { label: 'Campagnes récoltées', value: `${harvestedCampaigns}`, tone: 'neutral' }
       ],
-      insight: 'Le rapport rapproche les actes realises, ceux qui restent planifies et les couts sanitaires passes en comptabilite.'
+      insight: 'Le rapport rapproche les actes réalisés, ceux qui restent planifiés et les coûts sanitaires passés en comptabilité.'
     }
   };
 
@@ -328,18 +328,18 @@ export default function ReportsView({
           section: 'Ponte',
           date: production.date,
           lot: lots.find((lot) => lot.id === production.lotId)?.name ?? production.lotId,
-          oeufs_collectes: production.collectedCount,
-          oeufs_conformes: production.compliantCount,
+          œufs_collectés: production.collectedCount,
+          œufs_conformes: production.compliantCount,
           casses: production.brokenCount,
           pertes: production.lossesCount,
           stock: production.stockCount
         })),
         ...periodEggSales.map((sale) => ({
-          section: 'Ventes oeufs',
+          section: 'Ventes œufs',
           date: sale.date,
           lot: lots.find((lot) => lot.id === sale.lotId)?.name ?? sale.lotId,
           client: sale.customerName ?? 'Client comptoir',
-          oeufs_vendus: sale.eggsSold,
+          œufs_vendus: sale.eggsSold,
           plateaux: sale.traysSold,
           prix_unitaire: sale.unitPrice,
           montant: sale.amountPaid
@@ -418,7 +418,7 @@ export default function ReportsView({
         statut: campaign.status,
         rendement_attendu: campaign.expectedYield ?? 0,
         rendement_reel: campaign.actualYield ?? 0,
-        depenses: campaign.expenses,
+        dépenses: campaign.expenses,
         revenus: campaign.revenues
       })),
       ...periodTransactions.map((transaction) => ({
@@ -448,7 +448,7 @@ export default function ReportsView({
 
   const exportCsv = (rows: ExportRow[], fileName: string) => {
     if (rows.length === 0) {
-      downloadFile('Aucune donnee disponible', fileName, 'text/csv;charset=utf-8;');
+      downloadFile('Aucune donnée disponible pour cet export.', fileName, 'text/csv;charset=utf-8;');
       return;
     }
 
@@ -463,7 +463,7 @@ export default function ReportsView({
 
   const exportExcelCompatible = (rows: ExportRow[], fileName: string) => {
     if (rows.length === 0) {
-      downloadFile('Aucune donnee disponible', fileName, 'application/vnd.ms-excel;charset=utf-8;');
+      downloadFile('Aucune donnée disponible pour cet export.', fileName, 'application/vnd.ms-excel;charset=utf-8;');
       return;
     }
 
@@ -501,7 +501,7 @@ export default function ReportsView({
         </head>
         <body>
           <h1>${reportPreview.title}</h1>
-          <p>Periode: ${reportStartDate.toLocaleDateString('fr-FR')} au ${reportEndDate.toLocaleDateString('fr-FR')}</p>
+          <p>Période : ${reportStartDate.toLocaleDateString('fr-FR')} au ${reportEndDate.toLocaleDateString('fr-FR')}</p>
           ${tableHtml}
         </body>
       </html>
@@ -549,7 +549,7 @@ export default function ReportsView({
         </head>
         <body>
           <h1>${reportPreview.title}</h1>
-          <p>Periode: ${reportStartDate.toLocaleDateString('fr-FR')} au ${reportEndDate.toLocaleDateString('fr-FR')}</p>
+          <p>Période : ${reportStartDate.toLocaleDateString('fr-FR')} au ${reportEndDate.toLocaleDateString('fr-FR')}</p>
           <p>${reportPreview.insight}</p>
           <div class="grid">
             ${reportPreview.cards
@@ -573,7 +573,7 @@ export default function ReportsView({
                   <tbody>${tableRows}</tbody>
                 </table>
               `
-              : '<p>Aucune donnee detaillee disponible.</p>'
+              : '<p>Aucune donnée détaillée disponible pour cette sélection.</p>'
           }
         </body>
       </html>
@@ -608,10 +608,10 @@ export default function ReportsView({
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-sans tracking-tight flex items-center gap-2">
             <FileText className="w-5 h-5 text-emerald-600" />
-            Module Rapports & Decisions Analytiques
+            Module Rapports & Décisions Analytiques
           </h2>
           <p className="text-xs text-slate-500">
-            Generez des rapports consolides de production, financiers et sanitaires pour la gestion de votre ferme.
+            Générez des rapports consolidés de production, financiers et sanitaires pour la gestion de votre ferme.
           </p>
         </div>
         {role === 'owner' && (
@@ -625,18 +625,18 @@ export default function ReportsView({
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-4">
           <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-2">
             <Filter className="w-4 h-4 text-emerald-600" />
-            Criteres d'analyse du rapport
+            Critères d'analyse du rapport
           </h3>
 
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 text-xs">
-            <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Apercu du rapport</span>
+            <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Aperçu du rapport</span>
             <span className="mt-1 block text-sm font-semibold text-emerald-900">{reportLabels[reportType]}</span>
-            <p className="mt-1 text-[11px] text-emerald-800">Periode selectionnee: {periodLabels[period]}</p>
-            <p className="mt-1 text-[11px] text-emerald-800">Les exports reprendront exactement ce perimetre.</p>
+            <p className="mt-1 text-[11px] text-emerald-800">Période sélectionnée : {periodLabels[period]}</p>
+            <p className="mt-1 text-[11px] text-emerald-800">Les exports reprendront exactement ce périmètre.</p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Periodicite</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Périodicité</label>
             <div className="grid grid-cols-3 gap-2 text-xs">
               <button
                 type="button"
@@ -675,26 +675,26 @@ export default function ReportsView({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Type de synthese</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Type de synthèse</label>
             <select
               id="report-type-select"
               value={reportType}
               onChange={(e) => setReportType(e.target.value as typeof reportType)}
               className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
             >
-              <option value="global">Consolide de l'exploitation (Global)</option>
-              <option value="finances">Finances : Compte de resultat simplifie</option>
-              <option value="livestock">Elevage : Performance des lots de chair</option>
-              <option value="eggs">Pondeuses : Suivi de ponte et casse</option>
-              <option value="fish">Pisciculture : Croissance et qualite des bassins</option>
+              <option value="global">Consolidé de l'exploitation (global)</option>
+              <option value="finances">Finances : compte de résultat simplifié</option>
+              <option value="livestock">Élevage : performance des lots de chair</option>
+              <option value="eggs">Pondeuses : suivi de ponte et casse</option>
+              <option value="fish">Pisciculture : croissance et qualité des bassins</option>
               <option value="stocks">Logistique : Mouvements des intrants</option>
               <option value="sanitary">Sanitaire : Couverture sanitaire</option>
             </select>
-            <p className="mt-1 text-[10px] text-slate-500">Choisir le rapport a afficher et exporter.</p>
+            <p className="mt-1 text-[10px] text-slate-500">Choisissez le rapport à afficher et à exporter.</p>
           </div>
 
           <div className="bg-slate-50 border border-slate-100 p-3 rounded-2xl text-[11px] text-slate-500 leading-normal shadow-sm">
-            Le rapport extrait les donnees consolidees en temps reel des modules. Tout nouvel enregistrement y est automatiquement inclus.
+            Le rapport extrait les données consolidées en temps réel des modules. Tout nouvel enregistrement y est intégré automatiquement.
           </div>
         </div>
 
@@ -704,7 +704,7 @@ export default function ReportsView({
               <div>
                 <h3 className="text-sm font-bold text-emerald-950">{reportPreview.title}</h3>
                 <p className="mt-1 text-xs text-emerald-800">
-                  Periode analysee: du {reportStartDate.toLocaleDateString('fr-FR')} au {reportEndDate.toLocaleDateString('fr-FR')}
+                  Période analysée : du {reportStartDate.toLocaleDateString('fr-FR')} au {reportEndDate.toLocaleDateString('fr-FR')}
                 </p>
               </div>
               <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700 shadow-sm">
@@ -738,7 +738,7 @@ export default function ReportsView({
             <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
               <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Cultures</div>
               <div className="mt-2 text-sm font-bold text-slate-900">{cultivatedArea.toFixed(1)} {areaUnit}</div>
-              <p className="mt-1 text-[11px] text-slate-500">Surface actuellement cultivee dans les parcelles suivies.</p>
+              <p className="mt-1 text-[11px] text-slate-500">Surface actuellement cultivée dans les parcelles suivies.</p>
             </div>
             <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
               <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Pisciculture</div>
@@ -747,16 +747,16 @@ export default function ReportsView({
             </div>
             <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
               <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Pondeuses</div>
-              <div className="mt-2 text-sm font-bold text-slate-900">{eggSalesVolume.toLocaleString('fr-FR')} oeufs vendus</div>
-              <p className="mt-1 text-[11px] text-slate-500">Ventes d'oeufs consolidees sur la periode du rapport.</p>
+              <div className="mt-2 text-sm font-bold text-slate-900">{eggSalesVolume.toLocaleString('fr-FR')} œufs vendus</div>
+              <p className="mt-1 text-[11px] text-slate-500">Ventes d'œufs consolidées sur la période du rapport.</p>
             </div>
           </div>
 
           <div className="space-y-2">
-            <h3 className="font-bold text-slate-900 text-sm">Generation et telechargements</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Choisissez le format d'export de votre choix.</p>
+            <h3 className="font-bold text-slate-900 text-sm">Génération et téléchargements</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Choisissez le format d'export le plus adapté.</p>
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-[11px] text-slate-600">
-              CSV pour les donnees brutes, Excel pour les tableaux exploitables et PDF via la boite d'impression du navigateur.
+              CSV pour les données brutes, Excel pour les tableaux exploitables et PDF via la boîte d'impression du navigateur.
             </div>
           </div>
 
@@ -772,7 +772,7 @@ export default function ReportsView({
               </div>
               <div>
                 <h4 className="text-xs font-bold text-slate-900">Format Excel compatible</h4>
-                <p className="text-[10px] text-slate-400 mt-1">Ideal pour les calculs, filtres et tableaux a retraiter.</p>
+                <p className="text-[10px] text-slate-400 mt-1">Idéal pour les calculs, filtres et tableaux à retraiter.</p>
               </div>
               <span className="text-[10px] bg-emerald-600 text-white font-bold px-2.5 py-1 rounded-full flex items-center gap-1 mt-1 shadow-sm">
                 <Download className="w-3 h-3" /> EXPORT .XLS

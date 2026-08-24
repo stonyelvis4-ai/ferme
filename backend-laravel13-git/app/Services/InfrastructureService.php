@@ -60,6 +60,8 @@ class InfrastructureService
 
     public function createEnclosure(array $data): Enclosure
     {
+        $this->buildingForFarm((int) $data['farm_id'], (int) $data['building_id']);
+
         $enclosure = Enclosure::create([
             'farm_id' => $data['farm_id'],
             'building_id' => $data['building_id'],
@@ -88,6 +90,10 @@ class InfrastructureService
 
     public function updateEnclosure(Enclosure $enclosure, array $data): Enclosure
     {
+        if (array_key_exists('building_id', $data)) {
+            $this->buildingForFarm((int) $enclosure->farm_id, (int) $data['building_id']);
+        }
+
         $enclosure->fill($data);
         $enclosure->save();
 
@@ -118,5 +124,12 @@ class InfrastructureService
             'total_capacity' => (float) (clone $buildings)->sum('capacity') + (float) (clone $enclosures)->sum('capacity'),
             'used_capacity' => (float) (clone $enclosures)->whereNotNull('assigned_use')->sum('capacity'),
         ];
+    }
+
+    private function buildingForFarm(int $farmId, int $buildingId): Building
+    {
+        return Building::query()
+            ->where('farm_id', $farmId)
+            ->findOrFail($buildingId);
     }
 }

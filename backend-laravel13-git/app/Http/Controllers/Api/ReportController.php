@@ -11,6 +11,21 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ReportController extends Controller
 {
+    private const ALLOWED_SECTIONS = [
+        'overview',
+        'finances',
+        'tasks',
+        'alerts',
+        'stocks',
+        'layers',
+        'pisciculture',
+        'cultures',
+        'infrastructures',
+        'audit',
+    ];
+
+    private const ALLOWED_EXPORT_FORMATS = ['pdf', 'xlsx'];
+
     public function __construct(private readonly ReportService $reportService)
     {
     }
@@ -21,23 +36,14 @@ class ReportController extends Controller
 
         return response()->json([
             'overview' => $farmId ? $this->reportService->overview($farmId) : [],
-            'available_sections' => [
-                'overview',
-                'finances',
-                'tasks',
-                'alerts',
-                'stocks',
-                'layers',
-                'pisciculture',
-                'cultures',
-                'infrastructures',
-                'audit',
-            ],
+            'available_sections' => self::ALLOWED_SECTIONS,
         ]);
     }
 
     public function show(Request $request, string $section): JsonResponse
     {
+        abort_unless(in_array($section, self::ALLOWED_SECTIONS, true), 404);
+
         $farmId = $request->user()?->farm_id;
 
         return response()->json([
@@ -48,15 +54,21 @@ class ReportController extends Controller
 
     public function export(Request $request, string $section, string $format): Response|BinaryFileResponse
     {
+        abort_unless(in_array($section, self::ALLOWED_SECTIONS, true), 404);
+        abort_unless(in_array($format, self::ALLOWED_EXPORT_FORMATS, true), 404);
+
         $farmId = $request->user()?->farm_id;
-        $dataset = $this->reportService->dataset((int) $farmId, $section);
+        $safeSection = preg_replace('/[^a-z0-9_-]/i', '-', $section) ?: 'report';
+        $timestamp = now()->format('Ymd-His');
 
         if ($format === 'pdf') {
             $content = $this->reportService->downloadPdf((int) $farmId, $section);
 
             return response($content, 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => sprintf('attachment; filename="%s-%s.pdf"', $section, now()->format('Ymd-His')),
+                'Content-Disposition' => sprintf('attachment; filename="%s-%s.pdf"', $safeSection, $timestamp),
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'no-store, private',
             ]);
         }
 
@@ -64,6 +76,11 @@ class ReportController extends Controller
         $tempFile = tempnam(sys_get_temp_dir(), 'ferm_report_');
         file_put_contents($tempFile, $content);
 
-        return response()->download($tempFile, sprintf('%s-%s.xlsx', $section, now()->format('Ymd-His')))->deleteFileAfterSend(true);
+        return response()
+            ->download($tempFile, sprintf('%s-%s.xlsx', $safeSection, $timestamp), [
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'no-store, private',
+            ])
+            ->deleteFileAfterSend(true);
     }
 }

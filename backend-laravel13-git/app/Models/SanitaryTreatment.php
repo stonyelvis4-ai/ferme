@@ -21,6 +21,8 @@ class SanitaryTreatment extends Model
         'quantity_used',
         'status',
         'cost',
+        'stock_movement_id',
+        'financial_transaction_id',
         'notes',
     ];
 
@@ -43,5 +45,15 @@ class SanitaryTreatment extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(StockItem::class, 'product_id');
+    }
+
+    public function stockMovement(): BelongsTo
+    {
+        return $this->belongsTo(StockMovement::class);
+    }
+
+    public function financialTransaction(): BelongsTo
+    {
+        return $this->belongsTo(FinancialTransaction::class);
     }
 }

@@ -2,10 +2,14 @@
 
 namespace App\Http\Requests\Cultures;
 
+use App\Http\Requests\Concerns\UsesAuthenticatedFarmContext;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreCropSaleRequest extends FormRequest
 {
+    use UsesAuthenticatedFarmContext;
+
     public function authorize(): bool
     {
         return true;
@@ -15,8 +19,8 @@ class StoreCropSaleRequest extends FormRequest
     {
         return [
             'farm_id' => ['required', 'integer', 'exists:farms,id'],
-            'crop_id' => ['required', 'integer', 'exists:crops,id'],
-            'crop_harvest_id' => ['nullable', 'integer', 'exists:crop_harvests,id'],
+            'crop_id' => ['required', 'integer', Rule::exists('crops', 'id')->where(fn ($query) => $query->where('farm_id', $this->user()?->farm_id))],
+            'crop_harvest_id' => ['nullable', 'integer', Rule::exists('crop_harvests', 'id')->where(fn ($query) => $query->where('farm_id', $this->user()?->farm_id))],
             'sale_date' => ['required', 'date'],
             'customer_name' => ['required', 'string', 'max:255'],
             'kilograms_sold' => ['required', 'numeric', 'min:0'],

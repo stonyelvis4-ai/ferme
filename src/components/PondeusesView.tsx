@@ -139,7 +139,7 @@ export default function PondeusesView({
       <FormDialog
         open={editingProductionId !== null}
         title="Modifier la collecte"
-        subtitle="Ajustez le nombre d oeufs conformes pour garder la qualite tracee."
+        subtitle="Ajustez le nombre d'œufs conformes pour garder une qualité bien tracée."
         confirmLabel="Enregistrer"
         confirmDisabled={Number(editCompliantCount) < 0}
         onCancel={() => {
@@ -149,7 +149,7 @@ export default function PondeusesView({
         onSubmit={handleSubmitProductionEdit}
       >
         <label className="space-y-1.5">
-          <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Oeufs conformes</span>
+          <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-600">Œufs conformes</span>
           <input
             autoFocus
             type="number"
@@ -205,7 +205,7 @@ export default function PondeusesView({
 
       {layingLots.length === 0 && productions.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-700">Aucune activité pondeuse synchronisée pour cette ferme.</p>
+          <p className="text-sm font-semibold text-slate-700">Aucune activité pondeuse enregistrée pour cette ferme.</p>
           <p className="mt-2 text-xs text-slate-500">
             Ajoutez un lot de pondeuses puis enregistrez les collectes pour suivre le stock d’œufs et les ventes.
           </p>
@@ -289,8 +289,8 @@ export default function PondeusesView({
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Collecte du jour</span>
-              <span className="mt-1 block text-sm font-semibold text-amber-900">{collected.toLocaleString('fr-FR')} oeufs</span>
-              <p className="mt-1 text-[11px] text-amber-800">Conformes: {compliant.toLocaleString('fr-FR')} | Cassés: {broken.toLocaleString('fr-FR')}</p>
+              <span className="mt-1 block text-sm font-semibold text-amber-900">{collected.toLocaleString('fr-FR')} œufs</span>
+              <p className="mt-1 text-[11px] text-amber-800">Conformes : {compliant.toLocaleString('fr-FR')} | Cassés : {broken.toLocaleString('fr-FR')}</p>
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Projection</span>
@@ -421,13 +421,13 @@ export default function PondeusesView({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 text-xs">
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Stock disponible</span>
-              <span className="mt-1 block text-sm font-semibold text-emerald-900">{eggStock.toLocaleString('fr-FR')} oeufs</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{eggStock.toLocaleString('fr-FR')} œufs</span>
               <p className="mt-1 text-[11px] text-emerald-800">La quantité vendue ne peut pas dépasser ce niveau.</p>
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Vente prévue</span>
-              <span className="mt-1 block text-sm font-semibold text-emerald-900">{saleCount.toLocaleString('fr-FR')} oeufs</span>
-              <p className="mt-1 text-[11px] text-emerald-800">Prix unitaire: {unitPrice > 0 ? formatCurrency(unitPrice) : `0 ${currency}`}</p>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{saleCount.toLocaleString('fr-FR')} œufs</span>
+              <p className="mt-1 text-[11px] text-emerald-800">Prix unitaire : {unitPrice > 0 ? formatCurrency(unitPrice) : `0 ${currency}`}</p>
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Impact financier</span>
@@ -554,11 +554,10 @@ export default function PondeusesView({
                         <AdminEntityActions
                           compact
                           onEdit={() => handleEditProduction(p)}
-                          onDelete={() => {
-                            if (window.confirm(`Supprimer la collecte du ${p.date} ?`)) {
-                              onDeleteEggProduction(p.id);
-                            }
-                          }}
+                          onDelete={() => onDeleteEggProduction(p.id)}
+                          confirmDeleteTitle="Supprimer cette collecte ?"
+                          confirmDeleteDescription={`La collecte du ${p.date} sera retiree, avec reverification des impacts stock et financiers lies.`}
+                          confirmDeleteActionLabel="Supprimer la collecte"
                         />
                       </td>
                     )}

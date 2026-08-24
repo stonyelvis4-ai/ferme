@@ -190,7 +190,7 @@ export default function ElevageView({
           : lotPlan && Math.abs(planGapKg) > Math.max(plannedWeeklyQuantity * 0.15, 1)
             ? 'Ecart important entre le plan et la pratique.'
             : rationPerHead === 0
-              ? 'Aucune ration enregistree sur 7 jours.'
+              ? "Aucune ration n'a été enregistrée sur les 7 derniers jours."
               : feedConversionEstimate !== null && feedConversionEstimate > 3.5
                 ? 'Ration a optimiser, indice eleve.'
                 : 'Suivi coherent pour le moment.';
@@ -512,7 +512,7 @@ export default function ElevageView({
         <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 shadow-sm">
           <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sky-700">Dernier poids moyen</div>
           <div className="mt-2 text-2xl font-bold text-sky-900">{latestWeighing ? latestWeighing.averageWeightKg.toFixed(3) : '0.000'} kg</div>
-          <p className="mt-1 text-xs text-sky-800">{latestWeighing ? `Gain recent : ${latestWeighing.weightGainKg.toFixed(3)} kg` : 'Aucune pesee enregistree.'}</p>
+          <p className="mt-1 text-xs text-sky-800">{latestWeighing ? `Gain récent : ${latestWeighing.weightGainKg.toFixed(3)} kg` : 'Aucune pesée enregistrée.'}</p>
         </div>
       </div>
 
@@ -703,7 +703,7 @@ export default function ElevageView({
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-50 pb-3">
             <div>
               <h3 className="font-bold text-slate-800 text-sm">Enregistrer une distribution d'aliment</h3>
-              <p className="mt-1 text-xs text-slate-500">Chaque ration alimente automatiquement le stock, la comptabilite et la tracabilite du lot.</p>
+              <p className="mt-1 text-xs text-slate-500">Chaque ration alimente automatiquement le stock, la comptabilité et la traçabilité du lot.</p>
             </div>
             <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-right">
               <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Cout previsionnel</div>
@@ -798,7 +798,7 @@ export default function ElevageView({
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-50 pb-3">
             <div>
               <h3 className="font-bold text-slate-800 text-sm">Enregistrer une pesee de lot</h3>
-              <p className="mt-1 text-xs text-slate-500">Les pesees servent au suivi de croissance, a la detection des ecarts et au pilotage de l'alimentation.</p>
+              <p className="mt-1 text-xs text-slate-500">Les pesees servent au suivi de croissance, a la detection des ecarts et au pilotage de l alimentation.</p>
             </div>
             <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-right">
               <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Projection biomasse</div>
@@ -818,7 +818,7 @@ export default function ElevageView({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[10px] text-slate-500">Lot animal suivi par la pesee.</p>
+              <p className="mt-1 text-[10px] text-slate-500">Lot animal concerne par la pesee.</p>
             </div>
 
             <div>
@@ -868,7 +868,7 @@ export default function ElevageView({
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
           <p className="text-sm font-semibold text-slate-700">Aucun lot d'elevage enregistre pour cette ferme.</p>
           <p className="mt-2 text-xs text-slate-500">
-            Les lots crees depuis le module elevage apparaitront ici avec leur effectif, leur batiment et leur suivi.
+            Les lots créés depuis le module élevage apparaîtront ici avec leur effectif, leur bâtiment et leur suivi.
           </p>
         </div>
       ) : (
@@ -922,7 +922,7 @@ export default function ElevageView({
                     <span className="text-slate-400 flex items-center gap-1">
                       <Building2 className="w-3.5 h-3.5" /> Localisation :
                     </span>
-                    <span className="font-semibold text-slate-700">{building?.name || 'Inconnu'}</span>
+                    <span className="font-semibold text-slate-700">{building?.name || 'Non affecte'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 flex items-center gap-1">
@@ -981,11 +981,10 @@ export default function ElevageView({
                         <AdminEntityActions
                           compact
                           onEdit={() => handleEditLot(lot)}
-                          onDelete={() => {
-                            if (window.confirm(`Supprimer le lot ${lot.name} ?`)) {
-                              onDeleteLot(lot.id);
-                            }
-                          }}
+                          onDelete={() => onDeleteLot(lot.id)}
+                          confirmDeleteTitle="Cloturer ce lot animal ?"
+                          confirmDeleteDescription={`Le lot "${lot.name}" sortira des listes actives, tout en gardant sa tracabilite financiere et sanitaire.`}
+                          confirmDeleteActionLabel="Cloturer le lot"
                         />
                       </div>
                     )}
@@ -1136,7 +1135,7 @@ export default function ElevageView({
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-bold text-slate-900">Historique alimentation</h3>
-              <p className="mt-1 text-xs text-slate-500">Dernieres distributions enregistrees pour les animaux.</p>
+              <p className="mt-1 text-xs text-slate-500">Dernières distributions d'aliment enregistrées pour les animaux.</p>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
               {sortedFeedings.length} operation{sortedFeedings.length > 1 ? 's' : ''}
@@ -1145,7 +1144,7 @@ export default function ElevageView({
 
           {recentFeedings.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-              Aucune distribution d'aliment n'a encore ete enregistree.
+              Aucune distribution d'aliment n'a encore été enregistrée.
             </div>
           ) : (
             <div className="mt-4 space-y-3">
@@ -1155,7 +1154,7 @@ export default function ElevageView({
                     <div>
                       <div className="text-sm font-semibold text-slate-900">{feeding.articleName}</div>
                       <div className="mt-1 text-xs text-slate-500">
-                        Lot : {feeding.lotName || lots.find((lot) => lot.id === feeding.lotId)?.name || 'Non renseigne'}
+                        Lot : {feeding.lotName || lots.find((lot) => lot.id === feeding.lotId)?.name || 'Non affecte'}
                       </div>
                     </div>
                     <div className="text-right">
@@ -1170,7 +1169,7 @@ export default function ElevageView({
                     </div>
                     <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 border border-slate-100">
                       <Clock3 className="w-3.5 h-3.5 text-slate-400" />
-                      {feeding.time || 'Heure non precisee'}
+                      {feeding.time || 'Heure non renseignee'}
                     </div>
                     <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 border border-slate-100">
                       <Scale className="w-3.5 h-3.5 text-slate-400" />
@@ -1295,7 +1294,7 @@ export default function ElevageView({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900">Historique de croissance</h3>
-            <p className="mt-1 text-xs text-slate-500">Dernieres pesees enregistrees pour controler la progression des lots.</p>
+            <p className="mt-1 text-xs text-slate-500">Dernières pesées enregistrées pour suivre la progression des lots.</p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
             {sortedWeighings.length} pesee{sortedWeighings.length > 1 ? 's' : ''}
@@ -1304,7 +1303,7 @@ export default function ElevageView({
 
         {recentWeighings.length === 0 ? (
           <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-            Aucune pesee n'a encore ete enregistree.
+            Aucune pesée n'a encore été enregistrée.
           </div>
         ) : (
           <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">

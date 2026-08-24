@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'allowed_hosted_domain' => env('GOOGLE_ALLOWED_HOSTED_DOMAIN'),
+    ],
+
 ];

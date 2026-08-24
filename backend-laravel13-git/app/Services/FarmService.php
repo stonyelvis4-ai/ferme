@@ -12,9 +12,11 @@ class FarmService
 {
     public function createForAdministrator(User $administrator, array $data): Farm
     {
+        $baseSlug = $data['slug'] ?? Str::slug($data['name']);
+
         $farm = Farm::create([
             'name' => $data['name'],
-            'slug' => $data['slug'] ?? Str::slug($data['name']),
+            'slug' => $this->resolveUniqueSlug($baseSlug, $administrator),
             'administrator_id' => $administrator->id,
             'status' => $data['status'] ?? 'active',
             'currency' => $data['currency'] ?? 'FCFA',
@@ -56,6 +58,31 @@ class FarmService
         $administrator->assignedFarms()->sync([$farm->id]);
 
         return $farm;
+    }
+
+    private function resolveUniqueSlug(string $baseSlug, User $administrator): string
+    {
+        $normalizedBase = Str::slug($baseSlug !== '' ? $baseSlug : $administrator->name);
+        $candidate = $normalizedBase !== '' ? $normalizedBase : 'ferme';
+
+        if (! Farm::query()->where('slug', $candidate)->exists()) {
+            return $candidate;
+        }
+
+        $fallbackSeed = Str::slug($administrator->name);
+        $fallbackSeed = $fallbackSeed !== '' ? $fallbackSeed : 'admin';
+        $candidate = sprintf('%s-%s', $normalizedBase !== '' ? $normalizedBase : 'ferme', $fallbackSeed);
+
+        if (! Farm::query()->where('slug', $candidate)->exists()) {
+            return $candidate;
+        }
+
+        $suffix = 2;
+        while (Farm::query()->where('slug', sprintf('%s-%d', $candidate, $suffix))->exists()) {
+            $suffix++;
+        }
+
+        return sprintf('%s-%d', $candidate, $suffix);
     }
 
     public function createOwner(Farm $farm, array $data): User

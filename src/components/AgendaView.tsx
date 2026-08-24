@@ -75,7 +75,7 @@ export default function AgendaView({
         <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Point d'attention</span>
           <span className="mt-2 block text-sm font-bold text-amber-900">{nextTask?.title || 'Aucune échéance ouverte'}</span>
-          <p className="mt-1 text-xs text-amber-800">{overdueTasks > 0 ? `${overdueTasks} tâche(s) en retard à traiter.` : 'Aucun retard critique détecté.'}</p>
+          <p className="mt-1 text-xs text-amber-800">{overdueTasks > 0 ? `${overdueTasks} tache(s) en retard a traiter.` : 'Aucun retard critique detecte.'}</p>
         </div>
       </div>
 
@@ -83,7 +83,7 @@ export default function AgendaView({
       <div className="space-y-6">
         {Object.keys(groupedTasks).length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-slate-100 text-slate-400 text-xs">
-            Aucun événement programmé dans l'agenda.
+            Aucun evenement programme dans l agenda.
           </div>
         ) : (
           Object.keys(groupedTasks).map((dateStr) => {

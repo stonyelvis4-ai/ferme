@@ -4,6 +4,7 @@ namespace App\Http\Requests\Owner;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class UpdateOwnerRequest extends FormRequest
 {
@@ -17,9 +18,8 @@ class UpdateOwnerRequest extends FormRequest
         return [
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', Rule::unique('users', 'email')->ignore($this->route('owner')?->id)],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', 'string', Password::min(12)->mixedCase()->numbers()->symbols()],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
 }
-

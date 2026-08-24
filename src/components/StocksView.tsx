@@ -46,7 +46,7 @@ interface StocksViewProps {
 }
 
 const BUSINESS_MODULE_OPTIONS: Array<{ value: NonNullable<StockArticle['businessModule']>; label: string }> = [
-  { value: 'general', label: 'Usage général' },
+  { value: 'general', label: 'Usage general' },
   { value: 'livestock', label: 'Élevage' },
   { value: 'aquaculture', label: 'Pisciculture' },
   { value: 'crops', label: 'Cultures' },
@@ -315,6 +315,18 @@ export default function StocksView({
   };
 
   const linkedEntityCount = lots.length + bassins.length + parcelles.length + campaigns.length + buildings.length;
+  const lowStockCount = articles.filter((article) => article.quantity <= (article.minimumStock ?? article.minThreshold ?? 0)).length;
+  const stockValue = articles.reduce((sum, article) => sum + ((article.totalPurchasePrice ?? ((article.quantity || 0) * (article.unitCost ?? 0))) || 0), 0);
+  const activeArticlesCount = articles.filter((article) => article.isActive !== false).length;
+  const expiringSoonCount = articles.filter((article) => {
+    if (!article.expirationDate) return false;
+    const expiration = new Date(`${article.expirationDate}T00:00:00`);
+    if (Number.isNaN(expiration.getTime())) return false;
+    const days = (expiration.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    return days >= 0 && days <= 30;
+  }).length;
+  const stockTone = lowStockCount === 0 && expiringSoonCount === 0 ? 'emerald' : lowStockCount <= 3 ? 'amber' : 'rose';
+  const stockHeadline = lowStockCount === 0 && expiringSoonCount === 0 ? 'Stock sous controle' : lowStockCount <= 3 ? 'Vigilance stock' : 'Reapprovisionnement prioritaire';
 
   const handleSubmitArticleEdit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -390,8 +402,63 @@ export default function StocksView({
         )}
       </div>
 
+      <section className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_34%),linear-gradient(135deg,_#ffffff_0%,_#f8fafc_48%,_#ecfdf5_100%)] p-6 shadow-sm">
+        <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-emerald-200/20 blur-3xl" />
+        <div className="relative z-10 space-y-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                stockTone === 'emerald'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : stockTone === 'amber'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-rose-100 text-rose-800'
+              }`}>
+                {stockHeadline}
+              </span>
+              <div>
+                <h3 className="text-2xl font-black tracking-tight text-slate-950">Cockpit des intrants</h3>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+                  Lecture rapide de la valeur du stock, des seuils critiques, des peremptions et de la tracabilite metier.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
+              <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Valeur stock</div>
+                <div className="mt-2 text-xl font-black text-slate-900">{formatCurrency(stockValue)}</div>
+                <div className="mt-1 text-[11px] text-slate-500">Valorisation des articles suivis</div>
+              </div>
+              <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Articles actifs</div>
+                <div className="mt-2 text-xl font-black text-slate-900">{activeArticlesCount}</div>
+                <div className="mt-1 text-[11px] text-slate-500">Disponibles dans les operations</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Articles sensibles</span>
+              <span className="mt-2 block text-2xl font-black text-slate-900">{lowStockCount}</span>
+              <p className="mt-1 text-xs text-slate-500">Sous le stock minimum ou proches de la rupture.</p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Peremption proche</span>
+              <span className="mt-2 block text-2xl font-black text-slate-900">{expiringSoonCount}</span>
+              <p className="mt-1 text-xs text-slate-500">Articles a surveiller dans les 30 prochains jours.</p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Liens metier</span>
+              <span className="mt-2 block text-2xl font-black text-slate-900">{linkedEntityCount}</span>
+              <p className="mt-1 text-xs text-slate-500">Entites disponibles pour la tracabilite croisee.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {showCreateForm && role === 'admin' && (
-        <form onSubmit={handleCreateArticle} className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-sm space-y-5">
+        <form onSubmit={handleCreateArticle} className="bg-white border border-emerald-100 p-5 rounded-[26px] shadow-sm space-y-5">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Reference preview</span>
@@ -400,7 +467,7 @@ export default function StocksView({
             </div>
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Traçabilité</span>
-              <span className="mt-1 block text-sm font-semibold text-emerald-900">{selectedRelation?.label || 'Usage général'}</span>
+              <span className="mt-1 block text-sm font-semibold text-emerald-900">{selectedRelation?.label || 'Usage general'}</span>
               <p className="mt-1 text-[11px] text-emerald-800">Module: {BUSINESS_MODULE_OPTIONS.find((item) => item.value === (form.businessModule ?? 'general'))?.label}</p>
             </div>
             <div>
@@ -581,7 +648,7 @@ export default function StocksView({
                 }}
                 className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
               >
-                <option value=":">Usage général</option>
+                <option value=":">Usage general</option>
                 {availableRelations.map((relation) => (
                   <option key={`${relation.type}:${relation.id}`} value={`${relation.type}:${relation.id}`}>{relation.label}</option>
                 ))}
@@ -671,7 +738,7 @@ export default function StocksView({
                     className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
                     required
                   />
-                  <span className="block text-[10px] text-slate-500">Nom commercial ou raison sociale qui apparaitra dans les achats.</span>
+                  <span className="block text-[10px] text-slate-500">Nom commercial ou raison sociale qui apparaîtra dans les achats.</span>
                 </label>
 
                 <label className="space-y-1.5">
@@ -742,8 +809,8 @@ export default function StocksView({
 
           {articles.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
-              <p className="text-sm font-semibold text-slate-700">Aucun article de stock enregistre.</p>
-              <p className="mt-2 text-xs text-slate-500">Les intrants, medicaments, semences, equipements et consommables apparaitront ici apres creation.</p>
+              <p className="text-sm font-semibold text-slate-700">Aucun article de stock enregistre pour le moment.</p>
+              <p className="mt-2 text-xs text-slate-500">Les intrants, médicaments, semences, équipements et consommables apparaîtront ici après leur création.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -763,7 +830,7 @@ export default function StocksView({
                     ?.unitCost;
 
                 return (
-                  <div key={article.id} className={`bg-white border rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow transition-shadow ${isLow ? 'border-amber-200 bg-amber-50/10' : 'border-slate-100'}`}>
+                  <div key={article.id} className={`bg-white border rounded-[24px] p-4 shadow-sm flex flex-col justify-between transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg ${isLow ? 'border-amber-200 bg-amber-50/10' : 'border-slate-100'}`}>
                     <div className="space-y-3">
                       <div className="flex justify-between items-start gap-3">
                         <div>
@@ -798,7 +865,7 @@ export default function StocksView({
                         ) : null}
                         <div>
                           <span className="block text-[10px] uppercase tracking-wide text-slate-400">Prix unitaire</span>
-                          <span className="font-semibold text-slate-700">{typeof lastKnownUnitCost === 'number' && lastKnownUnitCost > 0 ? formatCurrency(lastKnownUnitCost) : 'Non renseigne'}</span>
+                          <span className="font-semibold text-slate-700">{typeof lastKnownUnitCost === 'number' && lastKnownUnitCost > 0 ? formatCurrency(lastKnownUnitCost) : 'A renseigner'}</span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase tracking-wide text-slate-400">Valeur totale</span>
@@ -806,23 +873,23 @@ export default function StocksView({
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase tracking-wide text-slate-400">Emplacement</span>
-                          <span className="font-semibold text-slate-700">{article.storageLocation || article.locationId || 'Non renseigne'}</span>
+                          <span className="font-semibold text-slate-700">{article.storageLocation || article.locationId || 'A renseigner'}</span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase tracking-wide text-slate-400">Fournisseur</span>
-                          <span className="font-semibold text-slate-700">{article.supplierName || 'Non renseigne'}</span>
+                          <span className="font-semibold text-slate-700">{article.supplierName || 'A renseigner'}</span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase tracking-wide text-slate-400">Marque</span>
-                          <span className="font-semibold text-slate-700">{article.brand || 'Non renseignee'}</span>
+                          <span className="font-semibold text-slate-700">{article.brand || 'A renseigner'}</span>
                         </div>
                         <div>
-                          <span className="block text-[10px] uppercase tracking-wide text-slate-400">Lot / péremption</span>
-                          <span className="font-semibold text-slate-700">{article.batchNumber || article.expirationDate || 'Non renseigne'}</span>
+                          <span className="block text-[10px] uppercase tracking-wide text-slate-400">Lot / peremption</span>
+                          <span className="font-semibold text-slate-700">{article.batchNumber || article.expirationDate || 'A renseigner'}</span>
                         </div>
                         <div>
-                          <span className="block text-[10px] uppercase tracking-wide text-slate-400">Module lié</span>
-                          <span className="font-semibold text-slate-700">{BUSINESS_MODULE_OPTIONS.find((item) => item.value === (article.businessModule || 'general'))?.label || 'Usage général'}</span>
+                          <span className="block text-[10px] uppercase tracking-wide text-slate-400">Module lie</span>
+                          <span className="font-semibold text-slate-700">{BUSINESS_MODULE_OPTIONS.find((item) => item.value === (article.businessModule || 'general'))?.label || 'Usage general'}</span>
                         </div>
                       </div>
 
@@ -876,11 +943,10 @@ export default function StocksView({
                                 setEditArticleName(article.name);
                                 setEditArticleUnitCost(String(article.unitCost ?? lastKnownUnitCost ?? 0));
                               }}
-                              onDelete={() => {
-                                if (window.confirm(`Supprimer l'article ${article.name} ?`)) {
-                                  onDeleteStockArticle(article.id);
-                                }
-                              }}
+                              onDelete={() => onDeleteStockArticle(article.id)}
+                              confirmDeleteTitle="Supprimer cet article de stock ?"
+                              confirmDeleteDescription={`L'article "${article.name}" sera retire s'il ne porte pas deja une trace operationnelle ou financiere.`}
+                              confirmDeleteActionLabel="Supprimer l'article"
                             />
                           </div>
                         )}
@@ -893,10 +959,10 @@ export default function StocksView({
           )}
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm space-y-4">
+        <div className="bg-white rounded-[26px] border border-slate-100 p-5 shadow-sm space-y-4">
           <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
             <History className="w-4 h-4 text-emerald-600" />
-            Mouvements recents
+            Mouvements récents
           </h3>
           <p className="text-[11px] text-slate-400">Historique des entrées, sorties et ajustements de stock tracés pour la ferme.</p>
 
@@ -932,3 +998,4 @@ export default function StocksView({
     </div>
   );
 }
+

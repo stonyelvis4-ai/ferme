@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -155,7 +155,7 @@ export default function DashboardView({
   const eggDirectCost = eggAcquisitionCost + eggFeedCost + eggSanitaryCost;
   const eggMargin = eggRevenue - eggDirectCost;
 
-  const livestockRevenue = getTransactionTotals('Élevage').income;
+  const livestockRevenue = getTransactionTotals('Elevage').income;
   const livestockFeedCost = livestockLots.reduce((sum, lot) => sum + (feedingTotals[lot.id]?.cost ?? 0), 0);
   const livestockFeedQuantity = livestockLots.reduce((sum, lot) => sum + (feedingTotals[lot.id]?.quantity ?? 0), 0);
   const livestockSanitaryCost = livestockLots.reduce((sum, lot) => sum + (sanitaryTotals[lot.id] ?? 0), 0);
@@ -174,18 +174,18 @@ export default function DashboardView({
       directCost: eggDirectCost,
       margin: eggMargin,
       accent: 'amber',
-      detail: `${eggSalesCount.toLocaleString('fr-FR')} oeufs vendus, ${eggFeedQuantity.toFixed(1)} kg d'aliment distribués`,
-      helper: `${layingLots.length} lot(s) suivis, coût sanitaire ${formatCurrency(eggSanitaryCost)}`
+      detail: `${eggSalesCount.toLocaleString('fr-FR')} œufs vendus, ${eggFeedQuantity.toFixed(1)} kg d'aliment distribués`,
+      helper: `${layingLots.length} lot(s) suivis, cout sanitaire ${formatCurrency(eggSanitaryCost)}`
     },
     {
-      key: 'élevage',
-      label: 'Élevage',
+      key: 'elevage',
+      label: 'Elevage',
       revenue: livestockRevenue,
       directCost: livestockDirectCost,
       margin: livestockMargin,
       accent: 'emerald',
-      detail: `${livestockLots.length} lot(s) hors pondeuses, ${livestockFeedQuantity.toFixed(1)} kg distribués`,
-      helper: `${treatments.filter((treatment) => livestockLotIds.has(treatment.lotId) && treatment.status === 'completed').length} soin(s) clôturés`
+      detail: `${livestockLots.length} lot(s) hors pondeuses, ${livestockFeedQuantity.toFixed(1)} kg distribues`,
+      helper: `${treatments.filter((treatment) => livestockLotIds.has(treatment.lotId) && treatment.status === 'completed').length} soin(s) clotures`
     },
     {
       key: 'pisciculture',
@@ -204,7 +204,7 @@ export default function DashboardView({
       directCost: cropsTotals.expense,
       margin: cropsTotals.income - cropsTotals.expense,
       accent: 'lime',
-      detail: `${cultivatedPlots.length} parcelle(s) cultivées sur ${cultivatedArea.toFixed(1)} ${areaUnit}`,
+      detail: `${cultivatedPlots.length} parcelle(s) cultivees sur ${cultivatedArea.toFixed(1)} ${areaUnit}`,
       helper: `Campagnes actives et récoltes valorisées en comptabilité`
     }
   ];
@@ -221,6 +221,12 @@ export default function DashboardView({
     .sort((a, b) => b.amount - a.amount);
 
   const totalExpenseAmount = expenseBreakdown.reduce((sum, item) => sum + item.amount, 0);
+  const criticalAlertsCount = activeAlerts.filter((alert) => alert.severity === 'critical').length;
+  const warningAlertsCount = activeAlerts.filter((alert) => alert.severity === 'warning').length;
+  const urgentLoad = activeAlerts.length + overdueTasksCount + stockAlerts;
+  const healthTone = urgentLoad === 0 ? 'emerald' : urgentLoad <= 3 ? 'amber' : 'rose';
+  const healthLabel = urgentLoad === 0 ? 'Exploitation stable' : urgentLoad <= 3 ? 'Points de vigilance' : 'Priorites a traiter';
+  const nextTask = [...pendingTasks].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0] ?? null;
 
   const isEmpty =
     lots.length === 0 &&
@@ -267,51 +273,105 @@ export default function DashboardView({
             Votre tableau de bord est prêt, mais la ferme ne contient pas encore de données opérationnelles.
           </p>
           <p className="mt-2 text-sm text-slate-500">
-            Commencez par créer un lot, une parcelle, un bassin, un stock ou une tâche pour alimenter les indicateurs.
+            Commencez par creer un lot, une parcelle, un bassin, un stock ou une tache pour alimenter les indicateurs.
           </p>
         </div>
       ) : null}
 
       {!isEmpty ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Résultat net</span>
-            <span className={`mt-2 block text-xl font-bold ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(netProfit)}</span>
-            <p className="mt-1 text-xs text-slate-500">Différence entre revenus et dépenses enregistrés.</p>
-          </div>
-          <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-4 shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Cheptel aquacole</span>
-            <span className="mt-2 block text-xl font-bold text-sky-900">{totalFishCount.toLocaleString('fr-FR')}</span>
-            <p className="mt-1 text-xs text-sky-800">Poissons actuellement suivis dans les bassins.</p>
-          </div>
-          <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4 shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Stocks sensibles</span>
-            <span className="mt-2 block text-xl font-bold text-amber-900">{stockAlerts}</span>
-            <p className="mt-1 text-xs text-amber-800">Articles proches ou sous leur seuil d'alerte.</p>
-          </div>
-          <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Vigilance</span>
-            <span className="mt-2 block text-xl font-bold text-rose-900">{activeAlerts.length + overdueTasksCount}</span>
-            <p className="mt-1 text-xs text-rose-800">Total des alertes ouvertes et tâches en retard.</p>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_1fr]">
+          <section className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_34%),linear-gradient(135deg,_#ffffff_0%,_#f8fafc_48%,_#ecfdf5_100%)] p-6 shadow-sm">
+            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-emerald-200/20 blur-3xl" />
+            <div className="relative z-10">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-2xl space-y-3">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${healthTone === 'emerald' ? 'bg-emerald-100 text-emerald-800' : healthTone === 'amber' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
+                    {healthLabel}
+                  </span>
+                  <div>
+                    <h2 className="text-2xl font-black tracking-tight text-slate-950">Cockpit de pilotage FERM+</h2>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
+                      Vue rapide de la rentabilite, des priorites terrain et des flux metier relies a la ferme.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
+                  <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Résultat net</div>
+                    <div className={`mt-2 text-xl font-black ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(netProfit)}</div>
+                    <div className="mt-1 text-[11px] text-slate-500">Revenus moins dépenses</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Valeur stock</div>
+                    <div className="mt-2 text-xl font-black text-slate-900">{formatCurrency(stockValue)}</div>
+                    <div className="mt-1 text-[11px] text-slate-500">Intrants et articles valorises</div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Alertes actives</span>
+                    <AlertTriangle className={`h-4 w-4 ${criticalAlertsCount > 0 ? 'text-rose-500' : 'text-amber-500'}`} />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-slate-900">{activeAlerts.length}</div>
+                  <p className="mt-1 text-xs text-slate-500">{criticalAlertsCount} critique(s), {warningAlertsCount} importante(s).</p>
+                </div>
+                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Execution du jour</span>
+                    <CheckSquare className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-slate-900">{pendingTasks.length}</div>
+                  <p className="mt-1 text-xs text-slate-500">{nextTask ? `Prochaine échéance : ${nextTask.dueDate}` : 'Aucune échéance immédiate en attente.'}</p>
+                </div>
+                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Pression operationnelle</span>
+                    <TrendingUp className={`h-4 w-4 ${urgentLoad > 3 ? 'text-rose-500' : urgentLoad > 0 ? 'text-amber-500' : 'text-emerald-500'}`} />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-slate-900">{urgentLoad}</div>
+                  <p className="mt-1 text-xs text-slate-500">Alertes, retards et stocks sensibles combines.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-1">
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Cheptel aquacole</span>
+              <span className="mt-2 block text-xl font-black text-sky-900">{totalFishCount.toLocaleString('fr-FR')}</span>
+              <p className="mt-1 text-xs text-sky-800">Poissons actuellement suivis dans les bassins.</p>
+            </div>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Stocks sensibles</span>
+              <span className="mt-2 block text-xl font-black text-amber-900">{stockAlerts}</span>
+              <p className="mt-1 text-xs text-amber-800">Articles proches ou sous leur seuil d'alerte.</p>
+            </div>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Vigilance</span>
+              <span className="mt-2 block text-xl font-black text-rose-900">{activeAlerts.length + overdueTasksCount}</span>
+              <p className="mt-1 text-xs text-rose-800">Total des alertes ouvertes et taches en retard.</p>
+            </div>
           </div>
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <button
           id="kpi-lots"
           type="button"
           onClick={() => onNavigate('élevage')}
-          className="group rounded-2xl border border-slate-100 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:border-emerald-500/40 hover:shadow"
+          className="group rounded-[24px] border border-slate-100 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-900/5"
         >
           <div className="flex items-start justify-between">
             <div className="rounded-xl bg-emerald-50 p-2.5 transition-colors group-hover:bg-emerald-100">
               <Activity className="h-5 w-5 text-emerald-600" />
             </div>
-            <span className="text-xs font-medium text-slate-400">Élevage</span>
+            <span className="text-xs font-medium text-slate-400">Elevage</span>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-bold text-slate-900">{activeLotsCount}</h3>
+            <h3 className="text-3xl font-black text-slate-900">{activeLotsCount}</h3>
             <p className="mt-1 text-xs text-slate-500">Lots actifs</p>
             <div className="mt-2.5 flex items-center justify-between border-t border-slate-50 pt-2.5 text-[11px]">
               <span className="font-semibold text-emerald-600">{avgSurvivalRate.toFixed(1)}% survie</span>
@@ -324,7 +384,7 @@ export default function DashboardView({
           id="kpi-eggs"
           type="button"
           onClick={() => onNavigate('pondeuses')}
-          className="group rounded-2xl border border-slate-100 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:border-amber-500/40 hover:shadow"
+          className="group rounded-[24px] border border-slate-100 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-900/5"
         >
           <div className="flex items-start justify-between">
             <div className="rounded-xl bg-amber-50 p-2.5 transition-colors group-hover:bg-amber-100">
@@ -333,10 +393,10 @@ export default function DashboardView({
             <span className="text-xs font-medium text-slate-400">Pondeuses</span>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-bold text-slate-900">{eggsToday.toLocaleString('fr-FR')}</h3>
-            <p className="mt-1 text-xs text-slate-500">Oeufs collectés</p>
+            <h3 className="text-3xl font-black text-slate-900">{eggsToday.toLocaleString('fr-FR')}</h3>
+            <p className="mt-1 text-xs text-slate-500">Œufs collectés</p>
             <div className="mt-2.5 flex items-center justify-between border-t border-slate-50 pt-2.5 text-[11px]">
-              <span className="font-semibold text-amber-600">Qualité : {latestQualityRate.toFixed(1)}%</span>
+              <span className="font-semibold text-amber-600">Qualite : {latestQualityRate.toFixed(1)}%</span>
               <span className="text-slate-400">Consulter</span>
             </div>
           </div>
@@ -346,7 +406,7 @@ export default function DashboardView({
           id="kpi-fish"
           type="button"
           onClick={() => onNavigate('pisciculture')}
-          className="group rounded-2xl border border-slate-100 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:border-sky-500/40 hover:shadow"
+          className="group rounded-[24px] border border-slate-100 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-500/40 hover:shadow-lg hover:shadow-sky-900/5"
         >
           <div className="flex items-start justify-between">
             <div className="rounded-xl bg-sky-50 p-2.5 transition-colors group-hover:bg-sky-100">
@@ -355,7 +415,7 @@ export default function DashboardView({
             <span className="text-xs font-medium text-slate-400">Pisciculture</span>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-bold text-slate-900">{activeBassinsCount}</h3>
+            <h3 className="text-3xl font-black text-slate-900">{activeBassinsCount}</h3>
             <p className="mt-1 text-xs text-slate-500">Bassins actifs</p>
             <div className="mt-2.5 flex items-center justify-between border-t border-slate-50 pt-2.5 text-[11px]">
               <span className="font-semibold text-sky-600">{totalFishCount.toLocaleString('fr-FR')} poissons</span>
@@ -368,7 +428,7 @@ export default function DashboardView({
           id="kpi-crops"
           type="button"
           onClick={() => onNavigate('cultures')}
-          className="group rounded-2xl border border-slate-100 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:border-lime-500/40 hover:shadow"
+          className="group rounded-[24px] border border-slate-100 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-lime-500/40 hover:shadow-lg hover:shadow-lime-900/5"
         >
           <div className="flex items-start justify-between">
             <div className="rounded-xl bg-lime-50 p-2.5 transition-colors group-hover:bg-lime-100">
@@ -377,10 +437,10 @@ export default function DashboardView({
             <span className="text-xs font-medium text-slate-400">Cultures</span>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-bold text-slate-900">
+            <h3 className="text-3xl font-black text-slate-900">
               {cultivatedArea.toFixed(1)} {areaUnit}
             </h3>
-            <p className="mt-1 text-xs text-slate-500">Superficie cultivée</p>
+            <p className="mt-1 text-xs text-slate-500">Superficie cultivee</p>
             <div className="mt-2.5 flex items-center justify-between border-t border-slate-50 pt-2.5 text-[11px]">
               <span className="font-semibold text-lime-600">{cultivatedPlots.length} parcelle(s) active(s)</span>
               <span className="text-slate-400">Parcelles</span>
@@ -391,14 +451,14 @@ export default function DashboardView({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <section className="rounded-[26px] border border-slate-100 bg-white p-5 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-sans text-base font-bold tracking-tight text-slate-900">
-                  Rentabilité par activité
+                  Rentabilite par activite
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Lecture économique des charges directes déjà tracées dans FERM+.
+                  Lecture economique des charges directes deja tracees dans FERM+.
                 </p>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-right">
@@ -417,7 +477,7 @@ export default function DashboardView({
                     key={activity.key}
                     type="button"
                     onClick={() => onNavigate(activity.key)}
-                    className={`rounded-2xl border p-4 text-left shadow-sm transition-all ${accent.panel} ${accent.button}`}
+                    className={`rounded-[22px] border p-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg ${accent.panel} ${accent.button}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -427,20 +487,20 @@ export default function DashboardView({
                         <p className="mt-3 text-sm font-semibold text-slate-900">{activity.detail}</p>
                       </div>
                       <span className={`text-xs font-bold ${marginPositive ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {marginPositive ? 'Marge positive' : 'Marge à corriger'}
+                        {marginPositive ? 'Marge positive' : 'Marge a corriger'}
                       </span>
                     </div>
 
                     <div className="mt-4 grid grid-cols-3 gap-3">
-                      <div className="rounded-xl border border-white/70 bg-white/80 p-3">
+                      <div className="rounded-2xl border border-white/70 bg-white/80 p-3">
                         <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Revenus</div>
                         <div className="mt-1 text-sm font-bold text-slate-900">{formatCurrency(activity.revenue)}</div>
                       </div>
-                      <div className="rounded-xl border border-white/70 bg-white/80 p-3">
+                      <div className="rounded-2xl border border-white/70 bg-white/80 p-3">
                         <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Charges</div>
                         <div className="mt-1 text-sm font-bold text-slate-900">{formatCurrency(activity.directCost)}</div>
                       </div>
-                      <div className="rounded-xl border border-white/70 bg-white/80 p-3">
+                      <div className="rounded-2xl border border-white/70 bg-white/80 p-3">
                         <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Marge</div>
                         <div className={`mt-1 text-sm font-bold ${marginPositive ? 'text-emerald-700' : 'text-rose-700'}`}>
                           {formatCurrency(activity.margin)}
@@ -455,11 +515,11 @@ export default function DashboardView({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <section className="rounded-[26px] border border-slate-100 bg-white p-5 shadow-sm">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h3 className="font-sans text-base font-bold tracking-tight text-slate-900">
-                  Vue d&apos;ensemble financière
+                  Vue d&apos;ensemble financiere
                 </h3>
                 <p className="text-xs text-slate-500">Synthèse calculée à partir des opérations enregistrées.</p>
               </div>
@@ -468,13 +528,13 @@ export default function DashboardView({
                 onClick={() => onNavigate('finances')}
                 className="flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
               >
-                Gérer la trésorerie
+                Gerer la tresorerie
                 <ArrowRight className="h-3 w-3" />
               </button>
             </div>
 
-            <div className="mb-6 grid grid-cols-3 gap-4">
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+            <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
                   <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
                   <span>Revenus</span>
@@ -482,16 +542,16 @@ export default function DashboardView({
                 <div className="truncate text-lg font-bold text-slate-900">{formatCurrency(income)}</div>
               </div>
 
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
                   <TrendingDown className="h-3.5 w-3.5 text-rose-500" />
-                  <span>Dépenses</span>
+                  <span>Depenses</span>
                 </div>
                 <div className="truncate text-lg font-bold text-slate-900">{formatCurrency(expenses)}</div>
               </div>
 
               <div
-                className={`rounded-xl border p-4 ${
+                className={`rounded-2xl border p-4 ${
                   netProfit >= 0 ? 'border-emerald-100 bg-emerald-50/50' : 'border-rose-100 bg-rose-50/50'
                 }`}
               >
@@ -538,14 +598,14 @@ export default function DashboardView({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <section className="rounded-[26px] border border-slate-100 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="flex items-center gap-1.5 font-bold text-slate-900">
                   <Package className="h-5 w-5 text-emerald-600" />
-                  Contrôle des stocks
+                  Controle des stocks
                 </h3>
-                <p className="text-xs text-slate-500">Articles surveillés selon les seuils réels du stock.</p>
+                <p className="text-xs text-slate-500">Articles surveilles selon les seuils reels du stock.</p>
               </div>
               <button
                 type="button"
@@ -559,7 +619,7 @@ export default function DashboardView({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {articles.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center text-xs text-slate-400 md:col-span-2">
-                  Aucun article de stock enregistré.
+                  Aucun article de stock enregistre pour le moment.
                 </div>
               ) : (
                 articles.map((article) => {
@@ -569,7 +629,7 @@ export default function DashboardView({
                   return (
                     <div
                       key={article.id}
-                      className={`rounded-xl border p-3.5 transition-colors ${
+                    className={`rounded-2xl border p-3.5 transition-colors duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
                         isLow ? 'border-amber-200/60 bg-amber-50/40' : 'border-slate-100 bg-slate-50/50'
                       }`}
                     >
@@ -597,7 +657,7 @@ export default function DashboardView({
                           {isLow ? (
                             <span className="flex items-center gap-0.5 font-medium text-amber-600">
                               <AlertTriangle className="h-3 w-3" />
-                              Réapprovisionner
+                              Reapprovisionner
                             </span>
                           ) : null}
                         </div>
@@ -611,7 +671,7 @@ export default function DashboardView({
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <section className="rounded-[26px] border border-slate-100 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="flex items-center gap-1.5 font-bold text-slate-900">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -629,13 +689,13 @@ export default function DashboardView({
             <div className="max-h-[280px] space-y-3 overflow-y-auto pr-1">
               {activeAlerts.length === 0 ? (
                 <div className="py-6 text-center text-xs text-slate-400">
-                  Aucune alerte active sur l&apos;exploitation.
+                  Aucune alerte active sur l exploitation.
                 </div>
               ) : (
                 activeAlerts.slice(0, 4).map((alert) => (
                   <div
                     key={alert.id}
-                    className={`relative overflow-hidden rounded-xl border p-3 text-xs ${
+                    className={`relative overflow-hidden rounded-2xl border p-3 text-xs shadow-sm ${
                       alert.severity === 'critical'
                         ? 'border-rose-100 bg-rose-50 text-rose-900'
                         : 'border-amber-100 bg-amber-50 text-amber-900'
@@ -647,7 +707,7 @@ export default function DashboardView({
                     </div>
                     <p className="mt-1 text-[11px] leading-relaxed text-slate-600">{alert.description}</p>
                     <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
-                      <span>Module : {alert.sourceModule || 'Général'}</span>
+                      <span>Module : {alert.sourceModule || 'Usage general'}</span>
                       <span>{new Date(alert.date).toLocaleDateString('fr-FR')}</span>
                     </div>
                   </div>
@@ -656,11 +716,11 @@ export default function DashboardView({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <section className="rounded-[26px] border border-slate-100 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="flex items-center gap-1.5 font-bold text-slate-900">
                 <CheckSquare className="h-4 w-4 text-emerald-600" />
-                Tâches ({pendingTasks.length})
+                Taches ({pendingTasks.length})
               </h3>
               <button
                 type="button"
@@ -674,13 +734,13 @@ export default function DashboardView({
             <div className="space-y-3">
               {pendingTasks.length === 0 ? (
                 <div className="py-6 text-center text-xs text-slate-400">
-                  Aucune tâche restante pour aujourd&apos;hui.
+                  Aucune tache restante pour aujourd hui.
                 </div>
               ) : (
                 pendingTasks.slice(0, 4).map((task) => (
                   <div
                     key={task.id}
-                    className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 text-xs transition-colors hover:bg-slate-50"
+                    className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3 text-xs transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"
                   >
                     <div className="flex items-start justify-between">
                       <span className="font-semibold text-slate-800">{task.title}</span>
@@ -700,7 +760,7 @@ export default function DashboardView({
                     <div className="mt-2.5 flex justify-between border-t border-slate-100/50 pt-2 text-[10px] text-slate-400">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-slate-400" />
-                        Échéance : {task.dueDate}
+                        Echeance : {task.dueDate}
                       </span>
                       {task.assignedTo ? <span>Par : {task.assignedTo}</span> : null}
                     </div>
@@ -712,9 +772,9 @@ export default function DashboardView({
                 <div className="mt-2 flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 p-3 text-xs text-rose-900">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
                   <div>
-                    <span className="font-bold">{overdueTasksCount} tâche(s) en retard</span>
+                    <span className="font-bold">{overdueTasksCount} tache(s) en retard</span>
                     <p className="mt-0.5 text-[10px] text-slate-500">
-                      Priorisez les opérations les plus urgentes depuis l&apos;agenda ou le module concerné.
+                      Priorisez les operations les plus urgentes depuis l&apos;agenda ou le module concerne.
                     </p>
                   </div>
                 </div>
@@ -726,3 +786,7 @@ export default function DashboardView({
     </div>
   );
 }
+
+
+
+

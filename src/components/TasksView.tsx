@@ -135,7 +135,7 @@ export default function TasksView({
               rows={4}
               value={editTaskDescription}
               onChange={(e) => setEditTaskDescription(e.target.value)}
-              placeholder="Precisez les consignes techniques pour l'equipe."
+              placeholder="Précisez les consignes techniques pour l'équipe."
               className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
             />
           </label>
@@ -193,8 +193,8 @@ export default function TasksView({
               <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Échéance</span>
               <span className="mt-1 block text-sm font-semibold text-emerald-900">{startDate} au {dueDate}</span>
               <p className="mt-1 text-[11px] text-emerald-800">
-                {durationInDays} {durationInDays > 1 ? 'jours planifies' : 'jour planifie'}.
-                {isCriticalPriority ? ' Cette tache ressortira en priorite dans le suivi quotidien.' : ' La tache sera visible dans le suivi quotidien.'}
+                {durationInDays} {durationInDays > 1 ? 'jours planifiés' : 'jour planifié'}.
+                {isCriticalPriority ? ' Cette tâche ressortira en priorité dans le suivi quotidien.' : ' La tâche sera visible dans le suivi quotidien.'}
               </p>
             </div>
           </div>
@@ -206,7 +206,7 @@ export default function TasksView({
                 id="task-title-input"
                 type="text"
                 required
-                placeholder="Ex: Nettoyage mangeoires Poulailler B"
+                placeholder="Ex. Nettoyage mangeoires Poulailler B"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
@@ -240,7 +240,7 @@ export default function TasksView({
                 onChange={(e) => setStartDate(e.target.value)}
                 className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
-              <p className="mt-1 text-[10px] text-slate-500">Date de debut de la tache dans le calendrier.</p>
+              <p className="mt-1 text-[10px] text-slate-500">Date de début de la tâche dans le calendrier.</p>
             </div>
 
             <div>
@@ -254,7 +254,7 @@ export default function TasksView({
                 min={startDate}
                 className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
               />
-              <p className="mt-1 text-[10px] text-slate-500">{isCriticalPriority ? "Fixez une fin proche si l'action est urgente." : 'Date de fin prevue.'}</p>
+              <p className="mt-1 text-[10px] text-slate-500">{isCriticalPriority ? "Fixez une fin proche si l'action est urgente." : 'Date de fin prévue.'}</p>
             </div>
 
             <div>
@@ -262,7 +262,7 @@ export default function TasksView({
               <div className="flex min-h-[48px] items-center rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 text-sm font-semibold text-emerald-900">
                 {durationInDays} {durationInDays > 1 ? 'jours' : 'jour'}
               </div>
-              <p className="mt-1 text-[10px] text-slate-500">Calcule automatiquement a partir des dates choisies.</p>
+              <p className="mt-1 text-[10px] text-slate-500">Calculée automatiquement à partir des dates choisies.</p>
             </div>
 
             <div className="md:col-span-2">
@@ -301,7 +301,7 @@ export default function TasksView({
               >
                 {taskModuleOptions.map((option) => (
                   <option key={option} value={option}>
-                    {option === 'Ferme' ? 'Ferme (General)' : option}
+                    {option === 'Ferme' ? 'Ferme (usage général)' : option}
                   </option>
                 ))}
               </select>
@@ -330,9 +330,9 @@ export default function TasksView({
       {/* Task checklist cards list */}
       {tasks.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-700">Aucune tâche enregistrée.</p>
+          <p className="text-sm font-semibold text-slate-700">Aucune tâche enregistrée pour le moment.</p>
           <p className="mt-2 text-xs text-slate-500">
-            Les tâches créées depuis les modules métier ou manuellement apparaîtront ici avec leur suivi.
+            Les tâches créées depuis les modules métier ou ajoutées manuellement apparaîtront ici avec leur suivi.
           </p>
         </div>
       ) : (
@@ -392,11 +392,10 @@ export default function TasksView({
                       <AdminEntityActions
                         compact
                         onEdit={() => handleEditTask(task)}
-                        onDelete={() => {
-                          if (window.confirm(`Supprimer la tâche ${task.title} ?`)) {
-                            onDeleteTask(task.id);
-                          }
-                        }}
+                        onDelete={() => onDeleteTask(task.id)}
+                        confirmDeleteTitle="Supprimer cette tache ?"
+                        confirmDeleteDescription={`La tache "${task.title}" sera retiree du suivi, du calendrier et de l'historique visible.`}
+                        confirmDeleteActionLabel="Supprimer la tache"
                       />
                     </div>
                   ) : (
@@ -415,4 +414,6 @@ export default function TasksView({
     </div>
   );
 }
+
+
 

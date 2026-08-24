@@ -8,15 +8,17 @@ const AUTH_TOKEN_KEY = 'fermplus_token';
 const AUTH_USER_KEY = 'fermplus_user';
 const COOKIE_AUTH_MARKER = 'cookie-session';
 
-function readSessionValue(key: string) {
-  return sessionStorage.getItem(key);
+function readPersistentValue(key: string) {
+  return localStorage.getItem(key) ?? sessionStorage.getItem(key);
 }
 
-function writeSessionValue(key: string, value: string) {
+function writePersistentValue(key: string, value: string) {
+  localStorage.setItem(key, value);
   sessionStorage.setItem(key, value);
 }
 
-function removeSessionValue(key: string) {
+function removeStoredValue(key: string) {
+  localStorage.removeItem(key);
   sessionStorage.removeItem(key);
 }
 
@@ -29,28 +31,24 @@ export function getApiBaseUrl() {
 }
 
 export function getStoredAuthToken() {
-  const sessionToken = readSessionValue(AUTH_TOKEN_KEY);
-  if (sessionToken) return sessionToken;
+  const storedValue = readPersistentValue(AUTH_TOKEN_KEY);
 
-  const legacyToken = localStorage.getItem(AUTH_TOKEN_KEY);
-  if (legacyToken) {
-    writeSessionValue(AUTH_TOKEN_KEY, legacyToken);
-    localStorage.removeItem(AUTH_TOKEN_KEY);
+  // Older versions persisted the raw Sanctum token. Replace it with a marker
+  // so authentication relies only on the HttpOnly cookie from now on.
+  if (storedValue && storedValue !== COOKIE_AUTH_MARKER) {
+    writePersistentValue(AUTH_TOKEN_KEY, COOKIE_AUTH_MARKER);
   }
 
-  return legacyToken ?? '';
+  return storedValue ? COOKIE_AUTH_MARKER : '';
 }
 
-export function setStoredAuthToken(token: string) {
-  writeSessionValue(AUTH_TOKEN_KEY, token || COOKIE_AUTH_MARKER);
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+export function setStoredAuthToken(_token?: string) {
+  writePersistentValue(AUTH_TOKEN_KEY, COOKIE_AUTH_MARKER);
 }
 
 export function clearStoredAuthToken() {
-  removeSessionValue(AUTH_TOKEN_KEY);
-  removeSessionValue(AUTH_USER_KEY);
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-  localStorage.removeItem(AUTH_USER_KEY);
+  removeStoredValue(AUTH_TOKEN_KEY);
+  removeStoredValue(AUTH_USER_KEY);
 }
 
 function shouldSendBearerToken(token?: string) {
@@ -58,23 +56,17 @@ function shouldSendBearerToken(token?: string) {
 }
 
 export function getStoredAuthUser<T = AuthUser>() {
-  const raw = readSessionValue(AUTH_USER_KEY) ?? localStorage.getItem(AUTH_USER_KEY);
+  const raw = readPersistentValue(AUTH_USER_KEY);
   if (!raw) return null;
   try {
-    const user = JSON.parse(raw) as T;
-    if (!readSessionValue(AUTH_USER_KEY)) {
-      writeSessionValue(AUTH_USER_KEY, raw);
-      localStorage.removeItem(AUTH_USER_KEY);
-    }
-    return user;
+    return JSON.parse(raw) as T;
   } catch {
     return null;
   }
 }
 
 export function setStoredAuthUser(user: AuthUser) {
-  writeSessionValue(AUTH_USER_KEY, JSON.stringify(user));
-  localStorage.removeItem(AUTH_USER_KEY);
+  writePersistentValue(AUTH_USER_KEY, JSON.stringify(user));
 }
 
 async function requestJson<T>(
@@ -109,10 +101,38 @@ async function requestJson<T>(
   const payload = isJson ? await response.json().catch(() => null) : await response.text().catch(() => '');
 
   if (!response.ok) {
-    const message =
+    let message =
       typeof payload === 'object' && payload && 'message' in payload
         ? String((payload as { message?: string }).message ?? 'Request failed.')
         : 'Request failed.';
+
+    if (typeof payload === 'object' && payload && 'errors' in payload) {
+      const errors = (payload as { errors?: Record<string, string[] | string> }).errors;
+      const firstError = errors
+        ? Object.values(errors)
+            .flatMap((value) => (Array.isArray(value) ? value : [value]))
+            .find(Boolean)
+        : null;
+
+      if (firstError) {
+        message = String(firstError);
+      }
+    }
+
+    if (response.status === 429) {
+      const retryAfterHeader = response.headers.get('Retry-After');
+      const retryAfterPayload =
+        typeof payload === 'object' && payload && 'retry_after' in payload
+          ? Number((payload as { retry_after?: number }).retry_after ?? 0)
+          : 0;
+      const retryAfter = Number(retryAfterHeader ?? retryAfterPayload ?? 0);
+
+      if (Number.isFinite(retryAfter) && retryAfter > 0) {
+        const minutes = Math.ceil(retryAfter / 60);
+        message = `${message} Temps d'attente estime : ${minutes} min.`;
+      }
+    }
+
     throw new Error(message);
   }
 
@@ -157,7 +177,7 @@ export type WorkspaceSnapshot = {
 };
 
 export async function login(payload: { email: string; password: string }) {
-  return requestJson<ApiResponse<{ token: string; user: AuthUser }>>('/auth/login', {
+  return requestJson<ApiResponse<{ token?: string; user: AuthUser }>>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
   }, '');
@@ -165,6 +185,13 @@ export async function login(payload: { email: string; password: string }) {
 
 export async function registerAdmin(payload: { name: string; email: string; password: string }) {
   return requestJson<ApiResponse<{ token?: string; user: AuthUser }>>('/auth/register-admin', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }, '');
+}
+
+export async function googleAuth(payload: { credential: string; intent?: 'login' | 'register' }) {
+  return requestJson<ApiResponse<{ token?: string; user: AuthUser }>>('/auth/google', {
     method: 'POST',
     body: JSON.stringify(payload),
   }, '');
