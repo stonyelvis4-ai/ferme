@@ -571,6 +571,103 @@ class AuthAndSanitaryTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['crop_id']);
     }
 
+    public function test_crops_flow_connects_operation_harvest_sale_stock_finance_and_audit(): void
+    {
+        $admin = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+        $farm = Farm::create([
+            'name' => 'Ferme Flux Cultures',
+            'slug' => 'ferme-flux-cultures',
+            'administrator_id' => $admin->id,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => $admin->name,
+            'contact_email' => $admin->email,
+        ]);
+        $admin->forceFill(['farm_id' => $farm->id])->save();
+        Sanctum::actingAs($admin);
+
+        $cropId = (int) $this->postJson('/api/v1/cultures', [
+            'farm_id' => $farm->id,
+            'name' => 'Tomate flux test',
+            'variety' => 'Roma',
+            'cycle_days' => 90,
+            'planting_date' => now()->toDateString(),
+            'area' => 1.5,
+            'expected_yield_kg' => 20,
+        ])->assertCreated()->json('data.id');
+
+        $plotId = (int) $this->postJson('/api/v1/cultures/plots', [
+            'farm_id' => $farm->id,
+            'crop_id' => $cropId,
+            'name' => 'Parcelle tomates test',
+            'area' => 1.5,
+            'soil_type' => 'Limoneux',
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson('/api/v1/cultures/operations', [
+            'farm_id' => $farm->id,
+            'crop_id' => $cropId,
+            'plot_id' => $plotId,
+            'operation_date' => now()->toDateString(),
+            'type' => 'fertilisation',
+            'description' => 'Fertilisation de démarrage',
+            'quantity' => 10,
+            'unit' => 'kg',
+            'unit_cost' => 300,
+        ])->assertCreated();
+
+        $harvestId = (int) $this->postJson('/api/v1/cultures/harvests', [
+            'farm_id' => $farm->id,
+            'crop_id' => $cropId,
+            'plot_id' => $plotId,
+            'harvest_date' => now()->toDateString(),
+            'harvested_kg' => 10,
+            'losses_kg' => 1,
+            'destination' => 'Marché local',
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson('/api/v1/cultures/sales', [
+            'farm_id' => $farm->id,
+            'crop_id' => $cropId,
+            'crop_harvest_id' => $harvestId,
+            'sale_date' => now()->toDateString(),
+            'customer_name' => 'Client cultures test',
+            'kilograms_sold' => 4,
+            'unit_price' => 1500,
+            'payment_method' => 'cash',
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('stock_items', [
+            'farm_id' => $farm->id,
+            'name' => 'Récoltes',
+            'current_quantity' => 5,
+        ]);
+        $this->assertDatabaseHas('financial_transactions', [
+            'farm_id' => $farm->id,
+            'type' => 'expense',
+            'amount' => 3000,
+            'source_module' => 'cultures',
+            'source_entity_type' => 'crop_operation',
+        ]);
+        $this->assertDatabaseHas('financial_transactions', [
+            'farm_id' => $farm->id,
+            'type' => 'income',
+            'amount' => 6000,
+            'source_module' => 'cultures',
+            'source_entity_type' => 'crop_sale',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'farm_id' => $farm->id,
+            'module' => 'cultures',
+            'action' => 'sale_recorded',
+        ]);
+    }
+
     public function test_register_admin_remains_available_when_an_admin_already_exists(): void
     {
         $firstAdmin = User::factory()->create([
