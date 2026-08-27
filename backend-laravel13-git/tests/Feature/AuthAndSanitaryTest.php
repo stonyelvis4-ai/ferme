@@ -314,6 +314,73 @@ class AuthAndSanitaryTest extends TestCase
         ]);
     }
 
+    public function test_layer_feeding_debits_stock_and_creates_a_traceable_expense(): void
+    {
+        $admin = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+        $farm = Farm::create([
+            'name' => 'Ferme Alimentation Test',
+            'slug' => 'ferme-alimentation-test',
+            'administrator_id' => $admin->id,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => $admin->name,
+            'contact_email' => $admin->email,
+        ]);
+        $admin->forceFill(['farm_id' => $farm->id])->save();
+        $feed = StockItem::create([
+            'farm_id' => $farm->id,
+            'name' => 'Aliment ponte test',
+            'category' => 'Aliment',
+            'unit' => 'kg',
+            'unit_cost' => 900,
+            'minimum_threshold' => 1,
+            'current_quantity' => 10,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $batchResponse = $this->postJson('/api/v1/pondeuses', [
+            'farm_id' => $farm->id,
+            'name' => 'Lot alimentation test',
+            'breed' => 'Leghorn',
+            'entry_date' => now()->toDateString(),
+            'initial_count' => 50,
+            'unit_cost' => 100,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/pondeuses/feedings', [
+            'farm_id' => $farm->id,
+            'layer_batch_id' => $batchResponse->json('data.id'),
+            'stock_item_id' => $feed->id,
+            'feeding_date' => now()->toDateString(),
+            'feeding_time' => '08:00',
+            'quantity' => 2,
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('stock_items', [
+            'id' => $feed->id,
+            'current_quantity' => 8,
+        ]);
+        $this->assertDatabaseHas('financial_transactions', [
+            'farm_id' => $farm->id,
+            'type' => 'expense',
+            'amount' => 1800,
+            'source_module' => 'elevage',
+            'source_entity_type' => 'layer_feeding',
+        ]);
+        $this->assertDatabaseHas('layer_feedings', [
+            'farm_id' => $farm->id,
+            'stock_item_id' => $feed->id,
+            'quantity' => 2,
+            'total_cost' => 1800,
+        ]);
+    }
+
     public function test_standalone_plot_can_be_created_and_updated_without_crop(): void
     {
         $admin = User::factory()->create([
