@@ -59,6 +59,36 @@ class AuthAndSanitaryTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_owner_cannot_write_stock(): void
+    {
+        $owner = User::factory()->create([
+            'role' => Role::Owner,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+        $farm = Farm::create([
+            'name' => 'Ferme Stock Lecture Seule',
+            'slug' => 'ferme-stock-lecture-seule',
+            'administrator_id' => null,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => 'Administrateur',
+            'contact_email' => 'admin-stock@example.com',
+        ]);
+        $owner->forceFill(['farm_id' => $farm->id])->save();
+        Sanctum::actingAs($owner);
+
+        $this->postJson('/api/v1/stocks', [
+            'farm_id' => $farm->id,
+            'name' => 'Article interdit',
+            'category' => 'Aliment',
+            'unit' => 'kg',
+            'current_quantity' => 1,
+            'unit_cost' => 500,
+        ])->assertForbidden();
+    }
+
     public function test_completed_sanitary_treatment_creates_stock_and_expense_entries(): void
     {
         $admin = User::factory()->create([
@@ -195,6 +225,50 @@ class AuthAndSanitaryTest extends TestCase
         ]);
         $this->assertDatabaseCount('financial_transactions', 1);
         $this->assertDatabaseCount('stock_movements', 1);
+    }
+
+    public function test_stock_cannot_become_negative_on_an_outgoing_movement(): void
+    {
+        $admin = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+        $farm = Farm::create([
+            'name' => 'Ferme Stock Suffisant',
+            'slug' => 'ferme-stock-suffisant',
+            'administrator_id' => $admin->id,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => $admin->name,
+            'contact_email' => $admin->email,
+        ]);
+        $admin->forceFill(['farm_id' => $farm->id])->save();
+        $item = StockItem::create([
+            'farm_id' => $farm->id,
+            'name' => 'Stock limité',
+            'category' => 'Aliment',
+            'unit' => 'kg',
+            'unit_cost' => 900,
+            'minimum_threshold' => 0,
+            'current_quantity' => 2,
+        ]);
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/v1/stocks/movements', [
+            'farm_id' => $farm->id,
+            'stock_item_id' => $item->id,
+            'type' => 'out',
+            'quantity' => 3,
+            'source_module' => 'Stocks',
+        ])->assertStatus(422)->assertJsonValidationErrors(['quantity']);
+
+        $this->assertDatabaseHas('stock_items', [
+            'id' => $item->id,
+            'current_quantity' => 2,
+        ]);
+        $this->assertDatabaseCount('stock_movements', 0);
     }
 
     public function test_pisciculture_flow_connects_stocking_harvest_sale_finance_and_audit(): void
