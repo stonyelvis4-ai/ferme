@@ -783,6 +783,66 @@ class AuthAndSanitaryTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_create_task_and_link_calendar_event(): void
+    {
+        $admin = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+        $farm = Farm::create([
+            'name' => 'Ferme Agenda Test',
+            'slug' => 'ferme-agenda-test',
+            'administrator_id' => $admin->id,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => $admin->name,
+            'contact_email' => $admin->email,
+        ]);
+        $admin->forceFill(['farm_id' => $farm->id])->save();
+        Sanctum::actingAs($admin);
+
+        $taskId = (int) $this->postJson('/api/v1/tasks', [
+            'farm_id' => $farm->id,
+            'title' => 'Contrôler la ration',
+            'description' => 'Vérification quotidienne',
+            'priority' => 'high',
+            'status' => 'todo',
+            'start_at' => now()->addDay()->setTime(8, 0)->toDateTimeString(),
+            'due_at' => now()->addDay()->setTime(10, 0)->toDateTimeString(),
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson('/api/v1/calendar', [
+            'farm_id' => $farm->id,
+            'title' => 'Contrôle ration',
+            'start_at' => now()->addDay()->setTime(8, 0)->toDateTimeString(),
+            'end_at' => now()->addDay()->setTime(8, 30)->toDateTimeString(),
+            'linked_task_id' => $taskId,
+            'source_module' => 'elevage',
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('calendar_events', [
+            'farm_id' => $farm->id,
+            'linked_task_id' => $taskId,
+            'title' => 'Contrôle ration',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'farm_id' => $farm->id,
+            'module' => 'tasks',
+            'action' => 'task_created',
+        ]);
+    }
+
+    public function test_admin_registration_rejects_a_weak_password(): void
+    {
+        $this->postJson('/api/v1/auth/register-admin', [
+            'name' => 'Admin Test',
+            'email' => 'weak-password@example.com',
+            'password' => 'password',
+        ])->assertStatus(422)->assertJsonValidationErrors(['password']);
+    }
+
     public function test_password_change_revokes_all_tokens(): void
     {
         $admin = User::factory()->create([
