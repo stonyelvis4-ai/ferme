@@ -432,7 +432,24 @@ export default function ReportsView({
     ];
   };
 
-  const escapeCsvValue = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+  const escapeHtml = (value: string | number) =>
+    String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+  const protectSpreadsheetValue = (value: string | number) => {
+    if (typeof value === 'string' && /^[=+\-@]/.test(value.trim())) {
+      return `'${value}`;
+    }
+
+    return String(value);
+  };
+
+  const escapeCsvValue = (value: string | number) =>
+    `"${protectSpreadsheetValue(value).replace(/"/g, '""')}"`;
 
   const downloadFile = (content: BlobPart, fileName: string, mimeType: string) => {
     const blob = new Blob([content], { type: mimeType });
@@ -471,14 +488,14 @@ export default function ReportsView({
     const tableHtml = `
       <table>
         <thead>
-          <tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr>
+          <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
         </thead>
         <tbody>
           ${rows
             .map(
               (row) =>
                 `<tr>${headers
-                  .map((header) => `<td>${String(row[header] ?? '')}</td>`)
+                  .map((header) => `<td>${escapeHtml(protectSpreadsheetValue(row[header] ?? ''))}</td>`)
                   .join('')}</tr>`
             )
             .join('')}
@@ -500,7 +517,7 @@ export default function ReportsView({
           </style>
         </head>
         <body>
-          <h1>${reportPreview.title}</h1>
+          <h1>${escapeHtml(reportPreview.title)}</h1>
           <p>Période : ${reportStartDate.toLocaleDateString('fr-FR')} au ${reportEndDate.toLocaleDateString('fr-FR')}</p>
           ${tableHtml}
         </body>
@@ -516,7 +533,7 @@ export default function ReportsView({
     const tableRows = rows
       .map(
         (row) =>
-          `<tr>${headers.map((header) => `<td>${String(row[header] ?? '')}</td>`).join('')}</tr>`
+          `<tr>${headers.map((header) => `<td>${escapeHtml(protectSpreadsheetValue(row[header] ?? ''))}</td>`).join('')}</tr>`
       )
       .join('');
 
@@ -529,7 +546,7 @@ export default function ReportsView({
     printWindow.document.write(`
       <html>
         <head>
-          <title>${reportPreview.title}</title>
+          <title>${escapeHtml(reportPreview.title)}</title>
           <meta charset="utf-8" />
           <style>
             body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
@@ -548,16 +565,16 @@ export default function ReportsView({
           </style>
         </head>
         <body>
-          <h1>${reportPreview.title}</h1>
+          <h1>${escapeHtml(reportPreview.title)}</h1>
           <p>Période : ${reportStartDate.toLocaleDateString('fr-FR')} au ${reportEndDate.toLocaleDateString('fr-FR')}</p>
-          <p>${reportPreview.insight}</p>
+          <p>${escapeHtml(reportPreview.insight)}</p>
           <div class="grid">
             ${reportPreview.cards
               .map(
                 (card) => `
                   <div class="card">
-                    <div class="label">${card.label}</div>
-                    <div class="value">${card.value}</div>
+                    <div class="label">${escapeHtml(card.label)}</div>
+                    <div class="value">${escapeHtml(card.value)}</div>
                   </div>
                 `
               )
@@ -568,7 +585,7 @@ export default function ReportsView({
               ? `
                 <table>
                   <thead>
-                    <tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr>
+                    <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
                   </thead>
                   <tbody>${tableRows}</tbody>
                 </table>

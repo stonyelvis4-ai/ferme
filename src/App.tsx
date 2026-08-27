@@ -24,7 +24,6 @@ import {
   Bell,
   Volume2,
   VolumeX,
-  Wifi,
   WifiOff,
   Menu,
   X,
@@ -881,7 +880,7 @@ export default function App() {
         setAuthError(
           error instanceof Error
             ? error.message
-            : 'Impossible de charger les données de la ferme depuis le serveur.'
+            : 'Les données ne sont pas disponibles pour le moment. Réessayez dans quelques instants.'
         );
       }
     } finally {
@@ -4045,28 +4044,6 @@ const handleDeleteStockArticle = async (articleId: string) => {
 
           {/* Right Header Panel */}
           <div className="flex items-center gap-4">
-            {/* Background sync indicator */}
-            <div
-              className={`text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${
-                !isOffline
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                  : 'bg-rose-50 text-rose-700 border-rose-100'
-              }`}
-              aria-live="polite"
-            >
-              {!isOffline ? (
-                <>
-                  <Wifi className={`w-3.5 h-3.5 text-emerald-600 ${isSyncing ? 'animate-pulse' : ''}`} />
-                  <span className="hidden sm:inline">{isSyncing ? 'Synchronisation...' : 'Synchronisation active'}</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-3.5 h-3.5 text-rose-600" />
-                  <span className="hidden sm:inline">Connexion perdue</span>
-                </>
-              )}
-            </div>
-
             {/* Quick user role selector dropdown */}
             <div className="flex items-center gap-2 border border-slate-100 p-1.5 rounded-xl text-xs">
               <Users className="w-4 h-4 text-slate-400" />

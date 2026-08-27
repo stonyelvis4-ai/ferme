@@ -14,14 +14,15 @@ class EnsureFarmTenant
     {
         $user = $request->user();
         $userFarmId = (int) ($user?->farm_id ?? 0);
+
+        // A protected tenant route must never fall back to an unscoped query.
+        // This prevents an authenticated but orphaned account from seeing all farms.
+        abort_if($userFarmId <= 0, 403, 'User is not attached to a farm.');
+
         $farmIds = collect();
 
         if ($userFarmId > 0) {
             $request->merge(['farm_id' => $userFarmId]);
-
-            if ($request->has('farm_ids') || $request->has('farm_id')) {
-                $request->merge(['farm_ids' => [$userFarmId]]);
-            }
         }
 
         if ($request->route('farm')?->id) {
@@ -40,26 +41,24 @@ class EnsureFarmTenant
             );
         }
 
-        if ($userFarmId > 0) {
-            foreach ($request->route()?->parameters() ?? [] as $parameter) {
-                if (! $parameter instanceof Model) {
-                    continue;
-                }
+        foreach ($request->route()?->parameters() ?? [] as $parameter) {
+            if (! $parameter instanceof Model) {
+                continue;
+            }
 
-                if ($parameter instanceof Farm) {
-                    $farmIds->push((int) $parameter->getKey());
-                    continue;
-                }
+            if ($parameter instanceof Farm) {
+                $farmIds->push((int) $parameter->getKey());
+                continue;
+            }
 
-                if (isset($parameter->farm_id)) {
-                    $farmIds->push((int) $parameter->farm_id);
-                }
+            if (isset($parameter->farm_id)) {
+                $farmIds->push((int) $parameter->farm_id);
             }
         }
 
         $farmIds = $farmIds->filter()->unique()->values();
 
-        if ($userFarmId > 0 && $farmIds->contains(fn (int $farmId) => $userFarmId !== $farmId)) {
+        if ($farmIds->contains(fn (int $farmId) => $userFarmId !== $farmId)) {
             abort(403, 'Farm tenant mismatch.');
         }
 

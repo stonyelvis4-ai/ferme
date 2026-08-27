@@ -156,7 +156,6 @@ export default function AuthGate({
   const googleButtonId = 'ferm-google-signin-button';
   const googleEnabled = googleClientId.length > 0;
   const googleInitializedClientRef = useRef('');
-  const googlePromptedRef = useRef(false);
   const googleCredentialHandlerRef = useRef(onGoogleCredential);
 
   useEffect(() => {
@@ -214,14 +213,6 @@ export default function AuthGate({
         text: isLoginMode ? 'signin_with' : 'continue_with',
       });
 
-      if (isLoginMode && !googlePromptedRef.current) {
-        google.prompt();
-        googlePromptedRef.current = true;
-      }
-
-      if (!isLoginMode) {
-        googlePromptedRef.current = false;
-      }
     };
 
     const existingScript = document.querySelector<HTMLScriptElement>('script[data-google-identity="true"]');
@@ -595,46 +586,63 @@ export default function AuthGate({
           to { opacity: 1; transform: translateY(0); }
         }
         .auth-nav {
-          display: inline-flex;
+          display: flex;
           align-items: center;
-          gap: 0.4rem;
-          font-size: 0.82rem;
-          font-weight: 500;
-          color: var(--text-muted);
-          margin-bottom: 1.35rem;
+          justify-content: space-between;
+          gap: 0.75rem;
+          font-size: 0.7rem;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--accent);
+          margin-bottom: 1rem;
           position: relative;
         }
         .auth-nav svg {
-          width: 14px;
-          height: 14px;
-          color: var(--accent);
+          display: none;
         }
         .auth-tabs {
-          display: inline-flex;
-          gap: 0.6rem;
-          margin-bottom: 0.95rem;
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 0.25rem;
+          padding: 0.25rem;
+          margin-bottom: 1.35rem;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          border-radius: 13px;
+          background: #f1f5f9;
         }
         .auth-tab {
-          border: none;
-          background: none;
+          min-height: 38px;
+          border: 1px solid transparent;
+          border-radius: 10px;
+          background: transparent;
           cursor: pointer;
           font: inherit;
-          font-size: 0.78rem;
+          font-size: 0.75rem;
           font-weight: 700;
           color: var(--text-muted);
+          transition: color 0.2s, background 0.2s, box-shadow 0.2s, border-color 0.2s;
         }
         .auth-tab.active {
-          color: var(--accent);
+          color: var(--text);
+          background: #fff;
+          border-color: rgba(255, 255, 255, 0.95);
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+        }
+        .auth-tab:hover:not(.active) {
+          color: var(--text);
         }
         .auth-label {
-          font-size: 0.88rem;
-          font-weight: 500;
-          color: var(--text-soft);
-          margin-bottom: 0.3rem;
+          font-size: 0.68rem;
+          font-weight: 800;
+          letter-spacing: 0.15em;
+          text-transform: uppercase;
+          color: var(--accent);
+          margin-bottom: 0.55rem;
           position: relative;
         }
         .auth-card h2 {
-          font-size: 1.4rem;
+          font-size: clamp(1.5rem, 2vw, 1.75rem);
           font-weight: 800;
           letter-spacing: -0.03em;
           line-height: 1.25;
@@ -656,7 +664,7 @@ export default function AuthGate({
           border: 1.5px solid rgba(13, 148, 136, 0.12);
           border-radius: var(--radius-sm);
           padding: 0.95rem;
-          margin-bottom: 1.25rem;
+          margin-bottom: 1.35rem;
           background: linear-gradient(135deg, rgba(236, 253, 245, 0.92), rgba(255, 255, 255, 0.7));
         }
         .auth-register-chip {
@@ -807,7 +815,7 @@ export default function AuthGate({
           width: 100%;
           margin-top: 0.3rem;
           margin-bottom: 1.1rem;
-          min-height: 54px;
+          min-height: 50px;
           padding: 0.8rem 1.1rem;
           border: none;
           border-radius: var(--radius-sm);
@@ -879,7 +887,7 @@ export default function AuthGate({
           border: 1.5px solid rgba(13, 148, 136, 0.12);
           border-radius: var(--radius-sm);
           padding: 0.95rem;
-          margin-bottom: 1.1rem;
+          margin: 1.25rem 0 1.1rem;
           background: linear-gradient(135deg, rgba(240, 253, 250, 0.92), rgba(255, 255, 255, 0.82));
         }
         .auth-google-help {
@@ -953,14 +961,6 @@ export default function AuthGate({
           height: 13px;
           flex-shrink: 0;
           color: var(--accent);
-        }
-        .auth-backend-note {
-          font-size: 0.72rem;
-          line-height: 1.4;
-          color: var(--text-muted);
-          flex: 1;
-          min-width: 140px;
-          text-align: right;
         }
         .auth-alert {
           display: flex;
@@ -1045,15 +1045,13 @@ export default function AuthGate({
             flex-direction: column;
             align-items: flex-start;
           }
-          .auth-backend-note {
-            text-align: left;
-          }
           .auth-cursor-glow {
             display: none;
           }
         }
       `}</style>
 
+      <img className="auth-bg-farm" src="/images/ferm-plus-home.png" alt="" aria-hidden="true" />
       <div className="auth-bg-overlay" aria-hidden="true" />
       <div className="auth-bg-grain" aria-hidden="true" />
       <div className="auth-orb auth-orb-1" aria-hidden="true" />
@@ -1121,8 +1119,7 @@ export default function AuthGate({
         <section className="auth-panel" aria-label="Formulaire de connexion">
           <div className="auth-card">
             <div className="auth-nav">
-              <KeyIcon />
-              {isLoginMode ? 'Connexion' : 'Inscription admin'}
+              <span>FERM+ / Espace sécurisé</span>
             </div>
 
             {allowRegister ? (
@@ -1131,6 +1128,7 @@ export default function AuthGate({
                   type="button"
                   className={`auth-tab${authMode === 'login' ? ' active' : ''}`}
                   onClick={() => setAuthMode('login')}
+                  aria-pressed={authMode === 'login'}
                 >
                   Connexion
                 </button>
@@ -1138,6 +1136,7 @@ export default function AuthGate({
                   type="button"
                   className={`auth-tab${authMode === 'register' ? ' active' : ''}`}
                   onClick={() => setAuthMode('register')}
+                  aria-pressed={authMode === 'register'}
                 >
                   Inscription admin
                 </button>
@@ -1148,59 +1147,6 @@ export default function AuthGate({
             <h2>
               {isLoginMode ? 'Accéder à votre espace' : 'Créer votre compte administrateur'} <span className="brand">FERM+</span>
             </h2>
-            <p className="auth-desc">
-              {isLoginMode
-                ? 'Connectez-vous avec un compte administrateur ou un compte propriétaire déjà créé.'
-                : 'Chaque inscription administrateur ouvre un espace ferme dédié. Les comptes propriétaires seront ensuite rattachés à cette ferme.'}
-            </p>
-
-            {!isLoginMode ? (
-              <div className="auth-register-box">
-                <div className="auth-register-chip">
-                  <UserIcon />
-                  Configuration admin
-                </div>
-
-                <div className="auth-register-step">
-                  <div className="auth-register-icon">
-                    <KeyIcon />
-                  </div>
-                  <div>
-                    <strong>Compte administrateur</strong>
-                    <span>Ce compte pilotera les modules, les stocks, la finance et les utilisateurs de sa ferme.</span>
-                  </div>
-                </div>
-
-                <div className="auth-register-step">
-                  <div className="auth-register-icon">
-                    <LeafIcon />
-                  </div>
-                  <div>
-                    <strong>Ferme dédiée</strong>
-                    <span>FERM+ préparera automatiquement une ferme rattachée uniquement à ce compte.</span>
-                  </div>
-                </div>
-
-                <div className="auth-register-step">
-                  <div className="auth-register-icon">
-                    <InfoIcon />
-                  </div>
-                  <div>
-                    <strong>Accès sécurisé</strong>
-                    <span>Vous pouvez soit definir un mot de passe FERM+, soit creer le compte directement avec Google.</span>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="auth-info-banner">
-              <InfoIcon />
-              <span>
-                {isLoginMode
-                  ? 'Connectez-vous avec votre compte administrateur ou créez-en un nouveau si besoin.'
-                  : 'Chaque nouvel administrateur obtient automatiquement sa propre ferme puis peut rattacher ses propriétaires.'}
-              </span>
-            </div>
 
             {authError ? (
               <div className="auth-alert" role="alert">
@@ -1307,34 +1253,10 @@ export default function AuthGate({
                 </div>
                 <div className="auth-google-box">
                   <div id={googleButtonId} />
-                  <p className="auth-google-help">
-                    {isLoginMode
-                      ? 'Connexion Google en un clic pour les comptes déjà autorisés dans FERM+.'
-                      : 'L inscription administrateur peut se faire directement avec Google, sans recopier de mot de passe local.'}
-                  </p>
                 </div>
               </>
             ) : null}
 
-            <div className="auth-admin-box">
-              <div className="auth-admin-title">
-                <InfoIcon />
-                Accès administrateur
-              </div>
-              <p>
-                {isLoginMode
-                  ? 'Utilisez vos identifiants pour accéder aux fermes, tâches, alertes et modules métier.'
-                  : 'Une ferme est créée automatiquement pour ce compte, puis vous pourrez y rattacher les propriétaires.'}
-              </p>
-            </div>
-
-            <div className="auth-footer">
-              <span className="auth-pwd-chip">
-                <KeyIcon />
-                Changement de mot de passe disponible après connexion
-              </span>
-              <p className="auth-backend-note">Connexion admin et propriétaire contrôlée par le backend Laravel.</p>
-            </div>
           </div>
         </section>
       </div>

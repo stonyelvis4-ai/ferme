@@ -12,6 +12,14 @@ class FarmService
 {
     public function createForAdministrator(User $administrator, array $data): Farm
     {
+        $administrator->refresh();
+
+        // Google peut renvoyer plusieurs fois le meme credential apres un clic
+        // ou une reconnexion. Ne jamais creer une seconde ferme pour le meme admin.
+        if ($administrator->farm_id) {
+            return Farm::query()->findOrFail($administrator->farm_id);
+        }
+
         $baseSlug = $data['slug'] ?? Str::slug($data['name']);
 
         $farm = Farm::create([
@@ -69,8 +77,11 @@ class FarmService
             return $candidate;
         }
 
+        // Le nom seul n'est pas suffisamment unique lorsque plusieurs admins
+        // utilisent le meme nom de ferme par defaut.
         $fallbackSeed = Str::slug($administrator->name);
         $fallbackSeed = $fallbackSeed !== '' ? $fallbackSeed : 'admin';
+        $fallbackSeed .= '-' . $administrator->id;
         $candidate = sprintf('%s-%s', $normalizedBase !== '' ? $normalizedBase : 'ferme', $fallbackSeed);
 
         if (! Farm::query()->where('slug', $candidate)->exists()) {

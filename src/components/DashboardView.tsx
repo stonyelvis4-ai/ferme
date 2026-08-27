@@ -16,7 +16,9 @@ import {
   Calendar,
   CheckSquare,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  ArrowUpRight,
+  ClipboardCheck
 } from 'lucide-react';
 import {
   Lot,
@@ -227,6 +229,16 @@ export default function DashboardView({
   const healthTone = urgentLoad === 0 ? 'emerald' : urgentLoad <= 3 ? 'amber' : 'rose';
   const healthLabel = urgentLoad === 0 ? 'Exploitation stable' : urgentLoad <= 3 ? 'Points de vigilance' : 'Priorites a traiter';
   const nextTask = [...pendingTasks].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0] ?? null;
+  const todayLabel = new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  }).format(new Date());
+  const quickActions = [
+    { label: 'Ajouter un intrant', view: 'stocks', icon: Package, tone: 'emerald' },
+    { label: 'Planifier une tâche', view: 'tâches', icon: ClipboardCheck, tone: 'sky' },
+    { label: 'Saisir une dépense', view: 'finances', icon: DollarSign, tone: 'amber' }
+  ] as const;
 
   const isEmpty =
     lots.length === 0 &&
@@ -266,7 +278,16 @@ export default function DashboardView({
   };
 
   return (
-    <div id="dashboard-view" className="space-y-6">
+    <div
+      id="dashboard-view"
+      className="relative isolate space-y-6 overflow-hidden rounded-[34px] bg-slate-50 p-1 sm:p-2"
+      style={{
+        backgroundImage: "linear-gradient(180deg, rgba(2,44,34,0.72) 0%, rgba(236,253,245,0.88) 72%, rgba(248,250,252,0.98) 100%), url('/images/ferm-plus-home.png')",
+        backgroundPosition: 'top center',
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: '100% 560px'
+      }}
+    >
       {isEmpty ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
           <p className="text-base font-semibold text-slate-800">
@@ -278,21 +299,43 @@ export default function DashboardView({
         </div>
       ) : null}
 
-      {!isEmpty ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_1fr]">
-          <section className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_34%),linear-gradient(135deg,_#ffffff_0%,_#f8fafc_48%,_#ecfdf5_100%)] p-6 shadow-sm">
-            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-emerald-200/20 blur-3xl" />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_1fr]">
+          <section className="relative isolate overflow-hidden rounded-[30px] border border-white/25 bg-emerald-950/70 p-6 shadow-[0_18px_45px_rgba(15,118,110,0.14)] backdrop-blur-[2px] sm:p-7">
+            <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(2,44,34,0.8)_0%,rgba(4,78,59,0.5)_55%,rgba(15,23,42,0.2)_100%)]" />
             <div className="relative z-10">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-2xl space-y-3">
-                  <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${healthTone === 'emerald' ? 'bg-emerald-100 text-emerald-800' : healthTone === 'amber' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
-                    {healthLabel}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex rounded-full border border-white/20 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${healthTone === 'emerald' ? 'bg-emerald-300/20 text-emerald-50' : healthTone === 'amber' ? 'bg-amber-300/20 text-amber-50' : 'bg-rose-300/20 text-rose-50'}`}>
+                      {healthLabel}
+                    </span>
+                    <span className="text-xs font-medium capitalize text-white/70">{todayLabel}</span>
+                  </div>
                   <div>
-                    <h2 className="text-2xl font-black tracking-tight text-slate-950">Cockpit de pilotage FERM+</h2>
-                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
-                      Vue rapide de la rentabilite, des priorites terrain et des flux metier relies a la ferme.
+                    <h2 className="max-w-xl text-2xl font-black tracking-tight text-white sm:text-3xl">Le rythme de votre ferme, en un regard.</h2>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/80">
+                      Suivez les priorités terrain, les performances et les décisions financières importantes au même endroit.
                     </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {quickActions.map(({ label, view, icon: Icon, tone }) => (
+                      <button
+                        key={view}
+                        type="button"
+                        onClick={() => onNavigate(view)}
+                        className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                          tone === 'emerald'
+                              ? 'border-emerald-300/50 bg-emerald-500 text-white hover:bg-emerald-400'
+                            : tone === 'sky'
+                              ? 'border-sky-200 bg-white/80 text-sky-700 hover:border-sky-300 hover:bg-white'
+                              : 'border-white/40 bg-white/90 text-slate-800 hover:border-white hover:bg-white'
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                        <ArrowUpRight className="h-3 w-3 opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </button>
+                    ))}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
@@ -355,7 +398,6 @@ export default function DashboardView({
             </div>
           </div>
         </div>
-      ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <button

@@ -90,7 +90,7 @@ async function requestJson<T>(
   } catch (error) {
     if (error instanceof TypeError) {
       throw new Error(
-        "Impossible de joindre l'API FERM+. Vérifiez que le backend Laravel est démarré et que la configuration API du frontend est correcte."
+        "Connexion impossible pour le moment. Vérifiez votre connexion et réessayez."
       );
     }
 

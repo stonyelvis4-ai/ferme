@@ -19,6 +19,20 @@ class AuthAndSanitaryTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_authenticated_user_without_farm_is_denied_tenant_routes(): void
+    {
+        $user = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+            'farm_id' => null,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/farms')->assertForbidden();
+    }
+
     public function test_owner_cannot_trigger_alert_evaluation(): void
     {
         $owner = User::factory()->create([
@@ -221,6 +235,82 @@ class AuthAndSanitaryTest extends TestCase
             'farm_id' => $farm->id,
             'operation_id' => 'finance-replay-1',
             'amount' => 15000,
+        ]);
+    }
+
+    public function test_layer_flow_connects_production_stock_sale_finance_and_audit(): void
+    {
+        $admin = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+        $farm = Farm::create([
+            'name' => 'Ferme Flux Pondeuses',
+            'slug' => 'ferme-flux-pondeuses',
+            'administrator_id' => $admin->id,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => $admin->name,
+            'contact_email' => $admin->email,
+        ]);
+        $admin->forceFill(['farm_id' => $farm->id])->save();
+
+        Sanctum::actingAs($admin);
+
+        $batchResponse = $this->postJson('/api/v1/pondeuses', [
+            'farm_id' => $farm->id,
+            'name' => 'Lot test flux',
+            'breed' => 'Isa Brown',
+            'entry_date' => now()->toDateString(),
+            'initial_count' => 100,
+            'unit_cost' => 150,
+        ])->assertCreated();
+
+        $batchId = (int) $batchResponse->json('data.id');
+
+        $this->postJson('/api/v1/pondeuses/productions', [
+            'farm_id' => $farm->id,
+            'layer_batch_id' => $batchId,
+            'production_date' => now()->toDateString(),
+            'eggs_produced' => 60,
+            'broken_eggs' => 2,
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('stock_items', [
+            'farm_id' => $farm->id,
+            'name' => 'Oeufs',
+            'current_quantity' => 58,
+        ]);
+
+        $this->postJson('/api/v1/pondeuses/sales', [
+            'farm_id' => $farm->id,
+            'layer_batch_id' => $batchId,
+            'sale_date' => now()->toDateString(),
+            'customer_name' => 'Client test',
+            'trays_sold' => 1,
+            'eggs_sold' => 30,
+            'unit_price' => 500,
+            'payment_method' => 'cash',
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('stock_items', [
+            'farm_id' => $farm->id,
+            'name' => 'Oeufs',
+            'current_quantity' => 28,
+        ]);
+        $this->assertDatabaseHas('financial_transactions', [
+            'farm_id' => $farm->id,
+            'type' => 'income',
+            'amount' => 500,
+            'source_module' => 'pondeuses',
+            'source_entity_type' => 'egg_sale',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'farm_id' => $farm->id,
+            'module' => 'pondeuses',
+            'action' => 'sale_recorded',
         ]);
     }
 
@@ -502,6 +592,8 @@ class AuthAndSanitaryTest extends TestCase
             'contact_email' => $admin->email,
         ]);
 
+        $admin->forceFill(['farm_id' => $firstFarm->id])->save();
+
         $owner = User::factory()->create([
             'role' => Role::Owner,
             'account_status' => 'active',
@@ -522,9 +614,7 @@ class AuthAndSanitaryTest extends TestCase
             'farm_ids' => [$secondFarm->id],
         ]);
 
-        $response
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['farm_ids.0']);
+        $response->assertForbidden();
 
         $this->assertDatabaseHas('farm_user_assignments', [
             'farm_id' => $firstFarm->id,
