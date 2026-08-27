@@ -33,6 +33,42 @@ class AuthAndSanitaryTest extends TestCase
         $this->getJson('/api/v1/farms')->assertForbidden();
     }
 
+    public function test_admin_cannot_read_or_modify_another_farm(): void
+    {
+        $admin = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+        $ownFarm = Farm::create([
+            'name' => 'Ferme Sécurisée A',
+            'slug' => 'ferme-securisee-a',
+            'administrator_id' => $admin->id,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => $admin->name,
+            'contact_email' => $admin->email,
+        ]);
+        $otherFarm = Farm::create([
+            'name' => 'Ferme Sécurisée B',
+            'slug' => 'ferme-securisee-b',
+            'administrator_id' => null,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => 'Autre administrateur',
+            'contact_email' => 'other-secure@example.com',
+        ]);
+        $admin->forceFill(['farm_id' => $ownFarm->id])->save();
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/v1/farms/' . $otherFarm->id)->assertForbidden();
+        $this->patchJson('/api/v1/farms/' . $otherFarm->id, [
+            'name' => 'Modification interdite',
+        ])->assertForbidden();
+    }
+
     public function test_owner_cannot_trigger_alert_evaluation(): void
     {
         $owner = User::factory()->create([
