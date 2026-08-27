@@ -197,6 +197,97 @@ class AuthAndSanitaryTest extends TestCase
         $this->assertDatabaseCount('stock_movements', 1);
     }
 
+    public function test_pisciculture_flow_connects_stocking_harvest_sale_finance_and_audit(): void
+    {
+        $admin = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+        $farm = Farm::create([
+            'name' => 'Ferme Flux Piscicole',
+            'slug' => 'ferme-flux-piscicole',
+            'administrator_id' => $admin->id,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => $admin->name,
+            'contact_email' => $admin->email,
+        ]);
+        $admin->forceFill(['farm_id' => $farm->id])->save();
+
+        Sanctum::actingAs($admin);
+
+        $pondResponse = $this->postJson('/api/v1/pisciculture', [
+            'farm_id' => $farm->id,
+            'name' => 'Bassin flux test',
+            'pond_type' => 'Bâche',
+            'species' => 'Tilapia',
+            'initial_fish_count' => 100,
+            'stocking_date' => now()->toDateString(),
+            'current_estimated_count' => 100,
+            'average_weight_kg' => 0.2,
+            'biomass_kg' => 20,
+            'unit_cost' => 100,
+        ])->assertCreated();
+
+        $pondId = (int) $pondResponse->json('data.id');
+
+        $this->postJson('/api/v1/pisciculture/stockings', [
+            'farm_id' => $farm->id,
+            'fish_pond_id' => $pondId,
+            'stocking_date' => now()->toDateString(),
+            'fish_count' => 20,
+            'average_weight_kg' => 0.1,
+            'total_weight_kg' => 2,
+            'unit_cost' => 120,
+        ])->assertCreated();
+
+        $harvestResponse = $this->postJson('/api/v1/pisciculture/harvests', [
+            'farm_id' => $farm->id,
+            'fish_pond_id' => $pondId,
+            'harvest_date' => now()->toDateString(),
+            'total_weight_kg' => 10,
+            'losses_kg' => 1,
+            'destination' => 'Vente locale',
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('stock_items', [
+            'farm_id' => $farm->id,
+            'name' => 'Poissons',
+            'current_quantity' => 9,
+        ]);
+
+        $this->postJson('/api/v1/pisciculture/sales', [
+            'farm_id' => $farm->id,
+            'fish_pond_id' => $pondId,
+            'fish_harvest_id' => $harvestResponse->json('data.id'),
+            'sale_date' => now()->toDateString(),
+            'customer_name' => 'Client piscicole test',
+            'kilograms_sold' => 5,
+            'unit_price' => 2500,
+            'payment_method' => 'cash',
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('stock_items', [
+            'farm_id' => $farm->id,
+            'name' => 'Poissons',
+            'current_quantity' => 4,
+        ]);
+        $this->assertDatabaseHas('financial_transactions', [
+            'farm_id' => $farm->id,
+            'type' => 'income',
+            'amount' => 12500,
+            'source_module' => 'pisciculture',
+            'source_entity_type' => 'fish_sale',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'farm_id' => $farm->id,
+            'module' => 'pisciculture',
+            'action' => 'sale_recorded',
+        ]);
+    }
+
     public function test_financial_operation_is_idempotent_for_replayed_sync_request(): void
     {
         $admin = User::factory()->create([
