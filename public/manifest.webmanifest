@@ -1,0 +1,20 @@
+{
+  "name": "FERM+ - Gestion agricole",
+  "short_name": "FERM+",
+  "description": "Gestion agricole connectee pour les fermes, stocks et finances.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0f766e",
+  "background_color": "#f8fafc",
+  "icons": [
+    {
+      "src": "/icons/ferm-plus-logo.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
