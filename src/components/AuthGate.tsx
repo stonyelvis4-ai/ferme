@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { getApiBaseUrl } from '../services/fermApi';
 
 declare global {
   interface Window {
@@ -149,14 +150,33 @@ export default function AuthGate({
 }: AuthGateProps) {
   const [cursorGlow, setCursorGlow] = useState({ x: 0, y: 0, active: false });
   const isLoginMode = authMode === 'login' || !allowRegister;
-  const googleClientId = useMemo(
+  const configuredGoogleClientId = useMemo(
     () => ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_GOOGLE_CLIENT_ID ?? '').trim(),
     []
   );
+  const [googleClientId, setGoogleClientId] = useState(configuredGoogleClientId);
   const googleButtonId = 'ferm-google-signin-button';
   const googleEnabled = googleClientId.length > 0;
   const googleInitializedClientRef = useRef('');
   const googleCredentialHandlerRef = useRef(onGoogleCredential);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void fetch(`${getApiBaseUrl()}/auth/google-config`, { headers: { Accept: 'application/json' } })
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((payload: { data?: { enabled?: boolean; client_id?: string | null } } | null) => {
+        const clientId = payload?.data?.enabled ? payload.data.client_id?.trim() : '';
+        if (!cancelled && clientId) setGoogleClientId(clientId);
+      })
+      .catch(() => {
+        // The build-time value remains available when the API is temporarily unreachable.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     googleCredentialHandlerRef.current = onGoogleCredential;

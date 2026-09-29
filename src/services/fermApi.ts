@@ -8,6 +8,12 @@ const AUTH_TOKEN_KEY = 'fermplus_token';
 const AUTH_USER_KEY = 'fermplus_user';
 const COOKIE_AUTH_MARKER = 'cookie-session';
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+  }
+}
+
 function readPersistentValue(key: string) {
   return localStorage.getItem(key) ?? sessionStorage.getItem(key);
 }
@@ -133,7 +139,8 @@ async function requestJson<T>(
       }
     }
 
-    throw new Error(message);
+    if (response.status === 401 && token) clearStoredAuthToken();
+    throw new ApiError(message, response.status);
   }
 
   return payload as T;
@@ -248,8 +255,17 @@ export async function loadWorkspaceSnapshot(token: string): Promise<WorkspaceSna
     requestJson<ApiResponse<unknown>>('/sync', {}, token),
   ]);
 
-  const unwrap = <T>(result: PromiseSettledResult<ApiResponse<T>>) =>
-    result.status === 'fulfilled' ? result.value : { data: undefined };
+  const unwrap = <T>(result: PromiseSettledResult<ApiResponse<T>>) => {
+    if (result.status === 'rejected') throw result.reason;
+    return result.value;
+  };
+
+  // Authentication failures take precedence over an unrelated endpoint failure.
+  for (const result of [dashboard, farms, users, settings, tasks, alerts, audit, stocks, finances, sanitary, layers, ponds, cultures, infrastructures, reports, sync]) {
+    if (result.status === 'rejected' && result.reason instanceof ApiError && [401, 403].includes(result.reason.status)) {
+      throw result.reason;
+    }
+  }
 
   return {
     dashboard: unwrap(dashboard),
@@ -285,16 +301,18 @@ export async function putJson<T>(path: string, payload: unknown, token?: string)
   }, token);
 }
 
-export async function postJson<T>(path: string, payload: unknown, token?: string) {
+export async function postJson<T>(path: string, payload: unknown, token?: string, operationId?: string) {
   return requestJson<ApiResponse<T>>(path, {
     method: 'POST',
+    headers: operationId ? { 'Idempotency-Key': operationId } : undefined,
     body: JSON.stringify(payload),
   }, token);
 }
 
-export async function postForm<T>(path: string, payload: FormData, token?: string) {
+export async function postForm<T>(path: string, payload: FormData, token?: string, operationId?: string) {
   return requestJson<ApiResponse<T>>(path, {
     method: 'POST',
+    headers: operationId ? { 'Idempotency-Key': operationId } : undefined,
     body: payload,
   }, token);
 }

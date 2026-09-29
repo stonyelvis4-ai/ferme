@@ -69,7 +69,7 @@ class AuthController extends Controller
             return $user;
         });
 
-        $token = $user->createToken('ferm-plus')->plainTextToken;
+        $token = $user->createToken('ferm-plus', ['*'], now()->addMinutes((int) config('session.lifetime', 120)))->plainTextToken;
 
         return response()
             ->json([
@@ -237,9 +237,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Compte introuvable.'], 404);
         }
 
-        $requiresCurrentPassword = blank($user->google_id) || $currentPassword !== '';
-
-        if ($requiresCurrentPassword && ! Hash::check($currentPassword, $user->password)) {
+        if (! Hash::check($currentPassword, $user->password)) {
             return response()->json(['message' => 'Le mot de passe actuel est invalide.'], 422);
         }
 
@@ -299,7 +297,7 @@ class AuthController extends Controller
         $token = $user->createToken(
             'ferm-plus',
             ['*'],
-            now()->addMinutes((int) env('SANCTUM_EXPIRATION', config('session.lifetime', 120)))
+            now()->addMinutes((int) config('session.lifetime', 120))
         )->plainTextToken;
 
         $user->forceFill([

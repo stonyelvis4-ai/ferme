@@ -65,6 +65,7 @@ import {
 import AuthGate from './components/AuthGate';
 import {
   changePassword,
+  ApiError,
   clearStoredAuthToken,
   getStoredAuthToken,
   getStoredAuthUser,
@@ -245,19 +246,43 @@ function countPendingWorkspaceEntries(localCache: WorkspaceLocalCache | null) {
   ].reduce((sum, bucket) => sum + bucket.length, 0);
 }
 
-async function syncLocalCacheToServer(token: string, farmId: string | number | null | undefined, localCache: WorkspaceLocalCache | null) {
+const pendingSyncRuns = new Map<string, Promise<{ syncedCount: number; pendingCache: WorkspaceLocalCache | null }>>();
+
+function syncLocalCacheToServer(token: string, farmId: string | number | null | undefined, localCache: WorkspaceLocalCache | null) {
+  const key = String(getStoredAuthUser()?.id) + ':' + String(farmId);
+  const existing = pendingSyncRuns.get(key);
+  if (existing) return existing;
+  const run = () => performLocalCacheSync(token, farmId, localCache);
+  const pending = (navigator.locks ? navigator.locks.request('fermplus-sync:' + key, run) : run())
+    .finally(() => pendingSyncRuns.delete(key));
+  pendingSyncRuns.set(key, pending);
+  return pending;
+}
+
+async function performLocalCacheSync(token: string, farmId: string | number | null | undefined, localCache: WorkspaceLocalCache | null) {
   if (!token || !farmId || !localCache) {
     return { syncedCount: 0, pendingCache: localCache };
   }
 
   let syncedCount = 0;
   const numericFarmId = Number(farmId);
-  const localToBackendIds = new Map<string, string>();
+  const mappingKey = 'fermplus-sync-ids:' + getStoredAuthUser()?.id + ':' + numericFarmId;
+  let savedIds: [string, string][] = [];
+  try { savedIds = JSON.parse(localStorage.getItem(mappingKey) || '[]'); } catch { /* No previous mappings. */ }
+  const localToBackendIds = new Map<string, string>(savedIds);
+  const rememberId = (localId: string, serverId: string) => {
+    localToBackendIds.set(localId, serverId);
+    localStorage.setItem(mappingKey, JSON.stringify([...localToBackendIds]));
+  };
+  let operationId = '';
+  const syncPostJson = (path: string, payload: unknown, auth: string) =>
+    postJson(path, payload, auth, 'offline:' + operationId);
   const pendingCache = createPendingWorkspaceCache(localCache);
 
   for (const building of localCache.buildings.filter((item) => !isBackendId(item.id))) {
+    operationId = building.id;
     try {
-      const response = await postJson('/infrastructures/buildings', {
+      const response = await syncPostJson('/infrastructures/buildings', {
         farm_id: numericFarmId,
         name: building.name,
         type: building.type,
@@ -269,7 +294,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
       }, token);
       const backendId = responseId(response);
       if (backendId) {
-        localToBackendIds.set(building.id, backendId);
+        rememberId(building.id, backendId);
         syncedCount += 1;
       } else {
         pendingCache.buildings.push(building);
@@ -280,8 +305,9 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const article of localCache.articles.filter((item) => !isBackendId(item.id))) {
+    operationId = article.id;
     try {
-      const response = await postJson('/stocks', {
+      const response = await syncPostJson('/stocks', {
         farm_id: numericFarmId,
         name: article.name,
         category: article.category,
@@ -293,7 +319,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
       }, token);
       const backendId = responseId(response);
       if (backendId) {
-        localToBackendIds.set(article.id, backendId);
+        rememberId(article.id, backendId);
         syncedCount += 1;
       } else {
         pendingCache.articles.push(article);
@@ -304,6 +330,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const lot of localCache.lots.filter((item) => !isBackendId(item.id))) {
+    operationId = lot.id;
     const backendBuildingId = localToBackendIds.get(lot.buildingId) ?? lot.buildingId;
     if (!isBackendId(backendBuildingId)) {
       pendingCache.lots.push(lot);
@@ -311,7 +338,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
     }
 
     try {
-      const response = await postJson('/pondeuses', {
+      const response = await syncPostJson('/pondeuses', {
         farm_id: numericFarmId,
         name: lot.name,
         breed: lot.breed,
@@ -328,7 +355,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
       }, token);
       const backendId = responseId(response);
       if (backendId) {
-        localToBackendIds.set(lot.id, backendId);
+        rememberId(lot.id, backendId);
         syncedCount += 1;
       } else {
         pendingCache.lots.push(lot);
@@ -339,6 +366,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const production of localCache.eggProductions.filter((item) => !isBackendId(item.id))) {
+    operationId = production.id;
     const backendLotId = localToBackendIds.get(production.lotId) ?? production.lotId;
     if (!isBackendId(backendLotId) || production.collectedCount <= 0) {
       pendingCache.eggProductions.push(production);
@@ -346,7 +374,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
     }
 
     try {
-      await postJson('/pondeuses/productions', {
+      await syncPostJson('/pondeuses/productions', {
         farm_id: numericFarmId,
         layer_batch_id: Number(backendLotId),
         production_date: production.date,
@@ -364,6 +392,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const sale of localCache.eggSales.filter((item) => !isBackendId(item.id))) {
+    operationId = sale.id;
     const backendLotId = localToBackendIds.get(sale.lotId) ?? sale.lotId;
     if (!isBackendId(backendLotId) || sale.eggsSold <= 0) {
       pendingCache.eggSales.push(sale);
@@ -371,7 +400,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
     }
 
     try {
-      await postJson('/pondeuses/sales', {
+      await syncPostJson('/pondeuses/sales', {
         farm_id: numericFarmId,
         layer_batch_id: Number(backendLotId),
         sale_date: sale.date,
@@ -391,6 +420,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const feeding of localCache.animalFeedings.filter((item) => !isBackendId(item.id))) {
+    operationId = feeding.id;
     const backendLotId = localToBackendIds.get(feeding.lotId) ?? feeding.lotId;
     const backendArticleId = localToBackendIds.get(feeding.articleId) ?? feeding.articleId;
     if (!isBackendId(backendLotId) || !isBackendId(backendArticleId) || feeding.quantity <= 0) {
@@ -399,7 +429,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
     }
 
     try {
-      await postJson('/pondeuses/feedings', {
+      await syncPostJson('/pondeuses/feedings', {
         farm_id: numericFarmId,
         layer_batch_id: Number(backendLotId),
         stock_item_id: Number(backendArticleId),
@@ -415,6 +445,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const plan of localCache.animalFeedPlans.filter((item) => !isBackendId(item.id))) {
+    operationId = plan.id;
     const backendLotId = localToBackendIds.get(plan.lotId) ?? plan.lotId;
     const backendArticleId = plan.articleId ? (localToBackendIds.get(plan.articleId) ?? plan.articleId) : null;
     if (!isBackendId(backendLotId) || plan.rationPerHeadKg <= 0) {
@@ -423,7 +454,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
     }
 
     try {
-      await postJson('/pondeuses/feed-plans', {
+      await syncPostJson('/pondeuses/feed-plans', {
         farm_id: numericFarmId,
         layer_batch_id: Number(backendLotId),
         stock_item_id: backendArticleId && isBackendId(backendArticleId) ? Number(backendArticleId) : null,
@@ -442,6 +473,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const weighing of localCache.animalWeighings.filter((item) => !isBackendId(item.id))) {
+    operationId = weighing.id;
     const backendLotId = localToBackendIds.get(weighing.lotId) ?? weighing.lotId;
     if (!isBackendId(backendLotId) || weighing.averageWeightKg <= 0) {
       pendingCache.animalWeighings.push(weighing);
@@ -449,7 +481,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
     }
 
     try {
-      await postJson('/pondeuses/weighings', {
+      await syncPostJson('/pondeuses/weighings', {
         farm_id: numericFarmId,
         layer_batch_id: Number(backendLotId),
         weighing_date: weighing.date,
@@ -465,8 +497,9 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const bassin of localCache.fishBassins.filter((item) => !isBackendId(item.id))) {
+    operationId = bassin.id;
     try {
-      const response = await postJson('/pisciculture', {
+      const response = await syncPostJson('/pisciculture', {
         farm_id: numericFarmId,
         name: bassin.name,
         pond_type: 'bassin',
@@ -486,8 +519,8 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
         continue;
       }
 
-      localToBackendIds.set(bassin.id, backendId);
-      await postJson('/pisciculture/stockings', {
+      rememberId(bassin.id, backendId);
+      await syncPostJson('/pisciculture/stockings', {
         farm_id: numericFarmId,
         fish_pond_id: Number(backendId),
         stocking_date: bassin.stockingDate,
@@ -503,10 +536,11 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const campaign of localCache.campaigns.filter((item) => !isBackendId(item.id))) {
+    operationId = campaign.id;
     const parcelle = localCache.parcelles.find((item) => item.id === campaign.parcelleId);
 
     try {
-      const cropResponse = await postJson('/cultures', {
+      const cropResponse = await syncPostJson('/cultures', {
         farm_id: numericFarmId,
         name: campaign.cropType,
         variety: campaign.variety,
@@ -526,10 +560,10 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
         continue;
       }
 
-      localToBackendIds.set(campaign.id, backendCropId);
+      rememberId(campaign.id, backendCropId);
 
       if (parcelle && !isBackendId(parcelle.id)) {
-        const plotResponse = await postJson('/cultures/plots', {
+        const plotResponse = await syncPostJson('/cultures/plots', {
           farm_id: numericFarmId,
           crop_id: Number(backendCropId),
           name: parcelle.name,
@@ -539,7 +573,7 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
         }, token);
         const backendPlotId = responseId(plotResponse);
         if (backendPlotId) {
-          localToBackendIds.set(parcelle.id, backendPlotId);
+          rememberId(parcelle.id, backendPlotId);
         } else {
           pendingCache.parcelles.push(parcelle);
         }
@@ -553,8 +587,9 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const task of localCache.tasks.filter((item) => !isBackendId(item.id))) {
+    operationId = task.id;
     try {
-      await postJson('/tasks', {
+      await syncPostJson('/tasks', {
         farm_id: numericFarmId,
         title: task.title,
         description: task.description,
@@ -575,8 +610,9 @@ async function syncLocalCacheToServer(token: string, farmId: string | number | n
   }
 
   for (const transaction of localCache.transactions.filter((item) => !isBackendId(item.id) && item.sourceModule === 'Finances')) {
+    operationId = transaction.id;
     try {
-      await postJson('/finances', {
+      await syncPostJson('/finances', {
         farm_id: numericFarmId,
         type: transaction.type,
         amount: transaction.amount,
@@ -665,10 +701,17 @@ export default function App() {
   const [alarmPlaybackBlocked, setAlarmPlaybackBlocked] = useState<boolean>(false);
   const [notices, setNotices] = useState<AppNotice[]>([]);
   const alarmAudioRef = useRef<HTMLAudioElement | null>(null);
+  const hydrationBusyRef = useRef(false);
+  const syncBusyRef = useRef(false);
   const previousAlarmCountRef = useRef<number>(0);
 
   // Help functions for quick uuid/dates
-  const generateId = (prefix: string) => `${prefix}-${Math.floor(Math.random() * 100000)}`;
+  const generateId = (prefix: string) => {
+    const randomPart = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return `${prefix}-${randomPart}`;
+  };
   const getTodayDate = () => new Date().toISOString().split('T')[0];
   const getSyncStatus = (): SyncStatus => (isOffline ? 'pending' : 'synced');
   const pushNotice = (
@@ -696,8 +739,11 @@ export default function App() {
   const hydrateWorkspace = async (token = authToken, options?: { silent?: boolean }) => {
     if (!token) {
       setAuthReady(true);
-      
+      return;
     }
+
+    if (hydrationBusyRef.current) return;
+    hydrationBusyRef.current = true;
 
     const silent = options?.silent ?? false;
 
@@ -789,6 +835,7 @@ export default function App() {
           }
 
           if (syncResult.syncedCount > 0) {
+            hydrationBusyRef.current = false;
             await hydrateWorkspace(token, { silent: true });
             return;
           }
@@ -844,6 +891,7 @@ export default function App() {
       const normalizedMessage = error instanceof Error ? error.message.toLowerCase() : '';
 
       if (
+        (error instanceof ApiError && [401, 403].includes(error.status)) ||
         normalizedMessage.includes('unauthenticated') ||
         normalizedMessage.includes('unauthorized') ||
         normalizedMessage.includes('forbidden')
@@ -884,6 +932,7 @@ export default function App() {
         );
       }
     } finally {
+      hydrationBusyRef.current = false;
       setAuthReady(true);
     }
   };
@@ -1298,7 +1347,11 @@ export default function App() {
 
   // Connectivity Sync Handler
   const flushPendingSync = async () => {
-    if (!authToken) return;
+    if (!authToken || syncBusyRef.current) return;
+    syncBusyRef.current = true;
+    try {
+    // Validate the session before replaying any local writes.
+    await loadWorkspaceSnapshot(authToken);
 
     const localCache = readWorkspaceCache(authUser?.id);
     if (activeFarmId) {
@@ -1315,6 +1368,12 @@ export default function App() {
     setAuditLogs((prev) =>
       prev.map((log) => (log.syncStatus === 'pending' ? { ...log, syncStatus: 'synced' } : log))
     );
+    } catch (error) {
+      if (error instanceof ApiError && [401, 403].includes(error.status)) resetToLogin('Session expiree.');
+      throw error;
+    } finally {
+      syncBusyRef.current = false;
+    }
   };
 
   // Moteur d'Interconnexion: Core Operations
@@ -3163,7 +3222,7 @@ const handleDeleteCampaign = async (campaignId: string) => {
         if (data.relatedId) formData.append('related_id', data.relatedId);
         if (data.imageFile) formData.append('image', data.imageFile);
 
-        const response = await postForm('/stocks', formData, authToken);
+        const response = await postForm('/stocks', formData, authToken, `article:${articleId}`);
         const backendArticleId = response.data && typeof response.data === 'object'
           ? String((response.data as Record<string, unknown>).id ?? '')
           : '';

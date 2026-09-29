@@ -18,6 +18,11 @@ class PromoteApiTokenCookie
         }
 
         if ($cookieToken && ! $request->bearerToken()) {
+            // Cookie credentials are automatic: require an exact trusted origin on writes.
+            if (! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
+                $origin = $request->header('Origin');
+                abort_unless(is_string($origin) && in_array($origin, config('cors.allowed_origins', []), true), 403);
+            }
             $request->headers->set('Authorization', 'Bearer '.$cookieToken);
             $request->server->set('HTTP_AUTHORIZATION', 'Bearer '.$cookieToken);
         }

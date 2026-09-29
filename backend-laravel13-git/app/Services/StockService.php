@@ -170,24 +170,44 @@ public function deleteItem(StockItem $item): ?FinancialTransaction
 
     public function recordMovement(array $data): StockMovement
     {
+        return DB::transaction(fn () => $this->recordMovementLocked($data), 3);
+    }
+
+    private function recordMovementLocked(array $data): StockMovement
+    {
         $farmId = (int) ($data['farm_id'] ?? request()->user()?->farm_id ?? 0);
+        \App\Models\Farm::whereKey($farmId)->lockForUpdate()->firstOrFail();
         $item = StockItem::query()
             ->where('farm_id', $farmId)
+            ->lockForUpdate()
             ->findOrFail($data['stock_item_id']);
 
         $operationId = trim((string) ($data['operation_id'] ?? ''));
+        $data['operation_id'] = $operationId === '' ? null : $operationId;
         if ($operationId !== '') {
             $existingMovement = StockMovement::query()
                 ->where('farm_id', $farmId)
                 ->where('operation_id', $operationId)
+                ->where('source_module', $data['source_module'] ?? null)
+                ->where('source_entity_type', $data['source_entity_type'] ?? null)
                 ->first();
 
             if ($existingMovement) {
+                if ((int) $existingMovement->stock_item_id !== (int) $item->id
+                    || $existingMovement->type !== $data['type']
+                    || (float) $existingMovement->quantity !== (float) $data['quantity']
+                    || (float) $existingMovement->unit_cost !== (float) ($data['unit_cost'] ?? 0)
+                    || (string) $existingMovement->source_entity_id !== (string) ($data['source_entity_id'] ?? '')) {
+                    throw ValidationException::withMessages(['operation_id' => 'Operation deja utilisee avec un contenu different.']);
+                }
                 return $existingMovement;
             }
         }
 
         $quantity = (float) $data['quantity'];
+        if (! is_finite($quantity) || $quantity < 0 || ! in_array($data['type'], ['in', 'out', 'adjustment'], true)) {
+            throw ValidationException::withMessages(['quantity' => 'Mouvement de stock invalide.']);
+        }
 
         if ($data['type'] === 'out' && (float) $item->current_quantity < $quantity) {
             throw ValidationException::withMessages([
@@ -197,6 +217,7 @@ public function deleteItem(StockItem $item): ?FinancialTransaction
 
         $movement = StockMovement::create([
             ...$data,
+            'idempotency_key' => $operationId === '' ? null : hash('sha256', json_encode([$farmId, $data['source_module'] ?? null, $data['source_entity_type'] ?? null, $operationId])),
             'farm_id' => $farmId,
             'quantity' => $quantity,
         ]);
@@ -230,7 +251,8 @@ public function deleteItem(StockItem $item): ?FinancialTransaction
             $this->alertService->createLowStockAlert($item->fresh());
         }
 
-        if ($movement->type === 'out' && strtolower((string) $movement->source_module) === 'pisciculture') {
+        if ($movement->type === 'out' && strtolower((string) $movement->source_module) === 'pisciculture'
+            && in_array($movement->source_entity_type, ['fish_feeding', 'fish_pond'], true)) {
             $totalCost = round($quantity * (float) ($item->unit_cost ?? $movement->unit_cost ?? 0), 2);
             if ($totalCost > 0) {
                 $this->financeService->createTransaction([
@@ -291,7 +313,7 @@ public function deleteItem(StockItem $item): ?FinancialTransaction
             'expiration_date' => $data['expiration_date'] ?? $item?->expiration_date,
             'unit' => $data['unit'] ?? $item?->unit,
             'unit_cost' => $unitCost,
-            'purchase_total_cost' => (float) ($data['purchase_total_cost'] ?? round($currentQuantity * $unitCost, 2)),
+            'purchase_total_cost' => round($currentQuantity * $unitCost, 2),
             'currency' => $data['currency'] ?? $item?->currency ?? 'XOF',
             'minimum_threshold' => (float) ($data['minimum_threshold'] ?? $item?->minimum_threshold ?? 0),
             'maximum_stock' => array_key_exists('maximum_stock', $data) ? $data['maximum_stock'] : $item?->maximum_stock,

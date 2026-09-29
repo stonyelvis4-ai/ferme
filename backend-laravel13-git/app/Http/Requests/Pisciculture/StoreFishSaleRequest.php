@@ -19,7 +19,8 @@ class StoreFishSaleRequest extends FormRequest
         return [
             'farm_id' => ['required', 'integer', 'exists:farms,id'],
             'fish_pond_id' => ['required', 'integer', 'exists:fish_ponds,id'],
-            'fish_harvest_id' => ['nullable', 'integer', 'exists:fish_harvests,id'],
+            'fish_harvest_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fish_harvests', 'id')
+                ->where('farm_id', $this->user()->farm_id)->where('fish_pond_id', $this->input('fish_pond_id'))],
             'sale_date' => ['required', 'date'],
             'customer_name' => ['required', 'string', 'max:255'],
             'kilograms_sold' => ['required', 'numeric', 'min:0'],

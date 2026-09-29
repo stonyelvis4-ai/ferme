@@ -42,6 +42,17 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/register-admin', [AuthController::class, 'registerAdmin'])->middleware('throttle:auth-register');
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
     Route::post('/auth/google', [AuthController::class, 'google'])->middleware('throttle:auth-login');
+    Route::get('/auth/google-config', function () {
+        $clientId = trim((string) config('services.google.client_id', ''));
+
+        return response()->json([
+            'data' => [
+                'enabled' => $clientId !== '',
+                // OAuth client IDs are intentionally public; client secrets never leave Laravel.
+                'client_id' => $clientId !== '' ? $clientId : null,
+            ],
+        ]);
+    });
 
     Route::middleware(['api.cookie.token', 'auth:sanctum', 'active.account'])->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -75,7 +86,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/users/{user}', [UserController::class, 'show']);
             Route::get('/settings', [SettingsController::class, 'show']);
 
-            Route::middleware(['admin'])->group(function () {
+            Route::middleware(['admin', 'idempotent'])->group(function () {
                 Route::post('/farms', [FarmController::class, 'store']);
                 Route::patch('/farms/{farm}', [FarmController::class, 'update']);
                 Route::post('/farms/{farm}/owner', [OwnerController::class, 'store']);

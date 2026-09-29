@@ -39,11 +39,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\prepare-o2switch-package.ps1 
 
 Le script genere :
 
-- `deploy-build/frontend/`
-- `deploy-build/backend-laravel13-git/`
-- `deploy-build/.env.frontend.production`
-- `deploy-build/.env.backend.production`
-- `deploy-build/README-DEPLOIEMENT.txt`
+- un dossier `release-AAAAmmjj-HHmmss/` (ou la valeur fournie avec `-OutputDir`)
+- `frontend/`, pret a publier sur le sous-domaine applicatif
+- `backend-laravel13-git/`, sans dependances, caches, fichiers d'environnement ni donnees locales
+- `.env.backend.production`, modele a completer uniquement sur le serveur
+- `README-DEPLOIEMENT.txt`, checklist contextualisee pour cette livraison
+
+Le script valide les noms de domaines, construit le frontend avec l'URL d'API cible et prepare les fichiers localement. Il ne se connecte pas a O2switch et ne deploie rien.
 
 ## Backend Laravel
 
@@ -96,15 +98,19 @@ Cela garde une politique de cookie simple et evite beaucoup de problemes CORS.
 
 ## Commandes backend
 
-Depuis `backend-laravel13-git/` :
+Depuis `backend-laravel13-git/`, apres avoir renseigne le fichier `.env` sur le serveur :
 
 ```bash
-composer install --no-dev --optimize-autoloader
-php artisan key:generate --force
+composer install --no-dev --optimize-autoloader --no-interaction
+# Installation neuve uniquement : php artisan key:generate --force
+# Mise a jour : conserver l'APP_KEY existante ; ne jamais la regenerer.
 php artisan migrate --force
 php artisan optimize:clear
+php artisan ferm:verify-production
 php artisan optimize
 ```
+
+Avant une migration, sauvegarder la base, les fichiers de `storage/` et la valeur d'`APP_KEY`, puis verifier qu'une restauration est possible. Ne pas publier la racine Laravel : seul `backend-laravel13-git/public/` doit etre la racine web de l'API.
 
 ## Permissions et stockage
 
@@ -121,11 +127,14 @@ Verifier au minimum :
 
 Tester :
 
-1. `https://api.votre-domaine.tld/api/v1/health`
+1. `https://api.votre-domaine.tld/api/v1/health` repond avec `data.status: "ok"`
 2. la page frontend
 3. la connexion administrateur
 4. la deconnexion
 5. le rechargement de page apres connexion
+6. la connexion Google, si elle est activee
+7. une operation avec deux comptes de fermes distinctes, pour confirmer l'isolation
+8. le refus des acces directs a `.env` et `.git`
 
 ## Points d'attention
 

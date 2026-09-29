@@ -20,6 +20,7 @@ class FinancialTransaction extends Model
         'source_entity_type',
         'source_entity_id',
         'operation_id',
+        'idempotency_key',
         'occurred_at',
     ];
 
@@ -33,4 +34,3 @@ class FinancialTransaction extends Model
         return $this->belongsTo(Farm::class);
     }
 }
-

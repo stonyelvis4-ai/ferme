@@ -13,8 +13,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->api(prepend: [\App\Http\Middleware\ValidateApiOrigin::class]);
+        $middleware->prependToPriorityList(
+            \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            \App\Http\Middleware\PromoteApiTokenCookie::class,
+        );
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'idempotent' => \App\Http\Middleware\IdempotentCreation::class,
             'active.account' => \App\Http\Middleware\EnsureActiveAccount::class,
             'auth' => \App\Http\Middleware\Authenticate::class,
             'api.cookie.token' => \App\Http\Middleware\PromoteApiTokenCookie::class,

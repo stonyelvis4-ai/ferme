@@ -312,7 +312,7 @@ class PiscicultureService
                 'farm_id' => $data['farm_id'],
                 'stock_item_id' => $stockItem->id,
                 'type' => 'in',
-                'quantity' => (int) round($sellable),
+                'quantity' => $sellable,
                 'unit_cost' => null,
                 'source_module' => 'pisciculture',
                 'source_entity_type' => 'fish_harvest',
@@ -343,6 +343,12 @@ class PiscicultureService
     public function recordSale(array $data): FishSale
     {
         return DB::transaction(function () use ($data) {
+            if (! empty($data['fish_harvest_id']) && ! FishHarvest::query()
+                ->where('farm_id', $data['farm_id'])
+                ->where('fish_pond_id', $data['fish_pond_id'])
+                ->whereKey($data['fish_harvest_id'])->exists()) {
+                throw ValidationException::withMessages(['fish_harvest_id' => 'Recolte invalide pour ce bassin et cette ferme.']);
+            }
             $pond = FishPond::query()
                 ->where('farm_id', $data['farm_id'])
                 ->findOrFail($data['fish_pond_id']);
@@ -362,7 +368,7 @@ class PiscicultureService
                 'farm_id' => $data['farm_id'],
                 'stock_item_id' => $stockItem->id,
                 'type' => 'out',
-                'quantity' => (int) round($kilograms),
+                'quantity' => $kilograms,
                 'unit_cost' => $unitPrice,
                 'source_module' => 'pisciculture',
                 'source_entity_type' => 'fish_sale',

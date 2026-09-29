@@ -1,8 +1,11 @@
 node_modules/
 build/
 dist/
+dist-*/
 deploy-build/
 deploy-build-*.zip
+release-*/
+.playwright-cli/
 coverage/
 .DS_Store
 *.log

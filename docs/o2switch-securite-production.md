@@ -48,17 +48,21 @@ Ne jamais versionner :
 
 ## Commandes exactes cote serveur
 
-Depuis le dossier Laravel :
+Depuis le dossier Laravel, une fois le fichier `.env` de production renseigne :
 
 ```bash
-composer install --no-dev --optimize-autoloader
-php artisan key:generate --force
+composer install --no-dev --optimize-autoloader --no-interaction
+# Installation neuve uniquement : php artisan key:generate --force
+# Mise a jour : conserver l'APP_KEY existante ; ne jamais la regenerer.
 php artisan migrate --force
 php artisan optimize:clear
+php artisan ferm:verify-production
 php artisan optimize
 ```
 
 Si une ancienne version a deja tourne sur le serveur, garder `optimize:clear` avant `optimize` pour eviter qu'un cache Laravel masque les nouveaux middlewares ou routes.
+
+Avant toute migration, sauvegarder la base, les fichiers `storage/` et l'`APP_KEY`, puis tester une restauration. Le sous-domaine API doit pointer exclusivement vers `public/`, jamais vers la racine Laravel.
 
 ## Permissions
 
@@ -79,6 +83,7 @@ Verifier au minimum :
 6. un proprietaire reste bien en lecture seule.
 7. les exports rapports ne fonctionnent qu'en `pdf` ou `xlsx`.
 8. les operations metier restent rattachees a la ferme connectee.
+9. `php artisan ferm:verify-production` reussit avant l'ouverture publique.
 
 ## Verifications navigateur
 

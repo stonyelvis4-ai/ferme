@@ -1,151 +1,83 @@
 param(
-    [string]$FrontendDomain = "app.votre-domaine.tld",
-    [string]$ApiDomain = "api.votre-domaine.tld",
-    [string]$OutputDir = "deploy-build"
+    [Parameter(Mandatory=$true)][string]$FrontendDomain,
+    [Parameter(Mandatory=$true)][string]$ApiDomain,
+    [ValidateSet("mysql", "pgsql")][string]$DatabaseDriver = "mysql",
+    [string]$GoogleClientId = "",
+    [string]$OutputDir = ("release-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 )
 
 $ErrorActionPreference = "Stop"
-
+foreach ($domain in @($FrontendDomain, $ApiDomain)) {
+    if ($domain -notmatch '^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$' -or $domain -match 'votre-domaine|example\.') {
+        throw "Un domaine reel, sans protocole ni chemin, est obligatoire."
+    }
+}
+if ($GoogleClientId -and $GoogleClientId -notmatch '^[A-Za-z0-9.-]+\.apps\.googleusercontent\.com$') {
+    throw "Identifiant client Google invalide."
+}
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$frontendDist = Join-Path $repoRoot "dist"
-$frontendTempDist = Join-Path $repoRoot "dist-o2switch"
-$backendRoot = Join-Path $repoRoot "backend-laravel13-git"
+if ($OutputDir -notmatch '^[a-zA-Z0-9_-]+$') { throw "Nom de dossier de livraison invalide." }
 $outputRoot = Join-Path $repoRoot $OutputDir
+if (Test-Path -LiteralPath $outputRoot) { throw "Le dossier existe deja. Choisissez un nouveau nom." }
+New-Item -ItemType Directory -Path $outputRoot | Out-Null
 $frontendOutput = Join-Path $outputRoot "frontend"
+$backendRoot = Join-Path $repoRoot "backend-laravel13-git"
 $backendOutput = Join-Path $outputRoot "backend-laravel13-git"
-
-function Reset-Directory {
-    param([string]$Path)
-
-    if (Test-Path $Path) {
-        Remove-Item -LiteralPath $Path -Recurse -Force
-    }
-
-    New-Item -ItemType Directory -Path $Path | Out-Null
-}
-
-Write-Host "Preparation du build frontend..."
+$oldApi = $env:VITE_FERM_API_URL
+$oldGoogle = $env:VITE_GOOGLE_CLIENT_ID
 Push-Location $repoRoot
-$env:VITE_FERM_API_URL = "https://$ApiDomain/api/v1"
-if (Test-Path $frontendTempDist) {
-    Remove-Item -LiteralPath $frontendTempDist -Recurse -Force
-}
-& npx.cmd vite build --outDir dist-o2switch --emptyOutDir
-if ($LASTEXITCODE -ne 0) {
-    throw "Le build frontend a echoue avec le code $LASTEXITCODE."
-}
-Pop-Location
-
-Write-Host "Creation du dossier de livraison..."
-Reset-Directory -Path $outputRoot
-New-Item -ItemType Directory -Path $frontendOutput | Out-Null
-
-Copy-Item -Path (Join-Path $frontendTempDist "*") -Destination $frontendOutput -Recurse -Force
-
-Write-Host "Copie du backend Laravel sans secrets ni dependances locales..."
-$backendExclude = @(
-    ".git.backend",
-    ".env",
-    "vendor",
-    "node_modules",
-    "database.sqlite",
-    ".phpunit.result.cache",
-    "storage\logs",
-    "storage\framework\cache\data",
-    "storage\framework\sessions",
-    "storage\framework\testing",
-    "storage\framework\views",
-    "bootstrap\cache\*.php"
-)
-
-robocopy $backendRoot $backendOutput /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NP `
-    /XD (Join-Path $backendRoot ".git.backend") `
-        (Join-Path $backendRoot "vendor") `
-        (Join-Path $backendRoot "node_modules") `
-        (Join-Path $backendRoot "storage\logs") `
-        (Join-Path $backendRoot "storage\framework\cache\data") `
-        (Join-Path $backendRoot "storage\framework\sessions") `
-        (Join-Path $backendRoot "storage\framework\testing") `
-        (Join-Path $backendRoot "storage\framework\views") `
-    /XF (Join-Path $backendRoot ".env") `
-        (Join-Path $backendRoot ".phpunit.result.cache") `
-        (Join-Path $backendRoot "database\database.sqlite") `
-        (Join-Path $backendRoot "bootstrap\cache\packages.php") `
-        (Join-Path $backendRoot "bootstrap\cache\services.php")
-
-if ($LASTEXITCODE -gt 7) {
-    throw "La copie du backend a echoue avec le code robocopy $LASTEXITCODE."
+try {
+    $env:VITE_FERM_API_URL = "https://$ApiDomain/api/v1"
+    $env:VITE_GOOGLE_CLIENT_ID = $GoogleClientId
+    & npx.cmd vite build --outDir $frontendOutput
+    if ($LASTEXITCODE -ne 0) { throw "Echec de compilation." }
+} finally {
+    $env:VITE_FERM_API_URL = $oldApi
+    $env:VITE_GOOGLE_CLIENT_ID = $oldGoogle
+    Pop-Location
 }
 
-$postCopyCleanup = @(
-    (Join-Path $backendOutput ".phpunit.result.cache"),
-    (Join-Path $backendOutput "database\database.sqlite")
-)
-
-foreach ($path in $postCopyCleanup) {
-    if (Test-Path $path) {
-        Remove-Item -LiteralPath $path -Force
-    }
+# Positive list: no local database, uploads, vendor, environment, logs or cached configuration.
+New-Item -ItemType Directory -Path $backendOutput | Out-Null
+foreach ($dir in @("app", "config", "database/migrations", "database/seeders", "resources", "routes")) {
+    $destination = Join-Path $backendOutput $dir
+    New-Item -ItemType Directory -Path $destination -Force | Out-Null
+    & robocopy (Join-Path $backendRoot $dir) $destination /E /XJ /R:1 /W:1 /NFL /NDL /NJH /NJS /NP /XF ".env*" "*.sqlite*" "*.log"
+    if ($LASTEXITCODE -gt 7) { throw "Echec copie de $dir." }
+}
+foreach ($dir in @("bootstrap", "bootstrap/cache", "public", "storage/app/private", "storage/app/public", "storage/logs", "storage/framework/cache/data", "storage/framework/sessions", "storage/framework/views")) {
+    New-Item -ItemType Directory -Path (Join-Path $backendOutput $dir) -Force | Out-Null
+}
+foreach ($file in @("artisan", "composer.json", "composer.lock", "bootstrap/app.php", "bootstrap/providers.php", "public/index.php", "public/.htaccess", "public/robots.txt")) {
+    $source = Join-Path $backendRoot $file
+    if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $backendOutput $file) }
 }
 
-if (Test-Path $frontendTempDist) {
-    Remove-Item -LiteralPath $frontendTempDist -Recurse -Force
-}
+$port = if ($DatabaseDriver -eq "mysql") { "3306" } else { "5432" }
+@(
+    'APP_NAME="FERM+ API"', "APP_ENV=production", "APP_DEBUG=false", "APP_KEY=",
+    "APP_URL=https://$ApiDomain", "APP_FRONTEND_URL=https://$FrontendDomain",
+    "CORS_ALLOWED_ORIGINS=https://$FrontendDomain", "GOOGLE_CLIENT_ID=$GoogleClientId",
+    "DB_CONNECTION=$DatabaseDriver", "DB_HOST=127.0.0.1", "DB_PORT=$port",
+    "DB_DATABASE=", "DB_USERNAME=", "DB_PASSWORD=",
+    "SESSION_DRIVER=database", "SESSION_LIFETIME=120", "SESSION_SECURE_COOKIE=true",
+    "SESSION_SAME_SITE=lax", "API_TOKEN_COOKIE=fermplus_api_token",
+    "API_TOKEN_COOKIE_SAME_SITE=lax", "LOG_LEVEL=warning"
+) | Set-Content -LiteralPath (Join-Path $outputRoot ".env.backend.production")
 
-$frontendEnvPath = Join-Path $outputRoot ".env.frontend.production"
-$backendEnvPath = Join-Path $outputRoot ".env.backend.production"
-$frontendEnv = @(
-    "VITE_FERM_API_URL=https://$ApiDomain/api/v1"
-)
-$backendEnv = @(
-    'APP_NAME="FERM+ API"',
-    "APP_ENV=production",
-    "APP_DEBUG=false",
-    "APP_URL=https://$ApiDomain",
-    "APP_FRONTEND_URL=https://$FrontendDomain",
-    "CORS_ALLOWED_ORIGINS=https://$FrontendDomain",
-    "",
-    "DB_CONNECTION=pgsql",
-    "DB_HOST=127.0.0.1",
-    "DB_PORT=5432",
-    "DB_DATABASE=ferm_plus",
-    "DB_USERNAME=utilisateur_db",
-    "DB_PASSWORD=mot_de_passe_db",
-    "DB_SSLMODE=prefer",
-    "",
-    "SESSION_DRIVER=database",
-    "SESSION_LIFETIME=120",
-    "SESSION_PATH=/",
-    "SESSION_DOMAIN=$ApiDomain",
-    "SESSION_SECURE_COOKIE=true",
-    "SESSION_SAME_SITE=lax",
-    "API_TOKEN_COOKIE=fermplus_api_token",
-    "API_TOKEN_COOKIE_SAME_SITE=lax",
-    "",
-    "LOG_LEVEL=warning"
-)
-
-Set-Content -Path $frontendEnvPath -Value $frontendEnv
-Set-Content -Path $backendEnvPath -Value $backendEnv
-
-$instructionsPath = Join-Path $outputRoot "README-DEPLOIEMENT.txt"
-$instructions = @(
-    "FERM+ - Kit de deploiement O2switch",
-    "",
-    "1. Publier le contenu du dossier frontend sur le sous-domaine $FrontendDomain",
-    "2. Publier le dossier backend-laravel13-git sur le sous-domaine $ApiDomain",
-    "3. Pointer le sous-domaine API vers le dossier public du projet Laravel",
-    "4. Copier .env.backend.production vers backend-laravel13-git/.env et adapter la base de donnees",
-    "5. Cote serveur, executer :",
-    "   composer install --no-dev --optimize-autoloader",
-    "   php artisan key:generate --force",
-    "   php artisan migrate --force",
-    "   php artisan optimize",
-    "6. Verifier https://$ApiDomain/api/v1/health puis la connexion sur le frontend"
-)
-Set-Content -Path $instructionsPath -Value $instructions
-
-Write-Host ""
-Write-Host "Kit genere dans : $outputRoot"
-Write-Host "Frontend pret dans : $frontendOutput"
-Write-Host "Backend pret dans : $backendOutput"
+@(
+    "FERM+ : livraison a valider en preproduction avant mise en ligne.",
+    "Frontend : $FrontendDomain. Racine API : backend-laravel13-git/public uniquement.",
+    "Configurer la base, Google OAuth et les origines exactes. Ne pas publier les fichiers .env.",
+    "Sauvegarder la base, les uploads et APP_KEY ; tester la restauration avant migration.",
+    "Installation neuve uniquement : php artisan key:generate --force.",
+    "Mise a jour : conserver APP_KEY et les fichiers storage existants. Ne jamais regenerer la cle.",
+    "composer install --no-dev --optimize-autoloader --no-interaction",
+    "php artisan migrate --force",
+    "php artisan ferm:verify-production",
+    "php artisan optimize",
+    "Configurer permissions d'ecriture sur storage et bootstrap/cache sans chmod 777.",
+    "Tester HTTPS, connexion/Google/deconnexion, refus .env/.git, cookies, isolation de deux fermes.",
+    "Cette generation ne deploie rien et n'atteste pas de la securite du serveur."
+) | Set-Content -LiteralPath (Join-Path $outputRoot "README-DEPLOIEMENT.txt")
+Write-Host "Livraison preparee dans $outputRoot"
