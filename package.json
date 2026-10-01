@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('server.js',{force:true});\"",
     "lint": "tsc --noEmit",
-    "test": "node --test tests/sw-security.test.mjs tests/ferm-api.test.mjs"
+    "test": "node --test tests/sw-security.test.mjs tests/ferm-api.test.mjs tests/offline-outbox.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

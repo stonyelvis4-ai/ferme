@@ -138,6 +138,7 @@ Route::prefix('v1')->group(function () {
                 Route::patch('/infrastructures/enclosures/{enclosure}', [InfrastructureController::class, 'updateEnclosure']);
                 Route::delete('/infrastructures/enclosures/{enclosure}', [InfrastructureController::class, 'destroyEnclosure']);
                 Route::post('/sync', [SyncController::class, 'store']);
+                Route::post('/sync/operations', [SyncController::class, 'operations']);
                 Route::patch('/sync/{entry}/process', [SyncController::class, 'process']);
                 Route::patch('/sync/{entry}/fail', [SyncController::class, 'fail']);
                 Route::post('/pisciculture', [PiscicultureController::class, 'store']);

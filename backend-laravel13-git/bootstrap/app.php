@@ -18,6 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
             \App\Http\Middleware\PromoteApiTokenCookie::class,
         );
+        // Run idempotency after authentication, but before route model binding so a
+        // replayed DELETE can return its saved response after the model is gone.
+        $middleware->appendToPriorityList(
+            \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            \App\Http\Middleware\IdempotentCreation::class,
+        );
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
             'idempotent' => \App\Http\Middleware\IdempotentCreation::class,

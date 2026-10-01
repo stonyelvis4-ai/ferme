@@ -9,6 +9,7 @@ use App\Models\Crop;
 use App\Models\Plot;
 use App\Models\SanitaryTreatment;
 use App\Models\StockItem;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1277,5 +1278,61 @@ class AuthAndSanitaryTest extends TestCase
             'id' => $stock->id,
             'unit_cost' => 1250,
         ]);
+    }
+
+    public function test_sync_operations_creates_independent_task_and_replays_it_safely(): void
+    {
+        [$admin, $farm] = $this->adminWithFarm('sync-task');
+        Sanctum::actingAs($admin);
+
+        $operation = [
+            'operation_id' => 'offline:task-001',
+            'method' => 'POST',
+            'path' => '/api/v1/tasks',
+            'payload' => ['title' => 'Contrôler le bassin', 'priority' => 'normal', 'status' => 'todo'],
+            'dependencies' => [],
+        ];
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [$operation]])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.status', 201)
+            ->assertJsonPath('data.results.0.success', true)
+            ->assertJsonPath('data.results.0.replayed', false);
+        $this->assertSame(1, Task::where('farm_id', $farm->id)->count());
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [$operation]])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.status', 201)
+            ->assertJsonPath('data.results.0.replayed', true);
+        $this->assertSame(1, Task::where('farm_id', $farm->id)->count());
+    }
+
+    public function test_sync_operations_rejects_unapproved_commands_and_dependencies(): void
+    {
+        [$admin] = $this->adminWithFarm('sync-reject');
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [[
+            'operation_id' => 'offline:stock-001', 'method' => 'POST', 'path' => '/api/v1/stocks',
+            'payload' => ['name' => 'Tentative interdite'], 'dependencies' => [],
+        ]]])->assertOk()->assertJsonPath('data.results.0.status', 422);
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [[
+            'operation_id' => 'offline:task-dependency', 'method' => 'POST', 'path' => '/api/v1/tasks',
+            'payload' => ['title' => 'Tâche', 'priority' => 'normal', 'status' => 'todo'], 'dependencies' => ['offline:other'],
+        ]]])->assertOk()->assertJsonPath('data.results.0.status', 422);
+    }
+
+    private function adminWithFarm(string $suffix): array
+    {
+        $admin = User::factory()->create(['role' => Role::Admin, 'account_status' => 'active', 'is_active' => true]);
+        $farm = Farm::create([
+            'name' => "Ferme {$suffix}", 'slug' => "ferme-{$suffix}", 'administrator_id' => $admin->id,
+            'status' => 'active', 'currency' => 'FCFA', 'area_unit' => 'ha',
+            'manager_name' => $admin->name, 'contact_email' => $admin->email,
+        ]);
+        $admin->forceFill(['farm_id' => $farm->id])->save();
+
+        return [$admin, $farm];
     }
 }

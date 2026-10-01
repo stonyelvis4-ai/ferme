@@ -108,6 +108,13 @@ import {
   mapTreatments,
   mapSuppliers
 } from './services/fermMappers';
+import {
+  enqueueOfflineOperation,
+  listReadyOfflineOperations,
+  markOfflineOperationRetry,
+  removeOfflineOperation,
+  type OfflineOutboxScope,
+} from './services/offlineOutbox';
 
 const ALARM_SOUND_LIBRARY: Record<string, string> = {
   'ferm-plus-default': '/audio/ferm-plus-alert-loop.m4a',
@@ -714,6 +721,10 @@ export default function App() {
   };
   const getTodayDate = () => new Date().toISOString().split('T')[0];
   const getSyncStatus = (): SyncStatus => (isOffline ? 'pending' : 'synced');
+  const getOfflineOutboxScope = (): OfflineOutboxScope | null => {
+    if (!authUser?.id || !activeFarmId) return null;
+    return { userId: authUser.id, farmId: activeFarmId };
+  };
   const pushNotice = (
     type: AppNotice['type'],
     title: string,
@@ -1353,6 +1364,42 @@ export default function App() {
   };
 
   // Connectivity Sync Handler
+  const flushDurableTaskOutbox = async () => {
+    const scope = getOfflineOutboxScope();
+    if (!scope || !authToken) return new Set<string>();
+
+    const operations = listReadyOfflineOperations(scope)
+      .filter((operation) => operation.method === 'POST' && operation.path === '/api/v1/tasks' && operation.dependsOn.length === 0);
+    if (operations.length === 0) return new Set<string>();
+
+    const response = await postJson<{ results?: Array<{ operation_id?: string; success?: boolean; error?: string; data?: unknown }> }>(
+      '/sync/operations',
+      {
+        operations: operations.map((operation) => ({
+          operation_id: operation.id,
+          method: operation.method,
+          path: operation.path,
+          payload: operation.payload,
+          dependencies: operation.dependsOn,
+        })),
+      },
+      authToken,
+    );
+
+    const completed = new Set<string>();
+    for (const result of response.data?.results ?? []) {
+      if (!result.operation_id) continue;
+      if (result.success) {
+        removeOfflineOperation(scope, result.operation_id);
+        completed.add(result.operation_id);
+      } else {
+        markOfflineOperationRetry(scope, result.operation_id, result.error);
+      }
+    }
+
+    return completed;
+  };
+
   const flushPendingSync = async () => {
     if (!authToken || syncBusyRef.current) return;
     syncBusyRef.current = true;
@@ -1360,7 +1407,12 @@ export default function App() {
     // Validate the session before replaying any local writes.
     await loadWorkspaceSnapshot(authToken);
 
+    const completedTaskIds = await flushDurableTaskOutbox();
     const localCache = readWorkspaceCache(authUser?.id);
+    if (localCache && completedTaskIds.size > 0) {
+      localCache.tasks = localCache.tasks.filter((task) => !completedTaskIds.has(String(task.id)));
+      writeWorkspaceCache(authUser?.id, localCache);
+    }
     if (activeFarmId) {
       const syncResult = await syncLocalCacheToServer(authToken, activeFarmId, localCache);
       if (syncResult.pendingCache) {
@@ -1385,6 +1437,13 @@ export default function App() {
       syncBusyRef.current = false;
     }
   };
+
+  useEffect(() => {
+    if (!authReady || !authToken || !activeFarmId || !authUser?.id || !navigator.onLine) return;
+    void flushPendingSync().catch((error) => console.error('Initial outbox sync failed:', error));
+    // The outbox is intentionally retried when the authenticated user/farm context becomes available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, authToken, activeFarmId, authUser?.id]);
 
   // Moteur d'Interconnexion: Core Operations
 
@@ -2535,32 +2594,51 @@ export default function App() {
 
     setTasks((prev) => [newTask, ...prev]);
 
+    const taskPayload = {
+      farm_id: Number(activeFarmId),
+      title: newTask.title,
+      description: newTask.description,
+      source_module: newTask.sourceModule,
+      source_entity_type: newTask.sourceEntityType ?? null,
+      source_entity_id: newTask.sourceElementId ?? null,
+      start_at: toUtcIso(newTask.startDate, '08:00'),
+      priority: newTask.priority,
+      status: newTask.status,
+      due_at: toUtcIso(newTask.dueDate, '17:00'),
+      reminder_at: newTask.reminderAt ?? null,
+      assigned_to: authUser?.id ? Number(authUser.id) : null,
+    };
+
     if (authToken && activeFarmId) {
       try {
         const response = await postJson<Task>(
           '/tasks',
-          {
-            farm_id: Number(activeFarmId),
-            title: newTask.title,
-            description: newTask.description,
-            source_module: newTask.sourceModule,
-            source_entity_type: newTask.sourceEntityType ?? null,
-            source_entity_id: newTask.sourceElementId ?? null,
-            start_at: toUtcIso(newTask.startDate, '08:00'),
-            priority: newTask.priority,
-            status: newTask.status,
-            due_at: toUtcIso(newTask.dueDate, '17:00'),
-            reminder_at: newTask.reminderAt ?? null,
-            assigned_to: authUser?.id ? Number(authUser.id) : undefined,
-          },
-          authToken
+          taskPayload,
+          authToken,
+          taskId,
         );
         const backendTask = response.data;
         if (backendTask) {
           setTasks((prev) => [mapTasks([backendTask], users)[0], ...prev.filter((task) => task.id !== taskId)]);
         }
       } catch (error) {
-        console.error('Task sync failed:', error);
+        const scope = getOfflineOutboxScope();
+        const canQueue = isOffline || (error instanceof Error && error.message.includes('Connexion impossible'));
+        if (scope && canQueue) {
+          try {
+            enqueueOfflineOperation(scope, {
+              id: taskId,
+              method: 'POST',
+              path: '/api/v1/tasks',
+              payload: taskPayload,
+            });
+            pushNotice('info', 'Tâche mise en attente', 'Elle sera envoyée automatiquement dès le retour du réseau.');
+          } catch (queueError) {
+            console.error('Task outbox enqueue failed:', queueError);
+          }
+        } else {
+          console.error('Task sync failed:', error);
+        }
       }
     }
 
