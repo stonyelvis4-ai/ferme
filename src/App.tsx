@@ -978,7 +978,14 @@ export default function App() {
         });
     };
     const handleBrowserOffline = () => {
-      if (!cancelled) setIsOffline(true);
+      if (!cancelled) {
+        setIsOffline(true);
+        pushNotice(
+          'warning',
+          'Mode hors connexion limité',
+          'Les modifications et suppressions doivent attendre le retour du réseau. Ne quittez pas cette page après une saisie non confirmée.'
+        );
+      }
     };
     const refreshWorkspace = () => {
       if (cancelled || document.visibilityState === 'hidden' || !navigator.onLine) return;
@@ -1358,16 +1365,19 @@ export default function App() {
       const syncResult = await syncLocalCacheToServer(authToken, activeFarmId, localCache);
       if (syncResult.pendingCache) {
         writeWorkspaceCache(authUser?.id, syncResult.pendingCache);
+        pushNotice(
+          'warning',
+          'Synchronisation partielle',
+          `${countPendingWorkspaceEntries(syncResult.pendingCache)} création(s) restent à reprendre. Les modifications existantes ne sont pas validées hors connexion.`
+        );
       } else if (syncResult.syncedCount > 0) {
         clearWorkspaceCache(authUser?.id);
+        pushNotice('success', 'Créations synchronisées', `${syncResult.syncedCount} création(s) ont été confirmées par le serveur.`);
       }
     }
 
     await hydrateWorkspace(authToken, { silent: true });
     setIsOffline(false);
-    setAuditLogs((prev) =>
-      prev.map((log) => (log.syncStatus === 'pending' ? { ...log, syncStatus: 'synced' } : log))
-    );
     } catch (error) {
       if (error instanceof ApiError && [401, 403].includes(error.status)) resetToLogin('Session expiree.');
       throw error;
