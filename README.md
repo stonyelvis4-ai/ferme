@@ -14,14 +14,22 @@ FERM+ est une application de gestion agricole et d'elevage avec:
 
 Le dossier `laravel13/` de prototype et les outils PHP embarques ont ete retires pour alleger le depot.
 
-## Frontend
+## Demarrage local
+
+Dans un premier terminal, lance l'API :
+
+```bash
+npm run api:dev
+```
+
+Dans un second terminal, lance l'interface :
 
 ```bash
 npm install
 npm run dev
 ```
 
-Le frontend tourne par defaut sur `http://localhost:3000`.
+L'interface tourne sur `http://127.0.0.1:3000` et communique avec l'API locale sur le port `8012`. Les deux services sont limites a cet ordinateur par defaut.
 
 Pour une mise en production, voir aussi [docs/o2switch-deploiement.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-deploiement.md) et [docs/o2switch-securite-production.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-securite-production.md).
 
@@ -34,7 +42,7 @@ composer install
 cp .env.example .env
 php artisan key:generate
 php artisan migrate
-php artisan serve
+php artisan serve --host=127.0.0.1 --port=8012
 ```
 
 L'API expose ses routes sur `/api/v1`.
