@@ -79,9 +79,8 @@ class TaskController extends Controller
             'source' => 'web',
         ]);
 
-        $task->delete();
+        $this->taskService->delete($task);
 
         return response()->json(['message' => 'Task deleted.']);
     }
 }
-

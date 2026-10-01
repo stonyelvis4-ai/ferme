@@ -43,6 +43,8 @@ class AlertEvaluationService
         return StockItem::query()
             ->where('farm_id', $farmId)
             ->where('current_quantity', '<=', $threshold)
+            ->get()
+            ->each(fn (StockItem $item) => $this->alertService->createLowStockAlert($item))
             ->count();
     }
 

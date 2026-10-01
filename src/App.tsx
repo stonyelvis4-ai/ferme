@@ -3945,8 +3945,8 @@ const handleDeleteStockArticle = async (articleId: string) => {
             { id: 'alertes', label: 'Alertes', icon: AlertTriangle, badge: unreadAlerts.length },
             { id: 'rapports', label: 'Rapports d\'activité', icon: FileText },
             { id: 'audit', label: 'Journal d\'Audit', icon: ShieldAlert },
-            { id: 'paramètres', label: 'Paramètres', icon: Settings }
-          ].map((navItem) => {
+            { id: 'paramètres', label: role === 'owner' ? 'Mon compte' : 'Paramètres', icon: Settings }
+          ].filter((navItem) => role === 'admin' || navItem.id !== 'audit').map((navItem) => {
             const IconComponent = navItem.icon;
             const isActive = currentView === navItem.id;
 

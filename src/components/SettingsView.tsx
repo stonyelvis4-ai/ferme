@@ -124,7 +124,6 @@ export default function SettingsView({
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (role !== 'admin') return;
     onChangePassword({
       current_password: currentPassword,
       password: newPassword,
@@ -157,16 +156,42 @@ export default function SettingsView({
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-sans tracking-tight flex items-center gap-2">
             <Settings className="w-5 h-5 text-emerald-600" />
-            Module Paramètres de l'Exploitation
+            {role === 'admin' ? "Module Paramètres de l'Exploitation" : 'Mon compte'}
           </h2>
           <p className="text-xs text-slate-500">
-            Configurez les métriques métier de votre ferme et gérez les comptes administrateur et propriétaire.
+            {role === 'admin'
+              ? 'Configurez les métriques métier de votre ferme et gérez les comptes administrateur et propriétaire.'
+              : 'Gérez le mot de passe de votre compte. Les réglages et le journal d’audit sont réservés à l’administrateur.'}
           </p>
         </div>
       </div>
 
+      {role === 'owner' && (
+        <form onSubmit={handlePasswordSubmit} className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
+            <KeyRound className="h-4 w-4 text-emerald-600" /> Changement de mot de passe
+          </h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <label className="block text-xs font-semibold text-slate-600">Mot de passe actuel
+              <input type="password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50/70 p-3 text-sm text-slate-900" />
+            </label>
+            <label className="block text-xs font-semibold text-slate-600">Nouveau mot de passe
+              <input type="password" required minLength={12} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50/70 p-3 text-sm text-slate-900" />
+            </label>
+            <label className="block text-xs font-semibold text-slate-600">Confirmation
+              <input type="password" required minLength={12} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50/70 p-3 text-sm text-slate-900" />
+            </label>
+          </div>
+          <div className="flex justify-end">
+            <button type="submit" className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white">
+              <KeyRound className="h-4 w-4" /> Mettre à jour le mot de passe
+            </button>
+          </div>
+        </form>
+      )}
+
       {/* Farm Settings Form */}
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-6" hidden={role === 'owner'}>
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           <h3 className="font-bold text-slate-900 text-sm mb-4 flex items-center gap-1.5">
             <Building className="w-4 h-4 text-emerald-600" />
@@ -521,11 +546,10 @@ export default function SettingsView({
             </div>
           )}
 
-          {role === 'admin' && (
-            <form onSubmit={handlePasswordSubmit} className="mt-8 border-t border-slate-100 pt-6 space-y-4">
+          <form onSubmit={handlePasswordSubmit} className="mt-8 border-t border-slate-100 pt-6 space-y-4">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                 <KeyRound className="w-4 h-4 text-emerald-600" />
-                Changement de mot de passe administrateur
+                Changement de mot de passe
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
@@ -603,7 +627,6 @@ export default function SettingsView({
                 </button>
               </div>
             </form>
-          )}
 
           {/* Files / Attachments Manager */}
           <div className="mt-8 border-t border-slate-100 pt-6 space-y-4">

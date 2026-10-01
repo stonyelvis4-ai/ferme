@@ -60,7 +60,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware(['tenant'])->group(function () {
             Route::get('/dashboard', [DashboardController::class, 'index']);
-            Route::get('/audit', [AuditController::class, 'index']);
+            Route::get('/audit', [AuditController::class, 'index'])->middleware('admin');
             Route::get('/alerts', [AlertController::class, 'index']);
             Route::get('/calendar', [CalendarController::class, 'index']);
             Route::get('/stocks', [StockController::class, 'index']);
@@ -84,7 +84,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/tasks', [TaskController::class, 'index']);
             Route::get('/users', [UserController::class, 'index']);
             Route::get('/users/{user}', [UserController::class, 'show']);
-            Route::get('/settings', [SettingsController::class, 'show']);
+            Route::get('/settings', [SettingsController::class, 'show'])->middleware('admin');
 
             Route::middleware(['admin', 'idempotent'])->group(function () {
                 Route::post('/farms', [FarmController::class, 'store']);
