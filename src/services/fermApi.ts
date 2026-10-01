@@ -61,6 +61,19 @@ function shouldSendBearerToken(token?: string) {
   return Boolean(token && token !== COOKIE_AUTH_MARKER);
 }
 
+function safeApiMessage(message: string, status: number) {
+  const includesSensitiveAuthenticationData =
+    /(?:id_token|access_token|refresh_token|authorization\s*:|bearer\s+|eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.)/i.test(message);
+
+  if (includesSensitiveAuthenticationData) {
+    return status === 401 || status === 403
+      ? "L'authentification a échoué. Veuillez vous reconnecter."
+      : "Une erreur d'authentification est survenue. Réessayez dans un instant.";
+  }
+
+  return message.length > 300 ? `${message.slice(0, 297)}…` : message;
+}
+
 export function getStoredAuthUser<T = AuthUser>() {
   const raw = readPersistentValue(AUTH_USER_KEY);
   if (!raw) return null;
@@ -124,6 +137,8 @@ async function requestJson<T>(
         message = String(firstError);
       }
     }
+
+    message = safeApiMessage(message, response.status);
 
     if (response.status === 429) {
       const retryAfterHeader = response.headers.get('Retry-After');

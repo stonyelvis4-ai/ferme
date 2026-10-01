@@ -1029,15 +1029,24 @@ export default function AuthGate({
         @media (max-width: 980px) {
           .auth-page {
             grid-template-columns: 1fr;
-            padding: 1.5rem 1.15rem 5rem;
-            gap: 1.75rem;
+            padding: 1rem 1.15rem 4rem;
+            gap: 1rem;
+          }
+          .auth-panel {
+            order: -1;
           }
           .auth-hero {
-            padding: 0.5rem 0 0;
+            padding: 0.75rem 0 0;
+            justify-content: flex-start;
           }
           .auth-feature-cards {
-            margin-top: 1.75rem;
-            max-width: 100%;
+            display: none;
+          }
+          .auth-hero h1 {
+            max-width: 38rem;
+          }
+          .auth-hero-lead {
+            max-width: 38rem;
           }
           .auth-bg-overlay {
             background:

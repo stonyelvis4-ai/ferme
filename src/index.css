@@ -6,32 +6,30 @@
   --font-display: "Space Grotesk", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Ultra-Modern, Crisp, SaaS-style Color Palette */
-  /* Slate: mapped to cool, pristine slate-gray tones for modern contrast */
-  --color-slate-50: #f8fafc;     /* Super clean light blue-gray background */
-  --color-slate-100: #f1f5f9;    /* Clean divider and section background */
-  --color-slate-200: #e2e8f0;    /* Crisp border gray */
-  --color-slate-300: #cbd5e1;    /* Accent border and muted elements */
-  --color-slate-400: #94a3b8;    /* Muted labels and secondary icons */
-  --color-slate-500: #64748b;    /* Secondary text */
-  --color-slate-600: #475569;    /* Readable body text */
-  --color-slate-700: #334155;    /* Strong text */
-  --color-slate-800: #1e293b;    /* Dark stone gray */
-  --color-slate-900: #0f172a;    /* Deep space black (Sidebar, headers) */
-  --color-slate-950: #020617;    /* Ultra dark pitch black */
+  /* Field notebook palette: warm paper, charcoal ink and cultivated greens. */
+  --color-slate-50: #f8f8f4;
+  --color-slate-100: #f0f1eb;
+  --color-slate-200: #dde0d6;
+  --color-slate-300: #c5cabc;
+  --color-slate-400: #899184;
+  --color-slate-500: #667065;
+  --color-slate-600: #4d574f;
+  --color-slate-700: #354138;
+  --color-slate-800: #26322a;
+  --color-slate-900: #17231c;
+  --color-slate-950: #0d1711;
 
-  /* Emerald: mapped to high-tech, vibrant electric emerald mint */
-  --color-emerald-50: #ecfdf5;   /* Very soft mint highlight */
-  --color-emerald-100: #d1fae5;  /* Light mint background badge */
-  --color-emerald-200: #a7f3d0;  /* Bright mint highlight */
-  --color-emerald-300: #6ee7b7;  /* Soft active green */
-  --color-emerald-400: #34d399;  /* Vibrant mint */
-  --color-emerald-500: #10b981;  /* High-tech green brand accent */
-  --color-emerald-600: #059669;  /* Deep rich premium emerald green */
-  --color-emerald-700: #047857;  /* Forest active brand green */
-  --color-emerald-800: #065f46;  /* Deep forest shadow */
-  --color-emerald-900: #064e3b;  /* Ultra dark forest sidebar background */
-  --color-emerald-950: #022c22;  /* Pitch green black */
+  --color-emerald-50: #edf8f0;
+  --color-emerald-100: #d5eedb;
+  --color-emerald-200: #adddb9;
+  --color-emerald-300: #79c891;
+  --color-emerald-400: #47ae6c;
+  --color-emerald-500: #258753;
+  --color-emerald-600: #176c41;
+  --color-emerald-700: #125535;
+  --color-emerald-800: #103f2a;
+  --color-emerald-900: #0d2e20;
+  --color-emerald-950: #071d14;
 
   /* Customize Amber to a premium golden ochre */
   --color-amber-50: #fffbeb;
@@ -84,6 +82,110 @@
 
 .animate-fade-in {
   animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+:root {
+  color: var(--color-slate-800);
+  background: var(--color-slate-50);
+  font-synthesis: none;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 78% -12%, rgba(121, 200, 145, 0.15), transparent 29rem),
+    linear-gradient(135deg, #f8f8f4 0%, #f2f4ed 52%, #edf3ed 100%);
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(37, 135, 83, 0.22);
+  color: var(--color-slate-950);
+}
+
+.app-shell {
+  isolation: isolate;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent 30%),
+    radial-gradient(circle at 92% 7%, rgba(121, 200, 145, 0.14), transparent 25rem);
+}
+
+.app-sidebar {
+  background:
+    radial-gradient(circle at 16% -8%, rgba(71, 174, 108, 0.34), transparent 15rem),
+    linear-gradient(180deg, #17291f 0%, #102019 55%, #0b1711 100%) !important;
+  border-color: rgba(221, 224, 214, 0.1) !important;
+  box-shadow: 16px 0 44px rgba(11, 23, 17, 0.12);
+}
+
+.app-sidebar button {
+  letter-spacing: 0.01em;
+}
+
+.app-topbar {
+  height: 4.75rem !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(197, 202, 188, 0.58) !important;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.app-main {
+  background: transparent;
+}
+
+.app-main > div {
+  animation: ferm-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.app-main :is(button, input, select, textarea) {
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.app-main :is(button, input, select, textarea):focus-visible,
+.app-topbar :is(button, input):focus-visible,
+.app-sidebar button:focus-visible {
+  outline: 3px solid rgba(71, 174, 108, 0.38);
+  outline-offset: 2px;
+}
+
+.app-main input:not([type="checkbox"]):not([type="radio"]),
+.app-main select,
+.app-main textarea {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.app-main [class~="bg-white"][class*="rounded"] {
+  box-shadow: 0 12px 30px rgba(38, 50, 42, 0.055);
+}
+
+@keyframes ferm-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1023px) {
+  .app-topbar {
+    height: 4.25rem !important;
+    padding-inline: 1rem !important;
+  }
+
+  .app-main {
+    padding: 1.25rem 1rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Custom Scrollbar for better UX */
