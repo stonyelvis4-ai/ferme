@@ -3827,7 +3827,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
 
   if (!authReady) {
     return (
-      <div className="app-loading min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
           <LoaderCircle className="h-5 w-5 animate-spin text-emerald-600" />
           <span className="text-sm font-semibold text-slate-700">Chargement de FERM+...</span>
@@ -3866,7 +3866,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
   }
 
   return (
-    <div className="app-shell min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex">
       {notices.length > 0 ? (
         <div className="pointer-events-none fixed right-4 top-4 z-[80] flex w-full max-w-sm flex-col gap-3">
           {notices.map((notice) => {
@@ -3908,7 +3908,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
       {/* Sidebar Navigation */}
       <aside
         id="app-sidebar"
-        className={`app-sidebar bg-slate-900 text-slate-300 w-64 border-r border-slate-800 flex flex-col shrink-0 fixed inset-y-0 left-0 z-40 transition-transform lg:translate-x-0 lg:static ${
+        className={`bg-slate-900 text-slate-300 w-64 border-r border-slate-800 flex flex-col shrink-0 fixed inset-y-0 left-0 z-40 transition-transform lg:translate-x-0 lg:static ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -3997,17 +3997,17 @@ const handleDeleteStockArticle = async (articleId: string) => {
       <div className="flex-1 flex flex-col min-w-0">
         
         {/* Top Header */}
-        <header className="app-topbar bg-white border-b border-slate-100 h-16 shrink-0 flex items-center justify-between px-6 z-30">
+        <header className="bg-white border-b border-slate-100 h-16 shrink-0 flex items-center justify-between px-6 z-30">
           <div className="flex items-center gap-4 flex-1">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-500 hover:text-slate-800" aria-label="Ouvrir la navigation">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-500 hover:text-slate-800">
               <Menu className="w-6 h-6" />
             </button>
 
             {/* Farm Title or Logo */}
             <div className="hidden sm:flex items-center gap-2">
               <img
-                src="/icons/ferm-plus-logo.jpg"
-                alt="Logo FERM+"
+                src="/src/assets/images/ferm_plus_logo_1783801064674.jpg"
+                alt="Fermé+ Logo"
                 className="w-8 h-8 rounded-lg object-cover"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
@@ -4198,7 +4198,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
         </header>
 
         {/* Core Screen View Port */}
-        <main className="app-main flex-1 overflow-y-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
             <Suspense
               fallback={
