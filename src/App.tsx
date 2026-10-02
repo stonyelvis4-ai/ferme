@@ -1364,12 +1364,17 @@ export default function App() {
   };
 
   // Connectivity Sync Handler
-  const flushDurableTaskOutbox = async () => {
+  const flushDurableCreationOutbox = async () => {
     const scope = getOfflineOutboxScope();
     if (!scope || !authToken) return new Set<string>();
 
+    const supportedPaths = new Set([
+      '/api/v1/tasks',
+      '/api/v1/infrastructures/buildings',
+      '/api/v1/stocks',
+    ]);
     const operations = listReadyOfflineOperations(scope)
-      .filter((operation) => operation.method === 'POST' && operation.path === '/api/v1/tasks' && operation.dependsOn.length === 0);
+      .filter((operation) => operation.method === 'POST' && supportedPaths.has(operation.path) && operation.dependsOn.length === 0);
     if (operations.length === 0) return new Set<string>();
 
     const response = await postJson<{ results?: Array<{ operation_id?: string; success?: boolean; error?: string; data?: unknown }> }>(
@@ -1407,10 +1412,12 @@ export default function App() {
     // Validate the session before replaying any local writes.
     await loadWorkspaceSnapshot(authToken);
 
-    const completedTaskIds = await flushDurableTaskOutbox();
+    const completedOperationIds = await flushDurableCreationOutbox();
     const localCache = readWorkspaceCache(authUser?.id);
-    if (localCache && completedTaskIds.size > 0) {
-      localCache.tasks = localCache.tasks.filter((task) => !completedTaskIds.has(String(task.id)));
+    if (localCache && completedOperationIds.size > 0) {
+      localCache.tasks = localCache.tasks.filter((task) => !completedOperationIds.has(String(task.id)));
+      localCache.buildings = localCache.buildings.filter((building) => !completedOperationIds.has(String(building.id)));
+      localCache.articles = localCache.articles.filter((article) => !completedOperationIds.has(String(article.id)));
       writeWorkspaceCache(authUser?.id, localCache);
     }
     if (activeFarmId) {
@@ -3192,7 +3199,32 @@ const handleDeleteCampaign = async (campaignId: string) => {
           )));
         }
       } catch (error) {
-        console.error('Building create sync failed:', error);
+        const scope = getOfflineOutboxScope();
+        const canQueue = isOffline || (error instanceof Error && error.message.includes('Connexion impossible'));
+        if (scope && canQueue) {
+          try {
+            enqueueOfflineOperation(scope, {
+              id: buildingId,
+              method: 'POST',
+              path: '/api/v1/infrastructures/buildings',
+              payload: {
+                farm_id: Number(activeFarmId),
+                name: data.name,
+                type: data.type,
+                capacity: data.capacity,
+                notes: data.notes ?? '',
+                status: 'active',
+                state: 'good',
+                assigned_use: data.type,
+              },
+            });
+            pushNotice('info', 'Bâtiment mis en attente', 'Il sera envoyé automatiquement dès le retour du réseau.');
+          } catch (queueError) {
+            console.error('Building outbox enqueue failed:', queueError);
+          }
+        } else {
+          console.error('Building create sync failed:', error);
+        }
       }
     }
     addAuditLog('Bâtiments', `Création du bâtiment ${building.name}`, building.type);
@@ -3320,7 +3352,55 @@ const handleDeleteCampaign = async (campaignId: string) => {
           )));
         }
       } catch (error) {
-        console.error('Stock article create sync failed:', error);
+        const scope = getOfflineOutboxScope();
+        const canQueue = isOffline || (error instanceof Error && error.message.includes('Connexion impossible'));
+        if (scope && canQueue) {
+          try {
+            enqueueOfflineOperation(scope, {
+              id: articleId,
+              method: 'POST',
+              path: '/api/v1/stocks',
+              payload: {
+                farm_id: Number(activeFarmId),
+                name: data.name,
+                reference: data.reference ?? '',
+                description: data.description ?? '',
+                brand: data.brand ?? '',
+                category: data.category,
+                ...(data.categoryId ? { category_id: data.categoryId } : {}),
+                ...(data.supplierId ? { supplier_id: data.supplierId } : {}),
+                batch_number: data.batchNumber ?? '',
+                purchase_date: data.purchaseDate ?? '',
+                manufacturing_date: data.manufacturingDate ?? '',
+                expiration_date: data.expirationDate ?? '',
+                unit: data.unit,
+                minimum_stock: data.minimumStock ?? data.minThreshold ?? 0,
+                maximum_stock: data.maximumStock ?? null,
+                current_quantity: data.quantity,
+                unit_cost: data.unitCost ?? 0,
+                purchase_total_cost: data.totalPurchasePrice ?? ((data.quantity ?? 0) * (data.unitCost ?? 0)),
+                storage_location: data.storageLocation ?? data.locationId ?? '',
+                currency: data.currency ?? 'XOF',
+                notes: data.notes ?? '',
+                is_active: data.isActive ?? true ? 1 : 0,
+                business_module: data.businessModule ?? 'general',
+                ...(data.relatedType ? { related_type: data.relatedType } : {}),
+                ...(data.relatedId ? { related_id: data.relatedId } : {}),
+              },
+            });
+            pushNotice(
+              'info',
+              'Article mis en attente',
+              data.imageFile
+                ? "L'article sera envoyé dès le retour du réseau, sans son image à joindre ultérieurement."
+                : 'Il sera envoyé automatiquement dès le retour du réseau.'
+            );
+          } catch (queueError) {
+            console.error('Stock article outbox enqueue failed:', queueError);
+          }
+        } else {
+          console.error('Stock article create sync failed:', error);
+        }
       }
     }
     addAuditLog('Stocks', `Création de l'article ${article.name}`, `${article.quantity} ${article.unit}`);

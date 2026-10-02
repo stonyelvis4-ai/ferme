@@ -1313,7 +1313,7 @@ class AuthAndSanitaryTest extends TestCase
         Sanctum::actingAs($admin);
 
         $this->postJson('/api/v1/sync/operations', ['operations' => [[
-            'operation_id' => 'offline:stock-001', 'method' => 'POST', 'path' => '/api/v1/stocks',
+            'operation_id' => 'offline:stock-movement-001', 'method' => 'POST', 'path' => '/api/v1/stocks/movements',
             'payload' => ['name' => 'Tentative interdite'], 'dependencies' => [],
         ]]])->assertOk()->assertJsonPath('data.results.0.status', 422);
 
@@ -1321,6 +1321,44 @@ class AuthAndSanitaryTest extends TestCase
             'operation_id' => 'offline:task-dependency', 'method' => 'POST', 'path' => '/api/v1/tasks',
             'payload' => ['title' => 'Tâche', 'priority' => 'normal', 'status' => 'todo'], 'dependencies' => ['offline:other'],
         ]]])->assertOk()->assertJsonPath('data.results.0.status', 422);
+    }
+
+    public function test_sync_operations_creates_buildings_and_stocks_in_the_authenticated_farm(): void
+    {
+        [$admin, $farm] = $this->adminWithFarm('sync-building-stock');
+        $otherFarm = Farm::create([
+            'name' => 'Ferme hors périmètre', 'slug' => 'ferme-hors-perimetre-sync', 'administrator_id' => null,
+            'status' => 'active', 'currency' => 'FCFA', 'area_unit' => 'ha',
+            'manager_name' => 'Autre', 'contact_email' => 'autre-sync@example.com',
+        ]);
+        Sanctum::actingAs($admin);
+
+        $building = [
+            'operation_id' => 'offline:building-001', 'method' => 'POST', 'path' => '/api/v1/infrastructures/buildings',
+            'payload' => ['farm_id' => $otherFarm->id, 'name' => 'Poulailler hors ligne', 'type' => 'poultry_house', 'capacity' => 120],
+            'dependencies' => [],
+        ];
+        $stock = [
+            'operation_id' => 'offline:stock-001', 'method' => 'POST', 'path' => '/api/v1/stocks',
+            'payload' => ['farm_id' => $otherFarm->id, 'reference' => 'ALI-OFF-001', 'name' => 'Aliment démarrage', 'category' => 'feed', 'unit' => 'kg', 'current_quantity' => 25, 'unit_cost' => 900],
+            'dependencies' => [],
+        ];
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [$building, $stock]])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.status', 201)
+            ->assertJsonPath('data.results.1.status', 201);
+        $this->assertDatabaseHas('buildings', ['farm_id' => $farm->id, 'name' => 'Poulailler hors ligne']);
+        $this->assertDatabaseMissing('buildings', ['farm_id' => $otherFarm->id, 'name' => 'Poulailler hors ligne']);
+        $this->assertDatabaseHas('stock_items', ['farm_id' => $farm->id, 'reference' => 'ALI-OFF-001', 'current_quantity' => 25]);
+        $this->assertDatabaseMissing('stock_items', ['farm_id' => $otherFarm->id, 'reference' => 'ALI-OFF-001']);
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [$building, $stock]])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.replayed', true)
+            ->assertJsonPath('data.results.1.replayed', true);
+        $this->assertSame(1, \App\Models\Building::where('farm_id', $farm->id)->count());
+        $this->assertSame(1, StockItem::where('farm_id', $farm->id)->count());
     }
 
     private function adminWithFarm(string $suffix): array
