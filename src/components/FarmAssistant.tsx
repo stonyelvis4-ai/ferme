@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { ImagePlus, LoaderCircle, MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { Camera, ImagePlus, LoaderCircle, MessageCircle, Send, Sparkles, X } from 'lucide-react';
 import type * as ThreeModule from 'three';
 
 import { ApiError, postForm } from '../services/fermApi';
@@ -160,8 +160,12 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const previewUrlsRef = useRef(new Set<string>());
   const mascotMood: MascotMood = isSending ? 'thinking' : draft.trim() ? 'listening' : 'idle';
 
@@ -172,6 +176,60 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
   useEffect(() => () => {
     previewUrlsRef.current.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
   }, []);
+
+  const stopCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null;
+  };
+
+  useEffect(() => {
+    if (!isCameraOpen) return undefined;
+
+    let disposed = false;
+    setCameraError('');
+
+    const startCamera = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError('La caméra nécessite HTTPS (ou localhost) et votre autorisation. Vous pouvez joindre une image existante.');
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1600 },
+            height: { ideal: 1200 },
+          },
+        });
+
+        if (disposed) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        cameraStreamRef.current = stream;
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          await cameraVideoRef.current.play();
+        }
+      } catch {
+        if (!disposed) {
+          stopCamera();
+          setCameraError('Orion ne peut pas accéder à la caméra. Autorisez-la dans le navigateur ou joignez une image existante.');
+        }
+      }
+    };
+
+    void startCamera();
+
+    return () => {
+      disposed = true;
+      stopCamera();
+    };
+  }, [isCameraOpen]);
 
   const clearSelectedImage = () => {
     if (selectedImage) {
@@ -206,6 +264,42 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
     previewUrlsRef.current.add(previewUrl);
     setSelectedImage({ file, previewUrl });
     setError('');
+  };
+
+  const closeCamera = () => {
+    stopCamera();
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    const video = cameraVideoRef.current;
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      setCameraError('La caméra est encore en cours de démarrage. Réessayez dans un instant.');
+      return;
+    }
+
+    const largestDimension = Math.max(video.videoWidth, video.videoHeight);
+    const scale = Math.min(1, 1600 / largestDimension);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      setCameraError('La photo n’a pas pu être préparée. Réessayez ou joignez une image existante.');
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setCameraError('La photo n’a pas pu être créée. Réessayez ou joignez une image existante.');
+        return;
+      }
+
+      selectImage(new File([blob], `orion-photo-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+      closeCamera();
+    }, 'image/jpeg', 0.88);
   };
 
   const submitQuestion = async (event: FormEvent<HTMLFormElement>) => {
@@ -278,6 +372,39 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
 
   return (
     <div className="fixed bottom-5 right-5 z-30">
+      {isCameraOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-end bg-slate-950/60 p-3 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="orion-camera-title" className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <header className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 id="orion-camera-title" className="text-sm font-bold text-slate-900">Prendre une photo pour Orion</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Cadrez le symptôme de près, avec une bonne lumière.</p>
+              </div>
+              <button type="button" onClick={closeCamera} className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" aria-label="Fermer la caméra">
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </header>
+            <div className="bg-slate-950 p-3">
+              {cameraError ? (
+                <div className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-2xl bg-slate-900 px-6 text-center text-sm text-slate-200">
+                  <Camera className="h-8 w-8 text-emerald-300" aria-hidden="true" />
+                  <p>{cameraError}</p>
+                  <button type="button" onClick={() => { closeCamera(); imageInputRef.current?.click(); }} className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-300">Choisir une image</button>
+                </div>
+              ) : (
+                <video ref={cameraVideoRef} autoPlay muted playsInline className="aspect-[4/3] w-full rounded-2xl object-cover" aria-label="Aperçu de la caméra" />
+              )}
+            </div>
+            <footer className="flex items-center justify-between gap-3 px-5 py-4">
+              <button type="button" onClick={closeCamera} className="rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500">Annuler</button>
+              <button type="button" disabled={Boolean(cameraError)} onClick={capturePhoto} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300">
+                <Camera className="h-4 w-4" aria-hidden="true" />
+                Prendre la photo
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
       {isOpen ? (
         <section
           aria-label="Assistant agricole Orion"
@@ -394,6 +521,15 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
                 className="sr-only"
                 onChange={(event) => selectImage(event.target.files?.[0] ?? null)}
               />
+              <button
+                type="button"
+                disabled={isSending}
+                onClick={() => setIsCameraOpen(true)}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Prendre une photo avec la caméra"
+              >
+                <Camera className="h-4 w-4" aria-hidden="true" />
+              </button>
               <button
                 type="button"
                 disabled={isSending}
