@@ -4034,6 +4034,49 @@ const handleDeleteStockArticle = async (articleId: string) => {
     );
   }
 
+  const navigationSections = [
+    {
+      label: 'Pilotage',
+      items: [
+        { id: 'dashboard', label: 'Tableau de bord', icon: Activity },
+      ],
+    },
+    {
+      label: 'Production',
+      items: [
+        { id: 'élevage', label: 'Élevage', icon: Activity },
+        { id: 'pondeuses', label: 'Pondeuses', icon: Egg },
+        { id: 'pisciculture', label: 'Pisciculture', icon: Fish },
+        { id: 'cultures', label: 'Cultures', icon: Sprout },
+      ],
+    },
+    {
+      label: 'Opérations',
+      items: [
+        { id: 'stocks', label: 'Stocks d\'intrants', icon: Package },
+        { id: 'finances', label: 'Finances / Livre', icon: DollarSign },
+        { id: 'sanitaire', label: 'Suivi sanitaire', icon: ShieldCheck },
+        { id: 'bâtiments', label: 'Bâtiments / Zones', icon: Building2 },
+        { id: 'agenda', label: 'Agenda / Échéances', icon: Calendar },
+        { id: 'tâches', label: 'Tâches / Travaux', icon: CheckSquare },
+      ],
+    },
+    {
+      label: 'Suivi',
+      items: [
+        { id: 'alertes', label: 'Alertes', icon: AlertTriangle, badge: unreadAlerts.length },
+        { id: 'rapports', label: 'Rapports d\'activité', icon: FileText },
+        { id: 'audit', label: 'Journal d\'audit', icon: ShieldAlert, adminOnly: true },
+      ],
+    },
+    {
+      label: 'Compte',
+      items: [
+        { id: 'paramètres', label: role === 'owner' ? 'Mon compte' : 'Paramètres', icon: Settings },
+      ],
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {notices.length > 0 ? (
@@ -4111,52 +4154,54 @@ const handleDeleteStockArticle = async (articleId: string) => {
         </div>
 
         {/* Navigation list */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-          {[
-            { id: 'dashboard', label: 'Tableau de bord', icon: Activity },
-            { id: 'élevage', label: 'Élevage', icon: Activity },
-            { id: 'pondeuses', label: 'Pondeuses', icon: Egg },
-            { id: 'pisciculture', label: 'Pisciculture', icon: Fish },
-            { id: 'cultures', label: 'Cultures', icon: Sprout },
-            { id: 'stocks', label: 'Stocks d\'intrants', icon: Package },
-            { id: 'finances', label: 'Finances / Livre', icon: DollarSign },
-            { id: 'sanitaire', label: 'Suivi Sanitaire', icon: ShieldCheck },
-            { id: 'bâtiments', label: 'Bâtiments / Zones', icon: Building2 },
-            { id: 'agenda', label: 'Agenda / Échéances', icon: Calendar },
-            { id: 'tâches', label: 'Tâches / Travaux', icon: CheckSquare },
-            { id: 'alertes', label: 'Alertes', icon: AlertTriangle, badge: unreadAlerts.length },
-            { id: 'rapports', label: 'Rapports d\'activité', icon: FileText },
-            { id: 'audit', label: 'Journal d\'Audit', icon: ShieldAlert },
-            { id: 'paramètres', label: role === 'owner' ? 'Mon compte' : 'Paramètres', icon: Settings }
-          ].filter((navItem) => role === 'admin' || navItem.id !== 'audit').map((navItem) => {
-            const IconComponent = navItem.icon;
-            const isActive = currentView === navItem.id;
+        <nav aria-label="Navigation principale" className="flex-1 overflow-y-auto px-3 py-4">
+          <div className="space-y-5">
+            {navigationSections.map((section) => {
+              const items = section.items.filter((navItem) => !navItem.adminOnly || role === 'admin');
 
-            return (
-              <button
-                key={navItem.id}
-                onClick={() => {
-                  setCurrentView(navItem.id);
-                  setSidebarOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                  isActive
-                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/20 font-bold scale-[1.01]'
-                    : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'
-                }`}
-              >
-                <span className="flex items-center gap-3">
-                  <IconComponent className="w-4 h-4" />
-                  {navItem.label}
-                </span>
-                {navItem.badge !== undefined && navItem.badge > 0 && (
-                  <span className="bg-amber-500 text-slate-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                    {navItem.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+              return (
+                <section key={section.label} aria-label={section.label} className="space-y-1.5">
+                  <div className="flex items-center gap-2 px-2.5">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{section.label}</span>
+                    <span className="h-px flex-1 bg-slate-800/90" />
+                  </div>
+                  <div className="space-y-1">
+                    {items.map((navItem) => {
+                      const IconComponent = navItem.icon;
+                      const isActive = currentView === navItem.id;
+
+                      return (
+                        <button
+                          key={navItem.id}
+                          type="button"
+                          aria-current={isActive ? 'page' : undefined}
+                          onClick={() => {
+                            setCurrentView(navItem.id);
+                            setSidebarOpen(false);
+                          }}
+                          className={`group relative flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
+                            isActive
+                              ? 'bg-emerald-600 text-white shadow-[0_8px_18px_rgba(6,78,59,0.28)]'
+                              : 'text-slate-400 hover:bg-slate-800/90 hover:text-slate-100'
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-3">
+                            <IconComponent className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 transition-colors group-hover:text-emerald-300'}`} />
+                            <span className="truncate">{navItem.label}</span>
+                          </span>
+                          {navItem.badge !== undefined && navItem.badge > 0 ? (
+                            <span className={`ml-3 min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-amber-400 text-slate-950'}`}>
+                              {navItem.badge}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </nav>
 
         {/* User profile details bottom of sidebar */}
