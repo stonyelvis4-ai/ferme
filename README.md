@@ -31,6 +31,14 @@ npm run dev
 
 L'interface tourne sur `http://127.0.0.1:3000` et communique avec l'API locale sur le port `8012`. Les deux services sont limites a cet ordinateur par defaut.
 
+Pour activer l'assistant agricole Orion en local, renseigne `GEMINI_API_KEY` dans `backend-laravel13-git/.env`, puis lance aussi, dans un troisième terminal :
+
+```bash
+npm run ai:proxy
+```
+
+Ce relais écoute uniquement sur `127.0.0.1:8038` et garde la clé côté machine. Il n'est utile qu'en développement local lorsque PHP ne peut pas joindre Gemini directement.
+
 Pour une mise en production, voir aussi [docs/o2switch-deploiement.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-deploiement.md) et [docs/o2switch-securite-production.md](/C:/MES%20PROJETS/FERM+/docs/o2switch-securite-production.md).
 
 ## Backend Laravel

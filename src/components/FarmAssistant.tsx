@@ -25,6 +25,8 @@ const SUGGESTIONS = [
   'Quels contrôles faire avant de semer ?',
 ];
 
+const MAX_HISTORY_ENTRY_LENGTH = 1200;
+
 export default function FarmAssistant({ authToken }: FarmAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [draft, setDraft] = useState('');
@@ -53,7 +55,12 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
       role: 'user',
       content: question,
     };
-    const history = messages.slice(-6).map(({ role, content }) => ({ role, content }));
+    const history = messages.slice(-6).map(({ role, content }) => ({
+      role,
+      content: content.length > MAX_HISTORY_ENTRY_LENGTH
+        ? `…${content.slice(-(MAX_HISTORY_ENTRY_LENGTH - 1))}`
+        : content,
+    }));
 
     setMessages((current) => [...current, nextUserMessage]);
     setDraft('');

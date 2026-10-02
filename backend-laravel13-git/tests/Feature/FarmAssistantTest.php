@@ -67,6 +67,42 @@ class FarmAssistantTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_local_development_uses_the_loopback_proxy_without_exposing_the_gemini_key(): void
+    {
+        [$user] = $this->userWithFarm();
+        $this->app->detectEnvironment(fn () => 'local');
+        config([
+            'services.gemini.api_key' => 'gemini-testing-key',
+            'services.gemini.model' => 'gemini-test-flash',
+            'services.gemini.local_proxy_url' => 'http://127.0.0.1:8038',
+            'services.gemini.local_proxy_token' => 'local-testing-token',
+        ]);
+        Http::fake([
+            'http://127.0.0.1:8038' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [['text' => 'Vérifiez les abreuvoirs chaque matin.']],
+                    ],
+                ]],
+            ]),
+        ]);
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/assistant/chat', [
+            'message' => 'Que vérifier le matin ?',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.answer', 'Vérifiez les abreuvoirs chaque matin.');
+
+        Http::assertSent(function (ClientRequest $request): bool {
+            return $request->url() === 'http://127.0.0.1:8038'
+                && $request->hasHeader('x-ferm-local-proxy-token', 'local-testing-token')
+                && ! $request->hasHeader('x-goog-api-key')
+                && data_get($request->data(), 'model') === 'gemini-test-flash'
+                && data_get($request->data(), 'request.contents.0.parts.0.text') === 'Que vérifier le matin ?';
+        });
+    }
+
     public function test_assistant_requires_an_authenticated_farm_member_and_valid_message(): void
     {
         $this->postJson('/api/v1/assistant/chat', ['message' => 'Bonjour'])
