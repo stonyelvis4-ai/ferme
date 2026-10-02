@@ -678,6 +678,7 @@ export default function App() {
   // Core Database States
   const [settings, setSettings] = useState<FarmSettings>(initialSettings);
   const [farms, setFarms] = useState<any[]>([]);
+  const activeFarmId = authUser?.farm_id ?? farms[0]?.id ?? null;
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
@@ -3860,7 +3861,6 @@ const handleDeleteStockArticle = async (articleId: string) => {
     [settings.alarmForCriticals, settings.alarmForWarnings, settings.alarmSoundEnabled, unreadAlerts]
   );
   const hasRingingAlerts = ringingAlerts.length > 0;
-  const activeFarmId = authUser?.farm_id ?? farms[0]?.id ?? null;
   const ownerUsers = users.filter((user) => user.role === 'owner' && String(user.farm_id ?? '') === String(activeFarmId ?? ''));
   const alarmSoundSource = ALARM_SOUND_LIBRARY[settings.alarmSoundKey ?? 'ferm-plus-default'] ?? ALARM_SOUND_LIBRARY['ferm-plus-default'];
 
