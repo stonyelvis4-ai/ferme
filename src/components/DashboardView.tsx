@@ -281,12 +281,6 @@ export default function DashboardView({
     <div
       id="dashboard-view"
       className="relative isolate space-y-6 overflow-hidden rounded-[34px] bg-slate-50 p-1 sm:p-2"
-      style={{
-        backgroundImage: "linear-gradient(180deg, rgba(2,44,34,0.72) 0%, rgba(236,253,245,0.88) 72%, rgba(248,250,252,0.98) 100%), url('/images/ferm-plus-home.png')",
-        backgroundPosition: 'top center',
-        backgroundRepeat: 'no-repeat',
-        backgroundSize: '100% 560px'
-      }}
     >
       {isEmpty ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
