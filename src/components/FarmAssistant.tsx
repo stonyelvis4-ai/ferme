@@ -1,13 +1,22 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { LoaderCircle, MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { ImagePlus, LoaderCircle, MessageCircle, Send, Sparkles, X } from 'lucide-react';
 import type * as ThreeModule from 'three';
 
-import { ApiError, postJson } from '../services/fermApi';
+import { ApiError, postForm } from '../services/fermApi';
 
 type AssistantMessage = {
   id: string;
   role: 'assistant' | 'user';
   content: string;
+  image?: {
+    name: string;
+    previewUrl: string;
+  };
+};
+
+type SelectedImage = {
+  file: File;
+  previewUrl: string;
 };
 
 type FarmAssistantProps = {
@@ -47,7 +56,7 @@ declare global {
 const STARTER_MESSAGES: AssistantMessage[] = [{
   id: 'welcome',
   role: 'assistant',
-  content: 'Bonjour, je suis Orion, votre assistant agricole. Je peux vous aider sur l’élevage, les cultures, la pisciculture, les intrants et l’organisation de la ferme.',
+  content: 'Bonjour, je suis Orion, votre assistant agricole. Envoyez-moi une photo de symptôme ou de culture : je décrirai ce qui est visible et les mesures prudentes à prendre. Je ne peux pas confirmer un diagnostic médical ou vétérinaire à partir d’une image.',
 }];
 
 const SUGGESTIONS = [
@@ -57,6 +66,8 @@ const SUGGESTIONS = [
 ];
 
 const MAX_HISTORY_ENTRY_LENGTH = 1200;
+const MAX_IMAGE_SIZE_BYTES = 7 * 1024 * 1024;
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MASCOT_SCRIPT_ID = 'ferm-plus-farmer-mascot';
 let mascotRuntimePromise: Promise<LoadedMascotRuntime> | null = null;
 
@@ -148,18 +159,61 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
   const [messages, setMessages] = useState<AssistantMessage[]>(STARTER_MESSAGES);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
+  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const previewUrlsRef = useRef(new Set<string>());
   const mascotMood: MascotMood = isSending ? 'thinking' : draft.trim() ? 'listening' : 'idle';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [messages, isSending]);
 
+  useEffect(() => () => {
+    previewUrlsRef.current.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
+  }, []);
+
+  const clearSelectedImage = () => {
+    if (selectedImage) {
+      URL.revokeObjectURL(selectedImage.previewUrl);
+      previewUrlsRef.current.delete(selectedImage.previewUrl);
+    }
+    setSelectedImage(null);
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  };
+
+  const selectImage = (file: File | null) => {
+    if (!file) return;
+
+    if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
+      setError('Choisissez une image au format JPG, PNG ou WebP.');
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      setError('La photo doit faire 7 Mo ou moins.');
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    if (selectedImage) {
+      URL.revokeObjectURL(selectedImage.previewUrl);
+      previewUrlsRef.current.delete(selectedImage.previewUrl);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    previewUrlsRef.current.add(previewUrl);
+    setSelectedImage({ file, previewUrl });
+    setError('');
+  };
+
   const submitQuestion = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const question = draft.trim();
-    if (!question || isSending) return;
+    const imageToSend = selectedImage;
+    if ((!question && !imageToSend) || isSending) return;
 
     if (!navigator.onLine) {
       setError('L’assistant nécessite une connexion Internet pour répondre.');
@@ -169,7 +223,11 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
     const nextUserMessage: AssistantMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: question,
+      content: question || 'Photo envoyée pour analyse.',
+      image: imageToSend ? {
+        name: imageToSend.file.name,
+        previewUrl: imageToSend.previewUrl,
+      } : undefined,
     };
     const history = messages.slice(-6).map(({ role, content }) => ({
       role,
@@ -181,13 +239,20 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
     setMessages((current) => [...current, nextUserMessage]);
     setDraft('');
     setError('');
+    setSelectedImage(null);
+    if (imageInputRef.current) imageInputRef.current.value = '';
     setIsSending(true);
 
     try {
-      const response = await postJson<{ answer: string }>('/assistant/chat', {
-        message: question,
-        history,
-      }, authToken);
+      const formData = new FormData();
+      formData.append('message', question);
+      history.forEach((entry, index) => {
+        formData.append(`history[${index}][role]`, entry.role);
+        formData.append(`history[${index}][content]`, entry.content);
+      });
+      if (imageToSend) formData.append('image', imageToSend.file);
+
+      const response = await postForm<{ answer: string }>('/assistant/chat', formData, authToken);
       const answer = response.data?.answer?.trim();
 
       if (!answer) throw new Error('Réponse de l’assistant indisponible.');
@@ -246,13 +311,20 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
                     <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                   </div>
                 ) : null}
-                <p className={`max-w-[82%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                <div className={`max-w-[82%] overflow-hidden rounded-2xl text-sm leading-relaxed ${
                   message.role === 'user'
                     ? 'rounded-br-md bg-emerald-600 text-white'
                     : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 shadow-sm'
                 }`}>
-                  {message.content}
-                </p>
+                  {message.image ? (
+                    <img
+                      src={message.image.previewUrl}
+                      alt={`Photo envoyée : ${message.image.name}`}
+                      className="max-h-44 w-full object-cover"
+                    />
+                  ) : null}
+                  <p className="whitespace-pre-wrap px-3.5 py-2.5">{message.content}</p>
+                </div>
               </div>
             ))}
             {isSending ? (
@@ -269,17 +341,32 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
           <div className="border-t border-slate-100 bg-white p-3">
             {error ? <p role="alert" className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{error}</p> : null}
             {messages.length === STARTER_MESSAGES.length ? (
-              <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-                {SUGGESTIONS.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => useSuggestion(suggestion)}
-                    className="shrink-0 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-left text-xs font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+              <div className="mb-3 space-y-2">
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {SUGGESTIONS.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => useSuggestion(suggestion)}
+                      className="shrink-0 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-left text-xs font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+                <p className="px-1 text-[10px] leading-relaxed text-slate-500">Pour une analyse utile, joignez une photo nette du symptôme, précisez l’espèce et depuis quand le problème est observé.</p>
+              </div>
+            ) : null}
+            {selectedImage ? (
+              <div className="mb-3 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2.5">
+                <img src={selectedImage.previewUrl} alt="Aperçu de la photo à analyser" className="h-14 w-14 rounded-xl object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-emerald-950">{selectedImage.file.name}</p>
+                  <p className="mt-0.5 text-[10px] text-emerald-700">Prête pour l’analyse d’Orion</p>
+                </div>
+                <button type="button" onClick={clearSelectedImage} className="rounded-lg p-1.5 text-emerald-700 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" aria-label="Retirer la photo">
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
               </div>
             ) : null}
             <form onSubmit={submitQuestion} className="flex items-end gap-2">
@@ -297,19 +384,35 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
                 rows={2}
                 maxLength={1200}
                 disabled={isSending}
-                placeholder="Posez une question sur votre ferme…"
+                placeholder="Décrivez ce que vous observez…"
                 className="min-h-[48px] flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
               />
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(event) => selectImage(event.target.files?.[0] ?? null)}
+              />
+              <button
+                type="button"
+                disabled={isSending}
+                onClick={() => imageInputRef.current?.click()}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Joindre une photo à analyser"
+              >
+                <ImagePlus className="h-4 w-4" aria-hidden="true" />
+              </button>
               <button
                 type="submit"
-                disabled={!draft.trim() || isSending}
+                disabled={(!draft.trim() && !selectedImage) || isSending}
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
                 aria-label="Envoyer la question"
               >
                 <Send className="h-4 w-4" aria-hidden="true" />
               </button>
             </form>
-            <p className="mt-2 px-1 text-[10px] leading-snug text-slate-400">Conseils généraux uniquement. Pour une urgence sanitaire ou un traitement, contactez un vétérinaire ou conseiller local.</p>
+            <p className="mt-2 px-1 text-[10px] leading-snug text-slate-400">JPG, PNG ou WebP, 7 Mo maximum. La photo est analysée pour cette demande et n’est pas ajoutée aux données FERM+. Conseils généraux uniquement : pour une urgence sanitaire ou un traitement, contactez un vétérinaire ou conseiller local.</p>
           </div>
         </section>
       ) : (

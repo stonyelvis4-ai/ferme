@@ -7,6 +7,7 @@ use App\Models\Farm;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -63,6 +64,60 @@ class FarmAssistantTest extends TestCase
         ])
             ->assertStatus(503)
             ->assertJsonPath('message', 'L’assistant agricole n’est pas encore configuré.');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_assistant_can_analyse_a_supported_farm_image_without_persisting_it(): void
+    {
+        [$user] = $this->userWithFarm();
+        config([
+            'services.gemini.api_key' => 'gemini-testing-key',
+            'services.gemini.model' => 'gemini-test-flash',
+        ]);
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [['text' => 'Isolez l’animal si cela est sûr et contactez un vétérinaire.']],
+                    ],
+                ]],
+            ]),
+        ]);
+        Sanctum::actingAs($user);
+
+        $this->post('/api/v1/assistant/chat', [
+            'message' => 'Cette poule présente des lésions sur la crête.',
+            'image' => UploadedFile::fake()->image('poule-symptomes.jpg', 640, 480)->size(512),
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.answer', 'Isolez l’animal si cela est sûr et contactez un vétérinaire.');
+
+        Http::assertSent(function (ClientRequest $request): bool {
+            $payload = $request->data();
+            $imageData = data_get($payload, 'contents.0.parts.1.inline_data.data');
+
+            return data_get($payload, 'contents.0.parts.0.text') === 'Cette poule présente des lésions sur la crête.'
+                && data_get($payload, 'contents.0.parts.1.inline_data.mime_type') === 'image/jpeg'
+                && is_string($imageData)
+                && $imageData !== ''
+                && str_contains((string) data_get($payload, 'system_instruction.parts.0.text'), 'une image ne permet pas de confirmer une maladie');
+        });
+    }
+
+    public function test_assistant_rejects_an_unsupported_image_type(): void
+    {
+        [$user] = $this->userWithFarm();
+        config(['services.gemini.api_key' => 'gemini-testing-key']);
+        Http::fake();
+        Sanctum::actingAs($user);
+
+        $this->post('/api/v1/assistant/chat', [
+            'message' => 'Pouvez-vous analyser ce fichier ?',
+            'image' => UploadedFile::fake()->create('symptomes.gif', 80, 'image/gif'),
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('image');
 
         Http::assertNothingSent();
     }

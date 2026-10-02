@@ -8,6 +8,7 @@ const backendEnvironment = readEnvironment(resolve('backend-laravel13-git/.env')
 const apiKey = process.env.GEMINI_API_KEY || backendEnvironment.GEMINI_API_KEY || '';
 const expectedToken = process.env.GEMINI_LOCAL_PROXY_TOKEN || backendEnvironment.GEMINI_LOCAL_PROXY_TOKEN || '';
 const port = Number(process.env.GEMINI_LOCAL_PROXY_PORT || backendEnvironment.GEMINI_LOCAL_PROXY_PORT || 8038);
+const MAX_REQUEST_BYTES = 12 * 1024 * 1024;
 
 if (!apiKey || !expectedToken || !Number.isInteger(port) || port < 1024 || port > 65535) {
   console.error('Gemini local proxy is missing its local configuration.');
@@ -79,10 +80,12 @@ function matchesToken(received, expected) {
 function readJsonBody(request) {
   return new Promise((resolveBody, reject) => {
     let body = '';
+    let bodyLength = 0;
     request.setEncoding('utf8');
     request.on('data', (chunk) => {
       body += chunk;
-      if (body.length > 20_000) request.destroy();
+      bodyLength += Buffer.byteLength(chunk);
+      if (bodyLength > MAX_REQUEST_BYTES) request.destroy();
     });
     request.on('end', () => {
       try {
