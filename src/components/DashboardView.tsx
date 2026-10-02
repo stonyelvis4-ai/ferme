@@ -228,7 +228,17 @@ export default function DashboardView({
   const urgentLoad = activeAlerts.length + overdueTasksCount + stockAlerts;
   const healthTone = urgentLoad === 0 ? 'emerald' : urgentLoad <= 3 ? 'amber' : 'rose';
   const healthLabel = urgentLoad === 0 ? 'Exploitation stable' : urgentLoad <= 3 ? 'Points de vigilance' : 'Priorites a traiter';
-  const nextTask = [...pendingTasks].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0] ?? null;
+  const taskPriorityRank: Record<Task['priority'], number> = { critical: 0, high: 1, normal: 2, low: 3 };
+  const priorityTasks = [...pendingTasks].sort((a, b) => {
+    const priorityDelta = taskPriorityRank[a.priority] - taskPriorityRank[b.priority];
+    return priorityDelta !== 0 ? priorityDelta : new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+  });
+  const alertSeverityRank: Record<Alert['severity'], number> = { critical: 0, warning: 1, info: 2 };
+  const priorityAlerts = [...activeAlerts].sort((a, b) => {
+    const severityDelta = alertSeverityRank[a.severity] - alertSeverityRank[b.severity];
+    return severityDelta !== 0 ? severityDelta : new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+  const nextTask = priorityTasks[0] ?? null;
   const todayLabel = new Intl.DateTimeFormat('fr-FR', {
     weekday: 'long',
     day: 'numeric',
@@ -294,7 +304,7 @@ export default function DashboardView({
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_1fr]">
-          <section className="relative isolate overflow-hidden rounded-[30px] border border-white/25 bg-emerald-950/70 p-6 shadow-[0_18px_45px_rgba(15,118,110,0.14)] backdrop-blur-[2px] sm:p-7">
+          <section aria-labelledby="dashboard-summary-title" className="relative isolate overflow-hidden rounded-[30px] border border-white/25 bg-emerald-950/70 p-6 shadow-[0_18px_45px_rgba(15,118,110,0.14)] backdrop-blur-[2px] sm:p-7">
             <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(2,44,34,0.8)_0%,rgba(4,78,59,0.5)_55%,rgba(15,23,42,0.2)_100%)]" />
             <div className="relative z-10">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -306,7 +316,7 @@ export default function DashboardView({
                     <span className="text-xs font-medium capitalize text-white/70">{todayLabel}</span>
                   </div>
                   <div>
-                    <h2 className="max-w-xl text-2xl font-black tracking-tight text-white sm:text-3xl">Le rythme de votre ferme, en un regard.</h2>
+                    <h2 id="dashboard-summary-title" className="max-w-xl text-2xl font-black tracking-tight text-white sm:text-3xl">Le rythme de votre ferme, en un regard.</h2>
                     <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/80">
                       Suivez les priorités terrain, les performances et les décisions financières importantes au même endroit.
                     </p>
@@ -346,53 +356,82 @@ export default function DashboardView({
                 </div>
               </div>
               <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('alertes')}
+                  className="group rounded-2xl border border-white/70 bg-white/75 p-4 text-left shadow-sm transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-950"
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Alertes actives</span>
-                    <AlertTriangle className={`h-4 w-4 ${criticalAlertsCount > 0 ? 'text-rose-500' : 'text-amber-500'}`} />
+                    <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-0.5 ${criticalAlertsCount > 0 ? 'text-rose-500' : 'text-amber-500'}`} />
                   </div>
                   <div className="mt-2 text-2xl font-black text-slate-900">{activeAlerts.length}</div>
                   <p className="mt-1 text-xs text-slate-500">{criticalAlertsCount} critique(s), {warningAlertsCount} importante(s).</p>
-                </div>
-                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('tâches')}
+                  className="group rounded-2xl border border-white/70 bg-white/75 p-4 text-left shadow-sm transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-950"
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Execution du jour</span>
-                    <CheckSquare className="h-4 w-4 text-emerald-600" />
+                    <ArrowRight className="h-4 w-4 text-emerald-600 transition-transform group-hover:translate-x-0.5" />
                   </div>
                   <div className="mt-2 text-2xl font-black text-slate-900">{pendingTasks.length}</div>
                   <p className="mt-1 text-xs text-slate-500">{nextTask ? `Prochaine échéance : ${nextTask.dueDate}` : 'Aucune échéance immédiate en attente.'}</p>
-                </div>
-                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate(urgentLoad > 0 ? 'alertes' : 'agenda')}
+                  className="group rounded-2xl border border-white/70 bg-white/75 p-4 text-left shadow-sm transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-950"
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Pression operationnelle</span>
-                    <TrendingUp className={`h-4 w-4 ${urgentLoad > 3 ? 'text-rose-500' : urgentLoad > 0 ? 'text-amber-500' : 'text-emerald-500'}`} />
+                    <ArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-0.5 ${urgentLoad > 3 ? 'text-rose-500' : urgentLoad > 0 ? 'text-amber-500' : 'text-emerald-500'}`} />
                   </div>
                   <div className="mt-2 text-2xl font-black text-slate-900">{urgentLoad}</div>
                   <p className="mt-1 text-xs text-slate-500">Alertes, retards et stocks sensibles combines.</p>
-                </div>
+                </button>
               </div>
             </div>
           </section>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-1">
-            <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Cheptel aquacole</span>
+          <aside aria-label="Raccourcis de pilotage" className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-1">
+            <button type="button" onClick={() => onNavigate('pisciculture')} className="group rounded-2xl border border-sky-100 bg-sky-50/60 p-4 text-left shadow-sm transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2">
+              <div className="flex items-start justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700">Cheptel aquacole</span>
+                <Fish className="h-4 w-4 text-sky-600" />
+              </div>
               <span className="mt-2 block text-xl font-black text-sky-900">{totalFishCount.toLocaleString('fr-FR')}</span>
-              <p className="mt-1 text-xs text-sky-800">Poissons actuellement suivis dans les bassins.</p>
-            </div>
-            <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Stocks sensibles</span>
+              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-sky-800"><span>Poissons suivis dans les bassins.</span><ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" /></div>
+            </button>
+            <button type="button" onClick={() => onNavigate('stocks')} className="group rounded-2xl border border-amber-100 bg-amber-50/60 p-4 text-left shadow-sm transition-colors hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2">
+              <div className="flex items-start justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Stocks sensibles</span>
+                <Package className="h-4 w-4 text-amber-600" />
+              </div>
               <span className="mt-2 block text-xl font-black text-amber-900">{stockAlerts}</span>
-              <p className="mt-1 text-xs text-amber-800">Articles proches ou sous leur seuil d'alerte.</p>
-            </div>
-            <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-4 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Vigilance</span>
+              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-amber-800"><span>Articles proches ou sous leur seuil.</span><ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" /></div>
+            </button>
+            <button type="button" onClick={() => onNavigate('alertes')} className="group rounded-2xl border border-rose-100 bg-rose-50/60 p-4 text-left shadow-sm transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2">
+              <div className="flex items-start justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">Vigilance</span>
+                <AlertTriangle className="h-4 w-4 text-rose-600" />
+              </div>
               <span className="mt-2 block text-xl font-black text-rose-900">{activeAlerts.length + overdueTasksCount}</span>
-              <p className="mt-1 text-xs text-rose-800">Total des alertes ouvertes et taches en retard.</p>
-            </div>
-          </div>
+              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-rose-800"><span>Alertes ouvertes et retards à traiter.</span><ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" /></div>
+            </button>
+          </aside>
         </div>
 
+      <section aria-labelledby="activity-kpis-title">
+        <div className="mb-3 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 id="activity-kpis-title" className="text-sm font-bold text-slate-900">Repères par activité</h3>
+            <p className="text-xs text-slate-500">Accédez directement aux données de production de chaque atelier.</p>
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Données opérationnelles</span>
+        </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <button
           id="kpi-lots"
@@ -484,6 +523,7 @@ export default function DashboardView({
           </div>
         </button>
       </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -728,7 +768,7 @@ export default function DashboardView({
                   Aucune alerte active sur l exploitation.
                 </div>
               ) : (
-                activeAlerts.slice(0, 4).map((alert) => (
+                priorityAlerts.slice(0, 4).map((alert) => (
                   <div
                     key={alert.id}
                     className={`relative overflow-hidden rounded-2xl border p-3 text-xs shadow-sm ${
@@ -773,7 +813,7 @@ export default function DashboardView({
                   Aucune tache restante pour aujourd hui.
                 </div>
               ) : (
-                pendingTasks.slice(0, 4).map((task) => (
+                priorityTasks.slice(0, 4).map((task) => (
                   <div
                     key={task.id}
                     className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3 text-xs transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"
