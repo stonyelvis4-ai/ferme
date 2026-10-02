@@ -16,14 +16,24 @@ import {
   UserPlus,
   Users,
   Eye,
-  EyeOff
+  EyeOff,
+  BellRing,
+  LayoutDashboard,
+  UserRound,
+  Volume2
 } from 'lucide-react';
 import { FarmSettings, UserRole } from '../types';
-import { AuthUser } from '../services/fermApi';
+import { AuthUser, UserPreferences } from '../services/fermApi';
+
+type EditablePreferences = Required<Pick<
+  UserPreferences,
+  'sound_alerts' | 'warning_alerts' | 'critical_alerts' | 'alert_volume' | 'default_view'
+>>;
 
 interface SettingsViewProps {
   role: UserRole;
   settings: FarmSettings;
+  currentUser: AuthUser | null;
   owners: AuthUser[];
   onUpdateSettings: (newSettings: FarmSettings) => void;
   onTestAlarm: (options: {
@@ -37,6 +47,11 @@ interface SettingsViewProps {
     password: string;
     password_confirmation: string;
   }) => void;
+  onUpdatePersonalSettings: (payload: {
+    name: string;
+    email: string;
+    preferences: EditablePreferences;
+  }) => Promise<void>;
   onCreateOwner: (payload: {
     name: string;
     email: string;
@@ -47,10 +62,12 @@ interface SettingsViewProps {
 export default function SettingsView({
   role,
   settings,
+  currentUser,
   owners,
   onUpdateSettings,
   onTestAlarm,
   onChangePassword,
+  onUpdatePersonalSettings,
   onCreateOwner
 }: SettingsViewProps) {
   const currencyOptions = [
@@ -70,6 +87,15 @@ export default function SettingsView({
   const [alarmForCriticals, setAlarmForCriticals] = useState(settings.alarmForCriticals ?? true);
   const [alarmVolume, setAlarmVolume] = useState(settings.alarmVolume ?? 100);
   const [alarmSoundKey, setAlarmSoundKey] = useState(settings.alarmSoundKey ?? 'ferm-plus-default');
+  const initialPreferences = currentUser?.preferences;
+  const [profileName, setProfileName] = useState(currentUser?.name ?? '');
+  const [profileEmail, setProfileEmail] = useState(currentUser?.email ?? '');
+  const [personalSoundEnabled, setPersonalSoundEnabled] = useState(initialPreferences?.sound_alerts ?? true);
+  const [personalWarningAlerts, setPersonalWarningAlerts] = useState(initialPreferences?.warning_alerts ?? true);
+  const [personalCriticalAlerts, setPersonalCriticalAlerts] = useState(initialPreferences?.critical_alerts ?? true);
+  const [personalAlertVolume, setPersonalAlertVolume] = useState(initialPreferences?.alert_volume ?? 100);
+  const [defaultView, setDefaultView] = useState<EditablePreferences['default_view']>(initialPreferences?.default_view ?? 'dashboard');
+  const [personalSaving, setPersonalSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -134,6 +160,28 @@ export default function SettingsView({
     setConfirmPassword('');
   };
 
+  const handlePersonalSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileName.trim() || !profileEmail.trim()) return;
+
+    setPersonalSaving(true);
+    try {
+      await onUpdatePersonalSettings({
+        name: profileName.trim(),
+        email: profileEmail.trim(),
+        preferences: {
+          sound_alerts: personalSoundEnabled,
+          warning_alerts: personalWarningAlerts,
+          critical_alerts: personalCriticalAlerts,
+          alert_volume: personalAlertVolume,
+          default_view: defaultView,
+        },
+      });
+    } finally {
+      setPersonalSaving(false);
+    }
+  };
+
   const handleOwnerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (role !== 'admin') return;
@@ -156,15 +204,114 @@ export default function SettingsView({
         <div>
           <h2 className="text-xl font-bold text-slate-900 font-sans tracking-tight flex items-center gap-2">
             <Settings className="w-5 h-5 text-emerald-600" />
-            {role === 'admin' ? "Module Paramètres de l'Exploitation" : 'Mon compte'}
+            {role === 'admin' ? "Paramètres de l'exploitation et mon compte" : 'Mon compte'}
           </h2>
           <p className="text-xs text-slate-500">
             {role === 'admin'
-              ? 'Configurez les métriques métier de votre ferme et gérez les comptes administrateur et propriétaire.'
-              : 'Gérez le mot de passe de votre compte. Les réglages et le journal d’audit sont réservés à l’administrateur.'}
+              ? 'Réglez d’abord votre expérience personnelle, puis les paramètres partagés de la ferme.'
+              : 'Personnalisez votre compte sans modifier les réglages communs de la ferme.'}
           </p>
         </div>
       </div>
+
+      <form onSubmit={handlePersonalSave} className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-white px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+              <UserRound className="h-4 w-4 text-emerald-600" /> Mon profil et mes préférences
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">Ces choix sont associés à votre compte et n’affectent pas les autres utilisateurs.</p>
+          </div>
+          <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+            Personnel
+          </span>
+        </div>
+
+        <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+          <section className="space-y-4">
+            <div>
+              <h4 className="text-xs font-bold text-slate-800">Identité de connexion</h4>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">Votre nom est affiché dans l’application. Votre adresse sert uniquement à votre accès personnel.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <label className="block text-xs font-semibold text-slate-600">
+                Nom affiché
+                <input
+                  required
+                  maxLength={255}
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                  placeholder="Votre nom"
+                />
+              </label>
+              <label className="block text-xs font-semibold text-slate-600">
+                Email de connexion
+                <input
+                  required
+                  type="email"
+                  maxLength={255}
+                  value={profileEmail}
+                  onChange={(e) => setProfileEmail(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                  placeholder="vous@exemple.com"
+                />
+              </label>
+            </div>
+            <label className="block text-xs font-semibold text-slate-600">
+              <span className="flex items-center gap-1.5"><LayoutDashboard className="h-3.5 w-3.5 text-emerald-600" /> Écran à l’ouverture</span>
+              <select
+                value={defaultView}
+                onChange={(e) => setDefaultView(e.target.value as EditablePreferences['default_view'])}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+              >
+                <option value="dashboard">Tableau de bord</option>
+                <option value="agenda">Agenda / échéances</option>
+                <option value="tasks">Tâches / travaux</option>
+                <option value="alerts">Alertes</option>
+              </select>
+            </label>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex items-start gap-3">
+              <span className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><BellRing className="h-4 w-4" /></span>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800">Alertes de mon poste</h4>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">Vous choisissez ce que vous entendez. Les règles d’alerte de la ferme restent inchangées.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-white p-3 text-xs">
+                <input type="checkbox" checked={personalSoundEnabled} onChange={(e) => setPersonalSoundEnabled(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                <span><span className="block font-semibold text-slate-700">Son activé</span><span className="mt-0.5 block text-[10px] text-slate-500">Coupe uniquement le son sur votre appareil.</span></span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-white p-3 text-xs">
+                <input type="checkbox" checked={personalWarningAlerts} disabled={!personalSoundEnabled} onChange={(e) => setPersonalWarningAlerts(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed" />
+                <span><span className="block font-semibold text-slate-700">Alertes importantes</span><span className="mt-0.5 block text-[10px] text-slate-500">Pour les avertissements terrain.</span></span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-white p-3 text-xs sm:col-span-2">
+                <input type="checkbox" checked={personalCriticalAlerts} disabled={!personalSoundEnabled} onChange={(e) => setPersonalCriticalAlerts(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed" />
+                <span><span className="block font-semibold text-slate-700">Alertes critiques</span><span className="mt-0.5 block text-[10px] text-slate-500">Recommandé pour les incidents urgents.</span></span>
+              </label>
+            </div>
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-700">
+                <span className="flex items-center gap-1.5"><Volume2 className="h-3.5 w-3.5 text-emerald-600" /> Volume personnel</span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{personalAlertVolume}%</span>
+              </div>
+              <input type="range" min="0" max="100" step="1" value={personalAlertVolume} disabled={!personalSoundEnabled} onChange={(e) => setPersonalAlertVolume(Number(e.target.value))} className="mt-3 w-full accent-emerald-600 disabled:cursor-not-allowed" />
+              <p className="mt-1 text-[10px] text-slate-500">Le volume reste limité par le seuil défini pour l’exploitation.</p>
+            </div>
+          </section>
+        </div>
+
+        <div className="flex justify-end border-t border-slate-100 bg-slate-50/50 px-5 py-3">
+          <button type="submit" disabled={personalSaving} className="inline-flex items-center gap-2 rounded-full border border-emerald-700 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-70">
+            <Save className="h-3.5 w-3.5" /> {personalSaving ? 'Enregistrement…' : 'Enregistrer mes préférences'}
+          </button>
+        </div>
+      </form>
 
       {role === 'owner' && (
         <form onSubmit={handlePasswordSubmit} className="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">

@@ -647,6 +647,7 @@ export default function App() {
   // Navigation Router
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const personalDefaultViewAppliedForUserRef = useRef<string | null>(null);
 
   // Actor Role Switcher
   const [role, setRole] = useState<UserRole>('admin');
@@ -744,6 +745,7 @@ export default function App() {
     clearStoredAuthToken();
     setAuthTokenState('');
     setAuthUser(null);
+    personalDefaultViewAppliedForUserRef.current = null;
     setRole('admin');
     setAuthMode('login');
     setAuthError(message);
@@ -972,6 +974,23 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!authReady || !authUser?.id) return;
+
+    const userId = String(authUser.id);
+    if (personalDefaultViewAppliedForUserRef.current === userId) return;
+
+    personalDefaultViewAppliedForUserRef.current = userId;
+    const defaultView = authUser.preferences?.default_view ?? 'dashboard';
+    const applicationView = {
+      dashboard: 'dashboard',
+      agenda: 'agenda',
+      tasks: 'tâches',
+      alerts: 'alertes',
+    }[defaultView] ?? 'dashboard';
+    setCurrentView(applicationView);
+  }, [authReady, authUser?.id, authUser?.preferences?.default_view]);
+
+  useEffect(() => {
     if (!authReady || !authToken) return;
 
     let cancelled = false;
@@ -1194,6 +1213,7 @@ export default function App() {
       clearStoredAuthToken();
       setAuthTokenState('');
       setAuthUser(null);
+      personalDefaultViewAppliedForUserRef.current = null;
       setRole('admin');
       setAllowRegisterAdmin(true);
       setAuthReady(true);
@@ -1235,6 +1255,38 @@ export default function App() {
       setAuthError(error instanceof Error ? error.message : 'Changement de mot de passe impossible.');
     } finally {
       setAuthBusy(false);
+    }
+  };
+
+  const handleUpdatePersonalSettings = async (payload: {
+    name: string;
+    email: string;
+    preferences: NonNullable<AuthUser['preferences']>;
+  }) => {
+    if (!authToken || !authUser) return;
+
+    try {
+      const response = await patchJson<AuthUser>('/me/preferences', payload, authToken);
+      const updatedUser = mapAuthUser(
+        response && typeof response === 'object' && 'data' in response
+          ? (response as { data?: unknown }).data
+          : response
+      );
+
+      if (!updatedUser) {
+        throw new Error('La réponse du profil est invalide.');
+      }
+
+      setAuthUser(updatedUser);
+      setStoredAuthUser(updatedUser);
+      setUsers((previous) => previous.map((user) => String(user.id) === String(updatedUser.id) ? updatedUser : user));
+      pushNotice('success', 'Préférences enregistrées', 'Votre profil et vos réglages personnels ont été mis à jour.');
+    } catch (error) {
+      pushNotice(
+        'error',
+        'Enregistrement impossible',
+        error instanceof Error ? error.message : 'Vos préférences personnelles n’ont pas pu être mises à jour.'
+      );
     }
   };
 
@@ -3851,15 +3903,22 @@ const handleDeleteStockArticle = async (articleId: string) => {
 
   // Active Alert Notifications Count
   const unreadAlerts = useMemo(() => alerts.filter((a) => !a.read), [alerts]);
+  const personalAlertPreferences = authUser?.preferences;
+  const personalSoundEnabled = personalAlertPreferences?.sound_alerts ?? true;
+  const personalWarningAlerts = personalAlertPreferences?.warning_alerts ?? true;
+  const personalCriticalAlerts = personalAlertPreferences?.critical_alerts ?? true;
+  const personalAlertVolume = personalAlertPreferences?.alert_volume ?? 100;
+  const effectiveAlarmVolume = Math.min(settings.alarmVolume ?? 100, personalAlertVolume);
+
   const ringingAlerts = useMemo(
     () =>
       unreadAlerts.filter((alertItem) => {
-        if (!settings.alarmSoundEnabled) return false;
-        if (alertItem.severity === 'critical') return settings.alarmForCriticals ?? true;
-        if (alertItem.severity === 'warning') return settings.alarmForWarnings ?? true;
+        if (!settings.alarmSoundEnabled || !personalSoundEnabled) return false;
+        if (alertItem.severity === 'critical') return (settings.alarmForCriticals ?? true) && personalCriticalAlerts;
+        if (alertItem.severity === 'warning') return (settings.alarmForWarnings ?? true) && personalWarningAlerts;
         return false;
       }),
-    [settings.alarmForCriticals, settings.alarmForWarnings, settings.alarmSoundEnabled, unreadAlerts]
+    [personalCriticalAlerts, personalSoundEnabled, personalWarningAlerts, settings.alarmForCriticals, settings.alarmForWarnings, settings.alarmSoundEnabled, unreadAlerts]
   );
   const hasRingingAlerts = ringingAlerts.length > 0;
   const ownerUsers = users.filter((user) => user.role === 'owner' && String(user.farm_id ?? '') === String(activeFarmId ?? ''));
@@ -3868,7 +3927,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
   useEffect(() => {
     const audio = new Audio(alarmSoundSource);
     audio.loop = settings.alarmLoopEnabled ?? true;
-    audio.volume = Math.min(Math.max((settings.alarmVolume ?? 100) / 100, 0), 1);
+    audio.volume = Math.min(Math.max(effectiveAlarmVolume / 100, 0), 1);
     audio.preload = 'auto';
     alarmAudioRef.current = audio;
 
@@ -3877,14 +3936,14 @@ const handleDeleteStockArticle = async (articleId: string) => {
       audio.currentTime = 0;
       alarmAudioRef.current = null;
     };
-  }, [alarmSoundSource, settings.alarmLoopEnabled, settings.alarmVolume]);
+  }, [alarmSoundSource, effectiveAlarmVolume, settings.alarmLoopEnabled]);
 
   useEffect(() => {
     const audio = alarmAudioRef.current;
     if (!audio) return;
     audio.loop = settings.alarmLoopEnabled ?? true;
-    audio.volume = Math.min(Math.max((settings.alarmVolume ?? 100) / 100, 0), 1);
-  }, [settings.alarmLoopEnabled, settings.alarmVolume]);
+    audio.volume = Math.min(Math.max(effectiveAlarmVolume / 100, 0), 1);
+  }, [effectiveAlarmVolume, settings.alarmLoopEnabled]);
 
   useEffect(() => {
     if (ringingAlerts.length > previousAlarmCountRef.current) {
@@ -3897,7 +3956,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
     const audio = alarmAudioRef.current;
     if (!audio) return;
 
-    if (!hasRingingAlerts || alarmSilenced || !settings.alarmSoundEnabled) {
+    if (!hasRingingAlerts || alarmSilenced || !settings.alarmSoundEnabled || !personalSoundEnabled) {
       audio.pause();
       audio.currentTime = 0;
       return;
@@ -3913,7 +3972,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
           setAlarmPlaybackBlocked(true);
         });
     }
-  }, [alarmSilenced, hasRingingAlerts, settings.alarmSoundEnabled]);
+  }, [alarmSilenced, hasRingingAlerts, personalSoundEnabled, settings.alarmSoundEnabled]);
 
   const handleSilenceAlarm = () => {
     const audio = alarmAudioRef.current;
@@ -4214,7 +4273,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
               <span className="font-bold text-slate-200 block truncate">
                 {role === 'admin' ? 'Administrateur' : 'Propriétaire'}
               </span>
-              <p className="text-[10px] text-slate-500 truncate">{settings.contactEmail}</p>
+              <p className="text-[10px] text-slate-500 truncate">{authUser?.email ?? settings.contactEmail}</p>
             </div>
           </div>
         </div>
@@ -4654,10 +4713,12 @@ const handleDeleteStockArticle = async (articleId: string) => {
               <SettingsView
                 role={role}
                 settings={settings}
+                currentUser={authUser}
                 owners={ownerUsers}
                 onUpdateSettings={handleUpdateSettings}
                 onTestAlarm={handleTestAlarm}
                 onChangePassword={handleChangePassword}
+                onUpdatePersonalSettings={handleUpdatePersonalSettings}
                 onCreateOwner={handleCreateOwner}
               />
             )}

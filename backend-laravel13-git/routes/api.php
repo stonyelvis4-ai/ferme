@@ -84,6 +84,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/farms', [FarmController::class, 'index']);
             Route::get('/farms/{farm}', [FarmController::class, 'show']);
             Route::get('/tasks', [TaskController::class, 'index']);
+            Route::patch('/me/preferences', [UserController::class, 'updateMyPreferences']);
             Route::get('/users', [UserController::class, 'index']);
             Route::get('/users/{user}', [UserController::class, 'show']);
             Route::get('/settings', [SettingsController::class, 'show'])->middleware('admin');

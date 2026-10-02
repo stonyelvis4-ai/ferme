@@ -167,6 +167,14 @@ type ApiResponse<T> = {
   [key: string]: unknown;
 };
 
+export type UserPreferences = {
+  sound_alerts?: boolean;
+  warning_alerts?: boolean;
+  critical_alerts?: boolean;
+  alert_volume?: number;
+  default_view?: 'dashboard' | 'agenda' | 'tasks' | 'alerts';
+};
+
 export type AuthUser = {
   id: number | string;
   name: string;
@@ -177,6 +185,7 @@ export type AuthUser = {
   farm_id?: number | string | null;
   last_login_at?: string | null;
   last_activity_at?: string | null;
+  preferences?: UserPreferences;
 };
 
 export type WorkspaceSnapshot = {

@@ -59,6 +59,14 @@ const labelOrFallback = (value: unknown, fallback: string) => {
 export function mapAuthUser(data: unknown): AuthUser | null {
   if (!data || typeof data !== 'object') return null;
   const item = data as Record<string, unknown>;
+  const rawPreferences = item.preferences && typeof item.preferences === 'object'
+    ? item.preferences as Record<string, unknown>
+    : {};
+  const rawDefaultView = toText(rawPreferences.default_view, 'dashboard');
+  const defaultView = ['dashboard', 'agenda', 'tasks', 'alerts'].includes(rawDefaultView)
+    ? rawDefaultView as NonNullable<AuthUser['preferences']>['default_view']
+    : 'dashboard';
+  const alertVolume = Math.min(Math.max(toNumber(rawPreferences.alert_volume, 100), 0), 100);
 
   return {
     id: item.id as string | number,
@@ -70,6 +78,13 @@ export function mapAuthUser(data: unknown): AuthUser | null {
     farm_id: (item.farm_id as string | number | null | undefined) ?? null,
     last_login_at: item.last_login_at ? toText(item.last_login_at, null as unknown as string) : null,
     last_activity_at: item.last_activity_at ? toText(item.last_activity_at, null as unknown as string) : null,
+    preferences: {
+      sound_alerts: rawPreferences.sound_alerts !== false,
+      warning_alerts: rawPreferences.warning_alerts !== false,
+      critical_alerts: rawPreferences.critical_alerts !== false,
+      alert_volume: alertVolume,
+      default_view: defaultView,
+    },
   };
 }
 
