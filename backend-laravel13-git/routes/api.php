@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\CalendarController;
+use App\Http\Controllers\Api\FarmAssistantController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\CulturesController;
 use App\Http\Controllers\Api\InfrastructureController;
@@ -59,6 +60,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/password', [AuthController::class, 'changePassword'])->middleware('throttle:auth-password');
 
         Route::middleware(['tenant'])->group(function () {
+            Route::post('/assistant/chat', [FarmAssistantController::class, 'chat'])->middleware('throttle:ai-chat');
             Route::get('/dashboard', [DashboardController::class, 'index']);
             Route::get('/audit', [AuditController::class, 'index'])->middleware('admin');
             Route::get('/alerts', [AlertController::class, 'index']);

@@ -63,6 +63,7 @@ import {
 } from './data';
 
 import AuthGate from './components/AuthGate';
+import FarmAssistant from './components/FarmAssistant';
 import {
   changePassword,
   ApiError,
@@ -4619,6 +4620,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
           </div>
         </main>
       </div>
+      <FarmAssistant authToken={authToken} />
     </div>
   );
 }

@@ -40,4 +40,9 @@ return [
         'allowed_hosted_domain' => env('GOOGLE_ALLOWED_HOSTED_DOMAIN'),
     ],
 
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+    ],
+
 ];

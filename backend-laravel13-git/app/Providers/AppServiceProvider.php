@@ -77,6 +77,26 @@ class AppServiceProvider extends ServiceProvider
                     )),
             ];
         });
+
+        RateLimiter::for('ai-chat', function (Request $request) {
+            $userId = (string) ($request->user()?->id ?? 'guest');
+            $farmId = (string) ($request->user()?->farm_id ?? 'none');
+
+            return [
+                Limit::perMinute(12)
+                    ->by($userId.'|'.$farmId)
+                    ->response(fn (Request $request, array $headers) => $this->tooManyAttemptsResponse(
+                        'L’assistant agricole reçoit beaucoup de demandes. Patientez un instant avant de recommencer.',
+                        $headers
+                    )),
+                Limit::perDay(120)
+                    ->by($userId.'|'.$farmId)
+                    ->response(fn (Request $request, array $headers) => $this->tooManyAttemptsResponse(
+                        'La limite quotidienne de l’assistant agricole est atteinte. Réessayez demain.',
+                        $headers
+                    )),
+            ];
+        });
     }
 
     private function tooManyAttemptsResponse(string $message, array $headers): JsonResponse
