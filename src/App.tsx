@@ -63,6 +63,7 @@ import {
 } from './data';
 
 import AuthGate from './components/AuthGate';
+import FarmAssistant from './components/FarmAssistant';
 import {
   changePassword,
   ApiError,
@@ -108,6 +109,13 @@ import {
   mapTreatments,
   mapSuppliers
 } from './services/fermMappers';
+import {
+  enqueueOfflineOperation,
+  listReadyOfflineOperations,
+  markOfflineOperationRetry,
+  removeOfflineOperation,
+  type OfflineOutboxScope,
+} from './services/offlineOutbox';
 
 const ALARM_SOUND_LIBRARY: Record<string, string> = {
   'ferm-plus-default': '/audio/ferm-plus-alert-loop.m4a',
@@ -639,6 +647,7 @@ export default function App() {
   // Navigation Router
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const personalDefaultViewAppliedForUserRef = useRef<string | null>(null);
 
   // Actor Role Switcher
   const [role, setRole] = useState<UserRole>('admin');
@@ -671,6 +680,7 @@ export default function App() {
   // Core Database States
   const [settings, setSettings] = useState<FarmSettings>(initialSettings);
   const [farms, setFarms] = useState<any[]>([]);
+  const activeFarmId = authUser?.farm_id ?? farms[0]?.id ?? null;
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
@@ -714,6 +724,10 @@ export default function App() {
   };
   const getTodayDate = () => new Date().toISOString().split('T')[0];
   const getSyncStatus = (): SyncStatus => (isOffline ? 'pending' : 'synced');
+  const getOfflineOutboxScope = (): OfflineOutboxScope | null => {
+    if (!authUser?.id || !activeFarmId) return null;
+    return { userId: authUser.id, farmId: activeFarmId };
+  };
   const pushNotice = (
     type: AppNotice['type'],
     title: string,
@@ -731,6 +745,7 @@ export default function App() {
     clearStoredAuthToken();
     setAuthTokenState('');
     setAuthUser(null);
+    personalDefaultViewAppliedForUserRef.current = null;
     setRole('admin');
     setAuthMode('login');
     setAuthError(message);
@@ -959,6 +974,23 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!authReady || !authUser?.id) return;
+
+    const userId = String(authUser.id);
+    if (personalDefaultViewAppliedForUserRef.current === userId) return;
+
+    personalDefaultViewAppliedForUserRef.current = userId;
+    const defaultView = authUser.preferences?.default_view ?? 'dashboard';
+    const applicationView = {
+      dashboard: 'dashboard',
+      agenda: 'agenda',
+      tasks: 'tâches',
+      alerts: 'alertes',
+    }[defaultView] ?? 'dashboard';
+    setCurrentView(applicationView);
+  }, [authReady, authUser?.id, authUser?.preferences?.default_view]);
+
+  useEffect(() => {
     if (!authReady || !authToken) return;
 
     let cancelled = false;
@@ -978,7 +1010,14 @@ export default function App() {
         });
     };
     const handleBrowserOffline = () => {
-      if (!cancelled) setIsOffline(true);
+      if (!cancelled) {
+        setIsOffline(true);
+        pushNotice(
+          'warning',
+          'Mode hors connexion limité',
+          'Les modifications et suppressions doivent attendre le retour du réseau. Ne quittez pas cette page après une saisie non confirmée.'
+        );
+      }
     };
     const refreshWorkspace = () => {
       if (cancelled || document.visibilityState === 'hidden' || !navigator.onLine) return;
@@ -1174,6 +1213,7 @@ export default function App() {
       clearStoredAuthToken();
       setAuthTokenState('');
       setAuthUser(null);
+      personalDefaultViewAppliedForUserRef.current = null;
       setRole('admin');
       setAllowRegisterAdmin(true);
       setAuthReady(true);
@@ -1215,6 +1255,38 @@ export default function App() {
       setAuthError(error instanceof Error ? error.message : 'Changement de mot de passe impossible.');
     } finally {
       setAuthBusy(false);
+    }
+  };
+
+  const handleUpdatePersonalSettings = async (payload: {
+    name: string;
+    email: string;
+    preferences: NonNullable<AuthUser['preferences']>;
+  }) => {
+    if (!authToken || !authUser) return;
+
+    try {
+      const response = await patchJson<AuthUser>('/me/preferences', payload, authToken);
+      const updatedUser = mapAuthUser(
+        response && typeof response === 'object' && 'data' in response
+          ? (response as { data?: unknown }).data
+          : response
+      );
+
+      if (!updatedUser) {
+        throw new Error('La réponse du profil est invalide.');
+      }
+
+      setAuthUser(updatedUser);
+      setStoredAuthUser(updatedUser);
+      setUsers((previous) => previous.map((user) => String(user.id) === String(updatedUser.id) ? updatedUser : user));
+      pushNotice('success', 'Préférences enregistrées', 'Votre profil et vos réglages personnels ont été mis à jour.');
+    } catch (error) {
+      pushNotice(
+        'error',
+        'Enregistrement impossible',
+        error instanceof Error ? error.message : 'Vos préférences personnelles n’ont pas pu être mises à jour.'
+      );
     }
   };
 
@@ -1346,6 +1418,47 @@ export default function App() {
   };
 
   // Connectivity Sync Handler
+  const flushDurableCreationOutbox = async () => {
+    const scope = getOfflineOutboxScope();
+    if (!scope || !authToken) return new Set<string>();
+
+    const supportedPaths = new Set([
+      '/api/v1/tasks',
+      '/api/v1/infrastructures/buildings',
+      '/api/v1/stocks',
+    ]);
+    const operations = listReadyOfflineOperations(scope)
+      .filter((operation) => operation.method === 'POST' && supportedPaths.has(operation.path) && operation.dependsOn.length === 0);
+    if (operations.length === 0) return new Set<string>();
+
+    const response = await postJson<{ results?: Array<{ operation_id?: string; success?: boolean; error?: string; data?: unknown }> }>(
+      '/sync/operations',
+      {
+        operations: operations.map((operation) => ({
+          operation_id: operation.id,
+          method: operation.method,
+          path: operation.path,
+          payload: operation.payload,
+          dependencies: operation.dependsOn,
+        })),
+      },
+      authToken,
+    );
+
+    const completed = new Set<string>();
+    for (const result of response.data?.results ?? []) {
+      if (!result.operation_id) continue;
+      if (result.success) {
+        removeOfflineOperation(scope, result.operation_id);
+        completed.add(result.operation_id);
+      } else {
+        markOfflineOperationRetry(scope, result.operation_id, result.error);
+      }
+    }
+
+    return completed;
+  };
+
   const flushPendingSync = async () => {
     if (!authToken || syncBusyRef.current) return;
     syncBusyRef.current = true;
@@ -1353,21 +1466,31 @@ export default function App() {
     // Validate the session before replaying any local writes.
     await loadWorkspaceSnapshot(authToken);
 
+    const completedOperationIds = await flushDurableCreationOutbox();
     const localCache = readWorkspaceCache(authUser?.id);
+    if (localCache && completedOperationIds.size > 0) {
+      localCache.tasks = localCache.tasks.filter((task) => !completedOperationIds.has(String(task.id)));
+      localCache.buildings = localCache.buildings.filter((building) => !completedOperationIds.has(String(building.id)));
+      localCache.articles = localCache.articles.filter((article) => !completedOperationIds.has(String(article.id)));
+      writeWorkspaceCache(authUser?.id, localCache);
+    }
     if (activeFarmId) {
       const syncResult = await syncLocalCacheToServer(authToken, activeFarmId, localCache);
       if (syncResult.pendingCache) {
         writeWorkspaceCache(authUser?.id, syncResult.pendingCache);
+        pushNotice(
+          'warning',
+          'Synchronisation partielle',
+          `${countPendingWorkspaceEntries(syncResult.pendingCache)} création(s) restent à reprendre. Les modifications existantes ne sont pas validées hors connexion.`
+        );
       } else if (syncResult.syncedCount > 0) {
         clearWorkspaceCache(authUser?.id);
+        pushNotice('success', 'Créations synchronisées', `${syncResult.syncedCount} création(s) ont été confirmées par le serveur.`);
       }
     }
 
     await hydrateWorkspace(authToken, { silent: true });
     setIsOffline(false);
-    setAuditLogs((prev) =>
-      prev.map((log) => (log.syncStatus === 'pending' ? { ...log, syncStatus: 'synced' } : log))
-    );
     } catch (error) {
       if (error instanceof ApiError && [401, 403].includes(error.status)) resetToLogin('Session expiree.');
       throw error;
@@ -1375,6 +1498,13 @@ export default function App() {
       syncBusyRef.current = false;
     }
   };
+
+  useEffect(() => {
+    if (!authReady || !authToken || !activeFarmId || !authUser?.id || !navigator.onLine) return;
+    void flushPendingSync().catch((error) => console.error('Initial outbox sync failed:', error));
+    // The outbox is intentionally retried when the authenticated user/farm context becomes available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, authToken, activeFarmId, authUser?.id]);
 
   // Moteur d'Interconnexion: Core Operations
 
@@ -2525,32 +2655,51 @@ export default function App() {
 
     setTasks((prev) => [newTask, ...prev]);
 
+    const taskPayload = {
+      farm_id: Number(activeFarmId),
+      title: newTask.title,
+      description: newTask.description,
+      source_module: newTask.sourceModule,
+      source_entity_type: newTask.sourceEntityType ?? null,
+      source_entity_id: newTask.sourceElementId ?? null,
+      start_at: toUtcIso(newTask.startDate, '08:00'),
+      priority: newTask.priority,
+      status: newTask.status,
+      due_at: toUtcIso(newTask.dueDate, '17:00'),
+      reminder_at: newTask.reminderAt ?? null,
+      assigned_to: authUser?.id ? Number(authUser.id) : null,
+    };
+
     if (authToken && activeFarmId) {
       try {
         const response = await postJson<Task>(
           '/tasks',
-          {
-            farm_id: Number(activeFarmId),
-            title: newTask.title,
-            description: newTask.description,
-            source_module: newTask.sourceModule,
-            source_entity_type: newTask.sourceEntityType ?? null,
-            source_entity_id: newTask.sourceElementId ?? null,
-            start_at: toUtcIso(newTask.startDate, '08:00'),
-            priority: newTask.priority,
-            status: newTask.status,
-            due_at: toUtcIso(newTask.dueDate, '17:00'),
-            reminder_at: newTask.reminderAt ?? null,
-            assigned_to: authUser?.id ? Number(authUser.id) : undefined,
-          },
-          authToken
+          taskPayload,
+          authToken,
+          taskId,
         );
         const backendTask = response.data;
         if (backendTask) {
           setTasks((prev) => [mapTasks([backendTask], users)[0], ...prev.filter((task) => task.id !== taskId)]);
         }
       } catch (error) {
-        console.error('Task sync failed:', error);
+        const scope = getOfflineOutboxScope();
+        const canQueue = isOffline || (error instanceof Error && error.message.includes('Connexion impossible'));
+        if (scope && canQueue) {
+          try {
+            enqueueOfflineOperation(scope, {
+              id: taskId,
+              method: 'POST',
+              path: '/api/v1/tasks',
+              payload: taskPayload,
+            });
+            pushNotice('info', 'Tâche mise en attente', 'Elle sera envoyée automatiquement dès le retour du réseau.');
+          } catch (queueError) {
+            console.error('Task outbox enqueue failed:', queueError);
+          }
+        } else {
+          console.error('Task sync failed:', error);
+        }
       }
     }
 
@@ -3104,7 +3253,32 @@ const handleDeleteCampaign = async (campaignId: string) => {
           )));
         }
       } catch (error) {
-        console.error('Building create sync failed:', error);
+        const scope = getOfflineOutboxScope();
+        const canQueue = isOffline || (error instanceof Error && error.message.includes('Connexion impossible'));
+        if (scope && canQueue) {
+          try {
+            enqueueOfflineOperation(scope, {
+              id: buildingId,
+              method: 'POST',
+              path: '/api/v1/infrastructures/buildings',
+              payload: {
+                farm_id: Number(activeFarmId),
+                name: data.name,
+                type: data.type,
+                capacity: data.capacity,
+                notes: data.notes ?? '',
+                status: 'active',
+                state: 'good',
+                assigned_use: data.type,
+              },
+            });
+            pushNotice('info', 'Bâtiment mis en attente', 'Il sera envoyé automatiquement dès le retour du réseau.');
+          } catch (queueError) {
+            console.error('Building outbox enqueue failed:', queueError);
+          }
+        } else {
+          console.error('Building create sync failed:', error);
+        }
       }
     }
     addAuditLog('Bâtiments', `Création du bâtiment ${building.name}`, building.type);
@@ -3232,7 +3406,55 @@ const handleDeleteCampaign = async (campaignId: string) => {
           )));
         }
       } catch (error) {
-        console.error('Stock article create sync failed:', error);
+        const scope = getOfflineOutboxScope();
+        const canQueue = isOffline || (error instanceof Error && error.message.includes('Connexion impossible'));
+        if (scope && canQueue) {
+          try {
+            enqueueOfflineOperation(scope, {
+              id: articleId,
+              method: 'POST',
+              path: '/api/v1/stocks',
+              payload: {
+                farm_id: Number(activeFarmId),
+                name: data.name,
+                reference: data.reference ?? '',
+                description: data.description ?? '',
+                brand: data.brand ?? '',
+                category: data.category,
+                ...(data.categoryId ? { category_id: data.categoryId } : {}),
+                ...(data.supplierId ? { supplier_id: data.supplierId } : {}),
+                batch_number: data.batchNumber ?? '',
+                purchase_date: data.purchaseDate ?? '',
+                manufacturing_date: data.manufacturingDate ?? '',
+                expiration_date: data.expirationDate ?? '',
+                unit: data.unit,
+                minimum_stock: data.minimumStock ?? data.minThreshold ?? 0,
+                maximum_stock: data.maximumStock ?? null,
+                current_quantity: data.quantity,
+                unit_cost: data.unitCost ?? 0,
+                purchase_total_cost: data.totalPurchasePrice ?? ((data.quantity ?? 0) * (data.unitCost ?? 0)),
+                storage_location: data.storageLocation ?? data.locationId ?? '',
+                currency: data.currency ?? 'XOF',
+                notes: data.notes ?? '',
+                is_active: data.isActive ?? true ? 1 : 0,
+                business_module: data.businessModule ?? 'general',
+                ...(data.relatedType ? { related_type: data.relatedType } : {}),
+                ...(data.relatedId ? { related_id: data.relatedId } : {}),
+              },
+            });
+            pushNotice(
+              'info',
+              'Article mis en attente',
+              data.imageFile
+                ? "L'article sera envoyé dès le retour du réseau, sans son image à joindre ultérieurement."
+                : 'Il sera envoyé automatiquement dès le retour du réseau.'
+            );
+          } catch (queueError) {
+            console.error('Stock article outbox enqueue failed:', queueError);
+          }
+        } else {
+          console.error('Stock article create sync failed:', error);
+        }
       }
     }
     addAuditLog('Stocks', `Création de l'article ${article.name}`, `${article.quantity} ${article.unit}`);
@@ -3681,25 +3903,31 @@ const handleDeleteStockArticle = async (articleId: string) => {
 
   // Active Alert Notifications Count
   const unreadAlerts = useMemo(() => alerts.filter((a) => !a.read), [alerts]);
+  const personalAlertPreferences = authUser?.preferences;
+  const personalSoundEnabled = personalAlertPreferences?.sound_alerts ?? true;
+  const personalWarningAlerts = personalAlertPreferences?.warning_alerts ?? true;
+  const personalCriticalAlerts = personalAlertPreferences?.critical_alerts ?? true;
+  const personalAlertVolume = personalAlertPreferences?.alert_volume ?? 100;
+  const effectiveAlarmVolume = Math.min(settings.alarmVolume ?? 100, personalAlertVolume);
+
   const ringingAlerts = useMemo(
     () =>
       unreadAlerts.filter((alertItem) => {
-        if (!settings.alarmSoundEnabled) return false;
-        if (alertItem.severity === 'critical') return settings.alarmForCriticals ?? true;
-        if (alertItem.severity === 'warning') return settings.alarmForWarnings ?? true;
+        if (!settings.alarmSoundEnabled || !personalSoundEnabled) return false;
+        if (alertItem.severity === 'critical') return (settings.alarmForCriticals ?? true) && personalCriticalAlerts;
+        if (alertItem.severity === 'warning') return (settings.alarmForWarnings ?? true) && personalWarningAlerts;
         return false;
       }),
-    [settings.alarmForCriticals, settings.alarmForWarnings, settings.alarmSoundEnabled, unreadAlerts]
+    [personalCriticalAlerts, personalSoundEnabled, personalWarningAlerts, settings.alarmForCriticals, settings.alarmForWarnings, settings.alarmSoundEnabled, unreadAlerts]
   );
   const hasRingingAlerts = ringingAlerts.length > 0;
-  const activeFarmId = authUser?.farm_id ?? farms[0]?.id ?? null;
   const ownerUsers = users.filter((user) => user.role === 'owner' && String(user.farm_id ?? '') === String(activeFarmId ?? ''));
   const alarmSoundSource = ALARM_SOUND_LIBRARY[settings.alarmSoundKey ?? 'ferm-plus-default'] ?? ALARM_SOUND_LIBRARY['ferm-plus-default'];
 
   useEffect(() => {
     const audio = new Audio(alarmSoundSource);
     audio.loop = settings.alarmLoopEnabled ?? true;
-    audio.volume = Math.min(Math.max((settings.alarmVolume ?? 100) / 100, 0), 1);
+    audio.volume = Math.min(Math.max(effectiveAlarmVolume / 100, 0), 1);
     audio.preload = 'auto';
     alarmAudioRef.current = audio;
 
@@ -3708,14 +3936,14 @@ const handleDeleteStockArticle = async (articleId: string) => {
       audio.currentTime = 0;
       alarmAudioRef.current = null;
     };
-  }, [alarmSoundSource, settings.alarmLoopEnabled, settings.alarmVolume]);
+  }, [alarmSoundSource, effectiveAlarmVolume, settings.alarmLoopEnabled]);
 
   useEffect(() => {
     const audio = alarmAudioRef.current;
     if (!audio) return;
     audio.loop = settings.alarmLoopEnabled ?? true;
-    audio.volume = Math.min(Math.max((settings.alarmVolume ?? 100) / 100, 0), 1);
-  }, [settings.alarmLoopEnabled, settings.alarmVolume]);
+    audio.volume = Math.min(Math.max(effectiveAlarmVolume / 100, 0), 1);
+  }, [effectiveAlarmVolume, settings.alarmLoopEnabled]);
 
   useEffect(() => {
     if (ringingAlerts.length > previousAlarmCountRef.current) {
@@ -3728,7 +3956,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
     const audio = alarmAudioRef.current;
     if (!audio) return;
 
-    if (!hasRingingAlerts || alarmSilenced || !settings.alarmSoundEnabled) {
+    if (!hasRingingAlerts || alarmSilenced || !settings.alarmSoundEnabled || !personalSoundEnabled) {
       audio.pause();
       audio.currentTime = 0;
       return;
@@ -3744,7 +3972,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
           setAlarmPlaybackBlocked(true);
         });
     }
-  }, [alarmSilenced, hasRingingAlerts, settings.alarmSoundEnabled]);
+  }, [alarmSilenced, hasRingingAlerts, personalSoundEnabled, settings.alarmSoundEnabled]);
 
   const handleSilenceAlarm = () => {
     const audio = alarmAudioRef.current;
@@ -3865,6 +4093,49 @@ const handleDeleteStockArticle = async (articleId: string) => {
     );
   }
 
+  const navigationSections = [
+    {
+      label: 'Pilotage',
+      items: [
+        { id: 'dashboard', label: 'Tableau de bord', icon: Activity },
+      ],
+    },
+    {
+      label: 'Production',
+      items: [
+        { id: 'élevage', label: 'Élevage', icon: Activity },
+        { id: 'pondeuses', label: 'Pondeuses', icon: Egg },
+        { id: 'pisciculture', label: 'Pisciculture', icon: Fish },
+        { id: 'cultures', label: 'Cultures', icon: Sprout },
+      ],
+    },
+    {
+      label: 'Opérations',
+      items: [
+        { id: 'stocks', label: 'Stocks d\'intrants', icon: Package },
+        { id: 'finances', label: 'Finances / Livre', icon: DollarSign },
+        { id: 'sanitaire', label: 'Suivi sanitaire', icon: ShieldCheck },
+        { id: 'bâtiments', label: 'Bâtiments / Zones', icon: Building2 },
+        { id: 'agenda', label: 'Agenda / Échéances', icon: Calendar },
+        { id: 'tâches', label: 'Tâches / Travaux', icon: CheckSquare },
+      ],
+    },
+    {
+      label: 'Suivi',
+      items: [
+        { id: 'alertes', label: 'Alertes', icon: AlertTriangle, badge: unreadAlerts.length },
+        { id: 'rapports', label: 'Rapports d\'activité', icon: FileText },
+        { id: 'audit', label: 'Journal d\'audit', icon: ShieldAlert, adminOnly: true },
+      ],
+    },
+    {
+      label: 'Compte',
+      items: [
+        { id: 'paramètres', label: role === 'owner' ? 'Mon compte' : 'Paramètres', icon: Settings },
+      ],
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {notices.length > 0 ? (
@@ -3906,9 +4177,17 @@ const handleDeleteStockArticle = async (articleId: string) => {
         </div>
       ) : null}
       {/* Sidebar Navigation */}
+      {sidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Fermer la navigation"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 cursor-default bg-slate-950/45 backdrop-blur-[1px] lg:hidden"
+        />
+      ) : null}
       <aside
         id="app-sidebar"
-        className={`bg-slate-900 text-slate-300 w-64 border-r border-slate-800 flex flex-col shrink-0 fixed inset-y-0 left-0 z-40 transition-transform lg:translate-x-0 lg:static ${
+        className={`bg-slate-900 text-slate-300 w-[calc(100vw-3.5rem)] max-w-[16rem] border-r border-slate-800 flex flex-col shrink-0 fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out lg:w-64 lg:max-w-none lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -3923,58 +4202,65 @@ const handleDeleteStockArticle = async (articleId: string) => {
               <p className="text-[10px] text-slate-400 font-medium">Gestion agricole connectée</p>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
+          <button
+            type="button"
+            aria-label="Fermer la navigation"
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-slate-400 hover:text-white"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Navigation list */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-          {[
-            { id: 'dashboard', label: 'Tableau de bord', icon: Activity },
-            { id: 'élevage', label: 'Élevage', icon: Activity },
-            { id: 'pondeuses', label: 'Pondeuses', icon: Egg },
-            { id: 'pisciculture', label: 'Pisciculture', icon: Fish },
-            { id: 'cultures', label: 'Cultures', icon: Sprout },
-            { id: 'stocks', label: 'Stocks d\'intrants', icon: Package },
-            { id: 'finances', label: 'Finances / Livre', icon: DollarSign },
-            { id: 'sanitaire', label: 'Suivi Sanitaire', icon: ShieldCheck },
-            { id: 'bâtiments', label: 'Bâtiments / Zones', icon: Building2 },
-            { id: 'agenda', label: 'Agenda / Échéances', icon: Calendar },
-            { id: 'tâches', label: 'Tâches / Travaux', icon: CheckSquare },
-            { id: 'alertes', label: 'Alertes', icon: AlertTriangle, badge: unreadAlerts.length },
-            { id: 'rapports', label: 'Rapports d\'activité', icon: FileText },
-            { id: 'audit', label: 'Journal d\'Audit', icon: ShieldAlert },
-            { id: 'paramètres', label: 'Paramètres', icon: Settings }
-          ].map((navItem) => {
-            const IconComponent = navItem.icon;
-            const isActive = currentView === navItem.id;
+        <nav aria-label="Navigation principale" className="flex-1 overflow-y-auto px-3 py-4">
+          <div className="space-y-5">
+            {navigationSections.map((section) => {
+              const items = section.items.filter((navItem) => !navItem.adminOnly || role === 'admin');
 
-            return (
-              <button
-                key={navItem.id}
-                onClick={() => {
-                  setCurrentView(navItem.id);
-                  setSidebarOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all ${
-                  isActive
-                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/20 font-bold scale-[1.01]'
-                    : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'
-                }`}
-              >
-                <span className="flex items-center gap-3">
-                  <IconComponent className="w-4 h-4" />
-                  {navItem.label}
-                </span>
-                {navItem.badge !== undefined && navItem.badge > 0 && (
-                  <span className="bg-amber-500 text-slate-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                    {navItem.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+              return (
+                <section key={section.label} aria-label={section.label} className="space-y-1.5">
+                  <div className="flex items-center gap-2 px-2.5">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{section.label}</span>
+                    <span className="h-px flex-1 bg-slate-800/90" />
+                  </div>
+                  <div className="space-y-1">
+                    {items.map((navItem) => {
+                      const IconComponent = navItem.icon;
+                      const isActive = currentView === navItem.id;
+
+                      return (
+                        <button
+                          key={navItem.id}
+                          type="button"
+                          aria-current={isActive ? 'page' : undefined}
+                          onClick={() => {
+                            setCurrentView(navItem.id);
+                            setSidebarOpen(false);
+                          }}
+                          className={`group relative flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
+                            isActive
+                              ? 'bg-emerald-600 text-white shadow-[0_8px_18px_rgba(6,78,59,0.28)]'
+                              : 'text-slate-400 hover:bg-slate-800/90 hover:text-slate-100'
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-3">
+                            <IconComponent className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 transition-colors group-hover:text-emerald-300'}`} />
+                            <span className="truncate">{navItem.label}</span>
+                          </span>
+                          {navItem.badge !== undefined && navItem.badge > 0 ? (
+                            <span className={`ml-3 min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-amber-400 text-slate-950'}`}>
+                              {navItem.badge}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </nav>
 
         {/* User profile details bottom of sidebar */}
@@ -3987,19 +4273,24 @@ const handleDeleteStockArticle = async (articleId: string) => {
               <span className="font-bold text-slate-200 block truncate">
                 {role === 'admin' ? 'Administrateur' : 'Propriétaire'}
               </span>
-              <p className="text-[10px] text-slate-500 truncate">{settings.contactEmail}</p>
+              <p className="text-[10px] text-slate-500 truncate">{authUser?.email ?? settings.contactEmail}</p>
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         
         {/* Top Header */}
         <header className="bg-white border-b border-slate-100 h-16 shrink-0 flex items-center justify-between px-6 z-30">
           <div className="flex items-center gap-4 flex-1">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-500 hover:text-slate-800">
+            <button
+              type="button"
+              aria-label="Ouvrir la navigation"
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden text-slate-500 hover:text-slate-800"
+            >
               <Menu className="w-6 h-6" />
             </button>
 
@@ -4422,10 +4713,12 @@ const handleDeleteStockArticle = async (articleId: string) => {
               <SettingsView
                 role={role}
                 settings={settings}
+                currentUser={authUser}
                 owners={ownerUsers}
                 onUpdateSettings={handleUpdateSettings}
                 onTestAlarm={handleTestAlarm}
                 onChangePassword={handleChangePassword}
+                onUpdatePersonalSettings={handleUpdatePersonalSettings}
                 onCreateOwner={handleCreateOwner}
               />
             )}
@@ -4433,6 +4726,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
           </div>
         </main>
       </div>
+      <FarmAssistant authToken={authToken} />
     </div>
   );
 }

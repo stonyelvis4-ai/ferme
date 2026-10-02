@@ -9,6 +9,7 @@ use App\Models\Crop;
 use App\Models\Plot;
 use App\Models\SanitaryTreatment;
 use App\Models\StockItem;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -123,6 +124,39 @@ class AuthAndSanitaryTest extends TestCase
             'current_quantity' => 1,
             'unit_cost' => 500,
         ])->assertForbidden();
+    }
+
+    public function test_owner_cannot_access_administration_audit_or_settings_but_can_change_own_password(): void
+    {
+        $owner = User::factory()->create([
+            'role' => Role::Owner,
+            'account_status' => 'active',
+            'is_active' => true,
+        ]);
+        $farm = Farm::create([
+            'name' => 'Ferme propriétaire',
+            'slug' => 'ferme-proprietaire',
+            'administrator_id' => null,
+            'status' => 'active',
+            'currency' => 'FCFA',
+            'area_unit' => 'ha',
+            'manager_name' => 'Administrateur',
+            'contact_email' => 'admin-owner@example.com',
+        ]);
+        $owner->forceFill(['farm_id' => $farm->id])->save();
+        $owner->createToken('ancienne-session');
+        Sanctum::actingAs($owner);
+
+        $this->getJson('/api/v1/audit')->assertForbidden();
+        $this->getJson('/api/v1/settings')->assertForbidden();
+
+        $this->postJson('/api/v1/auth/password', [
+            'current_password' => 'password',
+            'password' => 'OwnerSecure@123',
+            'password_confirmation' => 'OwnerSecure@123',
+        ])->assertOk();
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
     public function test_completed_sanitary_treatment_creates_stock_and_expense_entries(): void
@@ -819,7 +853,7 @@ class AuthAndSanitaryTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_create_task_and_link_calendar_event(): void
+    public function test_task_calendar_events_stay_in_sync_and_manual_events_cannot_link_tasks(): void
     {
         $admin = User::factory()->create([
             'role' => Role::Admin,
@@ -849,19 +883,64 @@ class AuthAndSanitaryTest extends TestCase
             'due_at' => now()->addDay()->setTime(10, 0)->toDateTimeString(),
         ])->assertCreated()->json('data.id');
 
+        $this->assertDatabaseHas('calendar_events', [
+            'farm_id' => $farm->id,
+            'linked_task_id' => $taskId,
+            'title' => 'Contrôler la ration',
+        ]);
+
         $this->postJson('/api/v1/calendar', [
             'farm_id' => $farm->id,
-            'title' => 'Contrôle ration',
-            'start_at' => now()->addDay()->setTime(8, 0)->toDateTimeString(),
-            'end_at' => now()->addDay()->setTime(8, 30)->toDateTimeString(),
-            'linked_task_id' => $taskId,
+            'title' => 'Visite vétérinaire',
+            'start_at' => now()->addDay()->setTime(11, 0)->toDateTimeString(),
+            'end_at' => now()->addDay()->setTime(11, 30)->toDateTimeString(),
             'source_module' => 'elevage',
         ])->assertCreated();
 
         $this->assertDatabaseHas('calendar_events', [
             'farm_id' => $farm->id,
+            'linked_task_id' => null,
+            'title' => 'Visite vétérinaire',
+        ]);
+        $this->assertDatabaseCount('calendar_events', 2);
+
+        $this->postJson('/api/v1/calendar', [
+            'farm_id' => $farm->id,
+            'title' => 'Événement invalide',
+            'start_at' => now()->addDay()->setTime(12, 0)->toDateTimeString(),
+            'end_at' => now()->addDay()->setTime(11, 30)->toDateTimeString(),
+        ])->assertUnprocessable()->assertJsonValidationErrors(['end_at']);
+
+        $this->postJson('/api/v1/calendar', [
+            'farm_id' => $farm->id,
+            'title' => 'Doublon interdit',
+            'start_at' => now()->addDay()->setTime(12, 0)->toDateTimeString(),
             'linked_task_id' => $taskId,
-            'title' => 'Contrôle ration',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['linked_task_id']);
+
+        $this->patchJson("/api/v1/tasks/{$taskId}", [
+            'start_at' => null,
+            'due_at' => null,
+        ])->assertOk();
+
+        $this->assertDatabaseMissing('calendar_events', [
+            'farm_id' => $farm->id,
+            'linked_task_id' => $taskId,
+        ]);
+
+        $taskToDelete = (int) $this->postJson('/api/v1/tasks', [
+            'farm_id' => $farm->id,
+            'title' => 'Tâche à supprimer',
+            'priority' => 'normal',
+            'status' => 'todo',
+            'due_at' => now()->addDays(2)->toDateTimeString(),
+        ])->assertCreated()->json('data.id');
+
+        $this->deleteJson("/api/v1/tasks/{$taskToDelete}")->assertOk();
+
+        $this->assertDatabaseMissing('calendar_events', [
+            'farm_id' => $farm->id,
+            'linked_task_id' => $taskToDelete,
         ]);
         $this->assertDatabaseHas('audit_logs', [
             'farm_id' => $farm->id,
@@ -1199,5 +1278,99 @@ class AuthAndSanitaryTest extends TestCase
             'id' => $stock->id,
             'unit_cost' => 1250,
         ]);
+    }
+
+    public function test_sync_operations_creates_independent_task_and_replays_it_safely(): void
+    {
+        [$admin, $farm] = $this->adminWithFarm('sync-task');
+        Sanctum::actingAs($admin);
+
+        $operation = [
+            'operation_id' => 'offline:task-001',
+            'method' => 'POST',
+            'path' => '/api/v1/tasks',
+            'payload' => ['title' => 'Contrôler le bassin', 'priority' => 'normal', 'status' => 'todo'],
+            'dependencies' => [],
+        ];
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [$operation]])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.status', 201)
+            ->assertJsonPath('data.results.0.success', true)
+            ->assertJsonPath('data.results.0.replayed', false);
+        $this->assertSame(1, Task::where('farm_id', $farm->id)->count());
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [$operation]])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.status', 201)
+            ->assertJsonPath('data.results.0.replayed', true);
+        $this->assertSame(1, Task::where('farm_id', $farm->id)->count());
+    }
+
+    public function test_sync_operations_rejects_unapproved_commands_and_dependencies(): void
+    {
+        [$admin] = $this->adminWithFarm('sync-reject');
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [[
+            'operation_id' => 'offline:stock-movement-001', 'method' => 'POST', 'path' => '/api/v1/stocks/movements',
+            'payload' => ['name' => 'Tentative interdite'], 'dependencies' => [],
+        ]]])->assertOk()->assertJsonPath('data.results.0.status', 422);
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [[
+            'operation_id' => 'offline:task-dependency', 'method' => 'POST', 'path' => '/api/v1/tasks',
+            'payload' => ['title' => 'Tâche', 'priority' => 'normal', 'status' => 'todo'], 'dependencies' => ['offline:other'],
+        ]]])->assertOk()->assertJsonPath('data.results.0.status', 422);
+    }
+
+    public function test_sync_operations_creates_buildings_and_stocks_in_the_authenticated_farm(): void
+    {
+        [$admin, $farm] = $this->adminWithFarm('sync-building-stock');
+        $otherFarm = Farm::create([
+            'name' => 'Ferme hors périmètre', 'slug' => 'ferme-hors-perimetre-sync', 'administrator_id' => null,
+            'status' => 'active', 'currency' => 'FCFA', 'area_unit' => 'ha',
+            'manager_name' => 'Autre', 'contact_email' => 'autre-sync@example.com',
+        ]);
+        Sanctum::actingAs($admin);
+
+        $building = [
+            'operation_id' => 'offline:building-001', 'method' => 'POST', 'path' => '/api/v1/infrastructures/buildings',
+            'payload' => ['farm_id' => $otherFarm->id, 'name' => 'Poulailler hors ligne', 'type' => 'poultry_house', 'capacity' => 120],
+            'dependencies' => [],
+        ];
+        $stock = [
+            'operation_id' => 'offline:stock-001', 'method' => 'POST', 'path' => '/api/v1/stocks',
+            'payload' => ['farm_id' => $otherFarm->id, 'reference' => 'ALI-OFF-001', 'name' => 'Aliment démarrage', 'category' => 'feed', 'unit' => 'kg', 'current_quantity' => 25, 'unit_cost' => 900],
+            'dependencies' => [],
+        ];
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [$building, $stock]])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.status', 201)
+            ->assertJsonPath('data.results.1.status', 201);
+        $this->assertDatabaseHas('buildings', ['farm_id' => $farm->id, 'name' => 'Poulailler hors ligne']);
+        $this->assertDatabaseMissing('buildings', ['farm_id' => $otherFarm->id, 'name' => 'Poulailler hors ligne']);
+        $this->assertDatabaseHas('stock_items', ['farm_id' => $farm->id, 'reference' => 'ALI-OFF-001', 'current_quantity' => 25]);
+        $this->assertDatabaseMissing('stock_items', ['farm_id' => $otherFarm->id, 'reference' => 'ALI-OFF-001']);
+
+        $this->postJson('/api/v1/sync/operations', ['operations' => [$building, $stock]])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.replayed', true)
+            ->assertJsonPath('data.results.1.replayed', true);
+        $this->assertSame(1, \App\Models\Building::where('farm_id', $farm->id)->count());
+        $this->assertSame(1, StockItem::where('farm_id', $farm->id)->count());
+    }
+
+    private function adminWithFarm(string $suffix): array
+    {
+        $admin = User::factory()->create(['role' => Role::Admin, 'account_status' => 'active', 'is_active' => true]);
+        $farm = Farm::create([
+            'name' => "Ferme {$suffix}", 'slug' => "ferme-{$suffix}", 'administrator_id' => $admin->id,
+            'status' => 'active', 'currency' => 'FCFA', 'area_unit' => 'ha',
+            'manager_name' => $admin->name, 'contact_email' => $admin->email,
+        ]);
+        $admin->forceFill(['farm_id' => $farm->id])->save();
+
+        return [$admin, $farm];
     }
 }

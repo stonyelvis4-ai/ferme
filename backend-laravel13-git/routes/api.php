@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AlertController;
 use App\Http\Controllers\Api\CalendarController;
+use App\Http\Controllers\Api\FarmAssistantController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\CulturesController;
 use App\Http\Controllers\Api\InfrastructureController;
@@ -59,8 +60,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/password', [AuthController::class, 'changePassword'])->middleware('throttle:auth-password');
 
         Route::middleware(['tenant'])->group(function () {
+            Route::post('/assistant/chat', [FarmAssistantController::class, 'chat'])->middleware('throttle:ai-chat');
             Route::get('/dashboard', [DashboardController::class, 'index']);
-            Route::get('/audit', [AuditController::class, 'index']);
+            Route::get('/audit', [AuditController::class, 'index'])->middleware('admin');
             Route::get('/alerts', [AlertController::class, 'index']);
             Route::get('/calendar', [CalendarController::class, 'index']);
             Route::get('/stocks', [StockController::class, 'index']);
@@ -82,9 +84,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/farms', [FarmController::class, 'index']);
             Route::get('/farms/{farm}', [FarmController::class, 'show']);
             Route::get('/tasks', [TaskController::class, 'index']);
+            Route::patch('/me/preferences', [UserController::class, 'updateMyPreferences']);
             Route::get('/users', [UserController::class, 'index']);
             Route::get('/users/{user}', [UserController::class, 'show']);
-            Route::get('/settings', [SettingsController::class, 'show']);
+            Route::get('/settings', [SettingsController::class, 'show'])->middleware('admin');
 
             Route::middleware(['admin', 'idempotent'])->group(function () {
                 Route::post('/farms', [FarmController::class, 'store']);
@@ -138,6 +141,7 @@ Route::prefix('v1')->group(function () {
                 Route::patch('/infrastructures/enclosures/{enclosure}', [InfrastructureController::class, 'updateEnclosure']);
                 Route::delete('/infrastructures/enclosures/{enclosure}', [InfrastructureController::class, 'destroyEnclosure']);
                 Route::post('/sync', [SyncController::class, 'store']);
+                Route::post('/sync/operations', [SyncController::class, 'operations']);
                 Route::patch('/sync/{entry}/process', [SyncController::class, 'process']);
                 Route::patch('/sync/{entry}/fail', [SyncController::class, 'fail']);
                 Route::post('/pisciculture', [PiscicultureController::class, 'store']);

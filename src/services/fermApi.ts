@@ -61,6 +61,19 @@ function shouldSendBearerToken(token?: string) {
   return Boolean(token && token !== COOKIE_AUTH_MARKER);
 }
 
+function safeApiMessage(message: string, status: number) {
+  const includesSensitiveAuthenticationData =
+    /(?:id_token|access_token|refresh_token|authorization\s*:|bearer\s+|eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.)/i.test(message);
+
+  if (includesSensitiveAuthenticationData) {
+    return status === 401 || status === 403
+      ? "L'authentification a échoué. Veuillez vous reconnecter."
+      : "Une erreur d'authentification est survenue. Réessayez dans un instant.";
+  }
+
+  return message.length > 300 ? `${message.slice(0, 297)}…` : message;
+}
+
 export function getStoredAuthUser<T = AuthUser>() {
   const raw = readPersistentValue(AUTH_USER_KEY);
   if (!raw) return null;
@@ -125,6 +138,8 @@ async function requestJson<T>(
       }
     }
 
+    message = safeApiMessage(message, response.status);
+
     if (response.status === 429) {
       const retryAfterHeader = response.headers.get('Retry-After');
       const retryAfterPayload =
@@ -152,6 +167,14 @@ type ApiResponse<T> = {
   [key: string]: unknown;
 };
 
+export type UserPreferences = {
+  sound_alerts?: boolean;
+  warning_alerts?: boolean;
+  critical_alerts?: boolean;
+  alert_volume?: number;
+  default_view?: 'dashboard' | 'agenda' | 'tasks' | 'alerts';
+};
+
 export type AuthUser = {
   id: number | string;
   name: string;
@@ -162,6 +185,7 @@ export type AuthUser = {
   farm_id?: number | string | null;
   last_login_at?: string | null;
   last_activity_at?: string | null;
+  preferences?: UserPreferences;
 };
 
 export type WorkspaceSnapshot = {

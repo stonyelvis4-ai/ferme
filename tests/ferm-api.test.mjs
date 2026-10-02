@@ -94,3 +94,20 @@ test('network failures expose a user-safe retry message', async () => {
     /Vérifiez votre connexion et réessayez/,
   );
 });
+
+test('authentication errors never expose an OAuth token returned by the server', async () => {
+  const { api } = loadApi({
+    fetchImpl: async () =>
+      new Response(
+        JSON.stringify({
+          message: 'OAuth validation failed for id_token=eyJhbGciOiJSUzI1Ni.fake-signature',
+        }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      ),
+  });
+
+  await assert.rejects(
+    api.googleAuth({ credential: 'not-a-real-token' }),
+    (error) => error.message === "Une erreur d'authentification est survenue. Réessayez dans un instant.",
+  );
+});

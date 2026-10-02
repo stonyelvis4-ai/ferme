@@ -40,4 +40,11 @@ return [
         'allowed_hosted_domain' => env('GOOGLE_ALLOWED_HOSTED_DOMAIN'),
     ],
 
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-flash-lite-latest'),
+        'local_proxy_url' => env('GEMINI_LOCAL_PROXY_URL'),
+        'local_proxy_token' => env('GEMINI_LOCAL_PROXY_TOKEN'),
+    ],
+
 ];
