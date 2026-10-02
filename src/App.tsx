@@ -4074,9 +4074,17 @@ const handleDeleteStockArticle = async (articleId: string) => {
         </div>
       ) : null}
       {/* Sidebar Navigation */}
+      {sidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Fermer la navigation"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 cursor-default bg-slate-950/45 backdrop-blur-[1px] lg:hidden"
+        />
+      ) : null}
       <aside
         id="app-sidebar"
-        className={`bg-slate-900 text-slate-300 w-64 border-r border-slate-800 flex flex-col shrink-0 fixed inset-y-0 left-0 z-40 transition-transform lg:translate-x-0 lg:static ${
+        className={`bg-slate-900 text-slate-300 w-[calc(100vw-3.5rem)] max-w-[16rem] border-r border-slate-800 flex flex-col shrink-0 fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out lg:w-64 lg:max-w-none lg:translate-x-0 lg:static ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -4091,7 +4099,12 @@ const handleDeleteStockArticle = async (articleId: string) => {
               <p className="text-[10px] text-slate-400 font-medium">Gestion agricole connectée</p>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
+          <button
+            type="button"
+            aria-label="Fermer la navigation"
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-slate-400 hover:text-white"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -4167,7 +4180,12 @@ const handleDeleteStockArticle = async (articleId: string) => {
         {/* Top Header */}
         <header className="bg-white border-b border-slate-100 h-16 shrink-0 flex items-center justify-between px-6 z-30">
           <div className="flex items-center gap-4 flex-1">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-500 hover:text-slate-800">
+            <button
+              type="button"
+              aria-label="Ouvrir la navigation"
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden text-slate-500 hover:text-slate-800"
+            >
               <Menu className="w-6 h-6" />
             </button>
 
