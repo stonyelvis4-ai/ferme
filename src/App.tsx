@@ -4084,7 +4084,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
       ) : null}
       <aside
         id="app-sidebar"
-        className={`bg-slate-900 text-slate-300 w-[calc(100vw-3.5rem)] max-w-[16rem] border-r border-slate-800 flex flex-col shrink-0 fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out lg:w-64 lg:max-w-none lg:translate-x-0 lg:static ${
+        className={`bg-slate-900 text-slate-300 w-[calc(100vw-3.5rem)] max-w-[16rem] border-r border-slate-800 flex flex-col shrink-0 fixed inset-y-0 left-0 z-40 transition-transform duration-200 ease-out lg:w-64 lg:max-w-none lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -4175,7 +4175,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
       </aside>
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         
         {/* Top Header */}
         <header className="bg-white border-b border-slate-100 h-16 shrink-0 flex items-center justify-between px-6 z-30">
