@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Bot, LoaderCircle, MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { LoaderCircle, MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import type * as ThreeModule from 'three';
 
 import { ApiError, postJson } from '../services/fermApi';
 
@@ -12,6 +13,36 @@ type AssistantMessage = {
 type FarmAssistantProps = {
   authToken: string;
 };
+
+type MascotMood = 'idle' | 'listening' | 'thinking';
+
+type MascotInstance = {
+  destroy: () => void;
+  setState: (state: 'idle' | 'listening' | 'thinking' | 'talking' | 'happy') => MascotInstance;
+};
+
+type MascotRuntime = {
+  create: (container: HTMLElement, options: {
+    framing: 'bust' | 'full';
+    decor: boolean;
+    shadows: boolean;
+    followPointer: boolean;
+    autoCheer: boolean;
+    THREE: typeof ThreeModule;
+  }) => MascotInstance;
+};
+
+type LoadedMascotRuntime = {
+  runtime: MascotRuntime;
+  three: typeof ThreeModule;
+};
+
+declare global {
+  interface Window {
+    FermierMascotte?: MascotRuntime;
+    THREE?: typeof ThreeModule;
+  }
+}
 
 const STARTER_MESSAGES: AssistantMessage[] = [{
   id: 'welcome',
@@ -26,6 +57,90 @@ const SUGGESTIONS = [
 ];
 
 const MAX_HISTORY_ENTRY_LENGTH = 1200;
+const MASCOT_SCRIPT_ID = 'ferm-plus-farmer-mascot';
+let mascotRuntimePromise: Promise<LoadedMascotRuntime> | null = null;
+
+function loadMascotRuntime(): Promise<LoadedMascotRuntime> {
+  if (typeof window === 'undefined') return Promise.reject(new Error('Mascotte indisponible.'));
+
+  if (mascotRuntimePromise) return mascotRuntimePromise;
+
+  mascotRuntimePromise = import('three').then((three) => new Promise((resolve, reject) => {
+    window.THREE = three;
+    if (window.FermierMascotte) {
+      resolve({ runtime: window.FermierMascotte, three });
+      return;
+    }
+
+    const finishLoading = () => {
+      if (window.FermierMascotte) resolve({ runtime: window.FermierMascotte, three });
+      else reject(new Error('La mascotte agricole n’a pas pu être chargée.'));
+    };
+    const existingScript = document.getElementById(MASCOT_SCRIPT_ID) as HTMLScriptElement | null;
+
+    if (existingScript) {
+      existingScript.addEventListener('load', finishLoading, { once: true });
+      existingScript.addEventListener('error', () => reject(new Error('La mascotte agricole est indisponible.')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = MASCOT_SCRIPT_ID;
+    script.src = '/mascotte/fermier-mascotte.js';
+    script.async = true;
+    script.onload = finishLoading;
+    script.onerror = () => reject(new Error('La mascotte agricole est indisponible.'));
+    document.head.appendChild(script);
+  }));
+
+  return mascotRuntimePromise;
+}
+
+function FarmMascot({ mood, compact = false }: { mood: MascotMood; compact?: boolean }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mascotRef = useRef<MascotInstance | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!containerRef.current) return undefined;
+
+    void loadMascotRuntime()
+      .then(({ runtime, three }) => {
+        if (cancelled || !containerRef.current) return;
+
+        mascotRef.current = runtime.create(containerRef.current, {
+          framing: 'bust',
+          decor: false,
+          shadows: false,
+          followPointer: !compact,
+          autoCheer: false,
+          THREE: three,
+        });
+        mascotRef.current.setState(mood);
+      })
+      .catch(() => {
+        // Le chatbot reste utilisable si WebGL est indisponible.
+      });
+
+    return () => {
+      cancelled = true;
+      mascotRef.current?.destroy();
+      mascotRef.current = null;
+    };
+  }, [compact]);
+
+  useEffect(() => {
+    mascotRef.current?.setState(mood);
+  }, [mood]);
+
+  return (
+    <div
+      ref={containerRef}
+      aria-hidden="true"
+      className={`pointer-events-none overflow-hidden ${compact ? 'h-11 w-11' : 'h-14 w-14'}`}
+    />
+  );
+}
 
 export default function FarmAssistant({ authToken }: FarmAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,6 +149,7 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const mascotMood: MascotMood = isSending ? 'thinking' : draft.trim() ? 'listening' : 'idle';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
@@ -104,8 +220,8 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
         >
           <header className="flex items-start justify-between gap-4 bg-slate-900 px-5 py-4 text-white">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-950/30">
-                <Bot className="h-5 w-5" aria-hidden="true" />
+              <div className="flex h-14 w-14 shrink-0 items-end justify-center overflow-hidden rounded-2xl border border-white/10 bg-emerald-500/20 shadow-lg shadow-emerald-950/30">
+                <FarmMascot mood={mascotMood} />
               </div>
               <div>
                 <h2 className="text-sm font-bold">Orion, assistant agricole</h2>
@@ -201,10 +317,13 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
           type="button"
           aria-label="Ouvrir l’assistant agricole Orion"
           onClick={() => setIsOpen(true)}
-          className="group flex h-14 items-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-xl shadow-emerald-950/20 transition hover:-translate-y-0.5 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+          className="group flex h-14 items-center gap-2 rounded-2xl bg-emerald-600 px-3 pr-4 text-sm font-bold text-white shadow-xl shadow-emerald-950/20 transition hover:-translate-y-0.5 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
         >
-          <MessageCircle className="h-5 w-5" aria-hidden="true" />
-          <span>Demander à Orion</span>
+          <div className="flex h-11 w-11 items-end justify-center overflow-hidden rounded-xl bg-emerald-950/20">
+            <FarmMascot mood="idle" compact />
+          </div>
+          <span>Parler à Orion</span>
+          <MessageCircle className="h-4 w-4 opacity-80" aria-hidden="true" />
         </button>
       )}
     </div>
