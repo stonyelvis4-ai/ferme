@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Camera, ImagePlus, LoaderCircle, MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { Camera, CircleAlert, ImagePlus, LoaderCircle, MessageCircle, Plus, RotateCcw, Send, Sparkles, X } from 'lucide-react';
 import type * as ThreeModule from 'three';
 
 import { ApiError, postForm } from '../services/fermApi';
@@ -8,6 +8,7 @@ type AssistantMessage = {
   id: string;
   role: 'assistant' | 'user';
   content: string;
+  createdAt: number;
   image?: {
     name: string;
     previewUrl: string;
@@ -17,6 +18,12 @@ type AssistantMessage = {
 type SelectedImage = {
   file: File;
   previewUrl: string;
+};
+
+type AssistantRequest = {
+  question: string;
+  history: Array<Pick<AssistantMessage, 'role' | 'content'>>;
+  image: SelectedImage | null;
 };
 
 type FarmAssistantProps = {
@@ -56,6 +63,7 @@ declare global {
 const STARTER_MESSAGES: AssistantMessage[] = [{
   id: 'welcome',
   role: 'assistant',
+  createdAt: Date.now(),
   content: 'Bonjour, je suis Orion, votre assistant agricole. Envoyez-moi une photo de symptôme ou de culture : je décrirai ce qui est visible et les mesures prudentes à prendre. Je ne peux pas confirmer un diagnostic médical ou vétérinaire à partir d’une image.',
 }];
 
@@ -167,6 +175,7 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
   const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const previewUrlsRef = useRef(new Set<string>());
+  const lastRequestRef = useRef<AssistantRequest | null>(null);
   const mascotMood: MascotMood = isSending ? 'thinking' : draft.trim() ? 'listening' : 'idle';
 
   useEffect(() => {
@@ -302,49 +311,38 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
     }, 'image/jpeg', 0.88);
   };
 
-  const submitQuestion = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const question = draft.trim();
-    const imageToSend = selectedImage;
-    if ((!question && !imageToSend) || isSending) return;
-
+  const requestAssistant = async (request: AssistantRequest, appendUserMessage: boolean) => {
+    if (isSending) return;
     if (!navigator.onLine) {
       setError('L’assistant nécessite une connexion Internet pour répondre.');
       return;
     }
 
-    const nextUserMessage: AssistantMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: question || 'Photo envoyée pour analyse.',
-      image: imageToSend ? {
-        name: imageToSend.file.name,
-        previewUrl: imageToSend.previewUrl,
-      } : undefined,
-    };
-    const history = messages.slice(-6).map(({ role, content }) => ({
-      role,
-      content: content.length > MAX_HISTORY_ENTRY_LENGTH
-        ? `…${content.slice(-(MAX_HISTORY_ENTRY_LENGTH - 1))}`
-        : content,
-    }));
+    if (appendUserMessage) {
+      setMessages((current) => [...current, {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: request.question || 'Photo envoyée pour analyse.',
+        createdAt: Date.now(),
+        image: request.image ? {
+          name: request.image.file.name,
+          previewUrl: request.image.previewUrl,
+        } : undefined,
+      }]);
+    }
 
-    setMessages((current) => [...current, nextUserMessage]);
-    setDraft('');
     setError('');
-    setSelectedImage(null);
-    if (imageInputRef.current) imageInputRef.current.value = '';
     setIsSending(true);
+    lastRequestRef.current = request;
 
     try {
       const formData = new FormData();
-      formData.append('message', question);
-      history.forEach((entry, index) => {
+      formData.append('message', request.question);
+      request.history.forEach((entry, index) => {
         formData.append(`history[${index}][role]`, entry.role);
         formData.append(`history[${index}][content]`, entry.content);
       });
-      if (imageToSend) formData.append('image', imageToSend.file);
+      if (request.image) formData.append('image', request.image.file);
 
       const response = await postForm<{ answer: string }>('/assistant/chat', formData, authToken);
       const answer = response.data?.answer?.trim();
@@ -355,7 +353,9 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: answer,
+        createdAt: Date.now(),
       }]);
+      lastRequestRef.current = null;
     } catch (caughtError) {
       const message = caughtError instanceof ApiError || caughtError instanceof Error
         ? caughtError.message
@@ -364,6 +364,38 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
     } finally {
       setIsSending(false);
     }
+  };
+
+  const submitQuestion = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const question = draft.trim();
+    const imageToSend = selectedImage;
+    if ((!question && !imageToSend) || isSending) return;
+
+    const history = messages.slice(-6).map(({ role, content }) => ({
+      role,
+      content: content.length > MAX_HISTORY_ENTRY_LENGTH
+        ? `…${content.slice(-(MAX_HISTORY_ENTRY_LENGTH - 1))}`
+        : content,
+    }));
+
+    setDraft('');
+    setSelectedImage(null);
+    if (imageInputRef.current) imageInputRef.current.value = '';
+    void requestAssistant({ question, history, image: imageToSend }, true);
+  };
+
+  const retryLastRequest = () => {
+    if (lastRequestRef.current) void requestAssistant(lastRequestRef.current, false);
+  };
+
+  const startNewConversation = () => {
+    setMessages([{ ...STARTER_MESSAGES[0], id: `welcome-${Date.now()}`, createdAt: Date.now() }]);
+    setDraft('');
+    setError('');
+    lastRequestRef.current = null;
+    clearSelectedImage();
   };
 
   const useSuggestion = (suggestion: string) => {
@@ -417,17 +449,22 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
               </div>
               <div>
                 <h2 className="text-sm font-bold">Orion, assistant agricole</h2>
-                <p className="mt-0.5 text-xs text-slate-300">Conseils généraux pour votre exploitation</p>
+                <p className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-slate-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />Conseils et analyse de photos</p>
               </div>
             </div>
-            <button
-              type="button"
-              aria-label="Fermer l’assistant agricole"
-              onClick={() => setIsOpen(false)}
-              className="rounded-xl p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
-            >
-              <X className="h-5 w-5" aria-hidden="true" />
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button type="button" disabled={isSending} aria-label="Nouvelle conversation" title="Nouvelle conversation" onClick={startNewConversation} className="rounded-xl p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-50">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label="Fermer l’assistant agricole"
+                onClick={() => setIsOpen(false)}
+                className="rounded-xl p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
           </header>
 
           <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 px-4 py-4" aria-live="polite">
@@ -438,19 +475,27 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
                     <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                   </div>
                 ) : null}
-                <div className={`max-w-[82%] overflow-hidden rounded-2xl text-sm leading-relaxed ${
-                  message.role === 'user'
-                    ? 'rounded-br-md bg-emerald-600 text-white'
-                    : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 shadow-sm'
-                }`}>
-                  {message.image ? (
-                    <img
-                      src={message.image.previewUrl}
-                      alt={`Photo envoyée : ${message.image.name}`}
-                      className="max-h-44 w-full object-cover"
-                    />
-                  ) : null}
-                  <p className="whitespace-pre-wrap px-3.5 py-2.5">{message.content}</p>
+                <div className={`flex max-w-[82%] flex-col gap-1 ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <span className={`px-1 text-[10px] font-semibold ${message.role === 'user' ? 'text-emerald-700' : 'text-slate-400'}`}>
+                    {message.role === 'user' ? 'Vous' : 'Orion'}
+                  </span>
+                  <div className={`overflow-hidden rounded-2xl text-sm leading-relaxed ${
+                    message.role === 'user'
+                      ? 'rounded-br-md bg-emerald-600 text-white'
+                      : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 shadow-sm'
+                  }`}>
+                    {message.image ? (
+                      <img
+                        src={message.image.previewUrl}
+                        alt={`Photo envoyée : ${message.image.name}`}
+                        className="max-h-44 w-full object-cover"
+                      />
+                    ) : null}
+                    <p className="whitespace-pre-wrap px-3.5 py-2.5">{message.content}</p>
+                  </div>
+                  <time className="px-1 text-[10px] text-slate-400" dateTime={new Date(message.createdAt).toISOString()}>
+                    {new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(message.createdAt)}
+                  </time>
                 </div>
               </div>
             ))}
@@ -466,7 +511,20 @@ export default function FarmAssistant({ authToken }: FarmAssistantProps) {
           </div>
 
           <div className="border-t border-slate-100 bg-white p-3">
-            {error ? <p role="alert" className="mb-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{error}</p> : null}
+            {error ? (
+              <div role="alert" className="mb-3 flex items-start gap-2.5 rounded-2xl border border-rose-100 bg-rose-50 px-3 py-2.5 text-xs text-rose-800">
+                <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium leading-relaxed">{error}</p>
+                  {lastRequestRef.current ? (
+                    <button type="button" disabled={isSending} onClick={retryLastRequest} className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-rose-700 shadow-sm transition hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-60">
+                      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                      Réessayer
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             {messages.length === STARTER_MESSAGES.length ? (
               <div className="mb-3 space-y-2">
                 <div className="flex gap-2 overflow-x-auto pb-1">
