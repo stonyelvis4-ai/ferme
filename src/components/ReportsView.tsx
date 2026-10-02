@@ -553,7 +553,7 @@ export default function ReportsView({
             h1 { font-size: 20px; margin-bottom: 4px; }
             p { font-size: 12px; color: #475569; margin: 0 0 8px; }
             .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
-            .card { border: 1px solid #dbeafe; background: #f0fdf4; padding: 12px; border-radius: 12px; }
+            .card { border: 1px solid #e7dbce; background: #fff5ed; padding: 12px; border-radius: 12px; }
             .label { font-size: 10px; text-transform: uppercase; color: #64748b; margin-bottom: 4px; }
             .value { font-size: 14px; font-weight: bold; }
             table { border-collapse: collapse; width: 100%; margin-top: 16px; }

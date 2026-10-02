@@ -6,68 +6,90 @@
   --font-display: "Space Grotesk", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Ultra-Modern, Crisp, SaaS-style Color Palette */
-  /* Slate: mapped to cool, pristine slate-gray tones for modern contrast */
-  --color-slate-50: #f8fafc;     /* Super clean light blue-gray background */
-  --color-slate-100: #f1f5f9;    /* Clean divider and section background */
-  --color-slate-200: #e2e8f0;    /* Crisp border gray */
-  --color-slate-300: #cbd5e1;    /* Accent border and muted elements */
-  --color-slate-400: #94a3b8;    /* Muted labels and secondary icons */
-  --color-slate-500: #64748b;    /* Secondary text */
-  --color-slate-600: #475569;    /* Readable body text */
-  --color-slate-700: #334155;    /* Strong text */
-  --color-slate-800: #1e293b;    /* Dark stone gray */
-  --color-slate-900: #0f172a;    /* Deep space black (Sidebar, headers) */
-  --color-slate-950: #020617;    /* Ultra dark pitch black */
+  /* Terre cuite, indigo nuit et sable : une palette agricole chaleureuse. */
+  --color-slate-50: #fbf7f2;
+  --color-slate-100: #f3ece4;
+  --color-slate-200: #e7dbce;
+  --color-slate-300: #d5c4b4;
+  --color-slate-400: #9f8f86;
+  --color-slate-500: #766963;
+  --color-slate-600: #59504d;
+  --color-slate-700: #3e3a3b;
+  --color-slate-800: #292a38;
+  --color-slate-900: #171b33;
+  --color-slate-950: #0b1026;
 
-  /* Emerald: mapped to high-tech, vibrant electric emerald mint */
-  --color-emerald-50: #ecfdf5;   /* Very soft mint highlight */
-  --color-emerald-100: #d1fae5;  /* Light mint background badge */
-  --color-emerald-200: #a7f3d0;  /* Bright mint highlight */
-  --color-emerald-300: #6ee7b7;  /* Soft active green */
-  --color-emerald-400: #34d399;  /* Vibrant mint */
-  --color-emerald-500: #10b981;  /* High-tech green brand accent */
-  --color-emerald-600: #059669;  /* Deep rich premium emerald green */
-  --color-emerald-700: #047857;  /* Forest active brand green */
-  --color-emerald-800: #065f46;  /* Deep forest shadow */
-  --color-emerald-900: #064e3b;  /* Ultra dark forest sidebar background */
-  --color-emerald-950: #022c22;  /* Pitch green black */
+  /* L'ancienne échelle emerald devient la couleur signature terre cuite. */
+  --color-emerald-50: #fff5ed;
+  --color-emerald-100: #ffe4d1;
+  --color-emerald-200: #ffc8a6;
+  --color-emerald-300: #f5a276;
+  --color-emerald-400: #df7650;
+  --color-emerald-500: #c95436;
+  --color-emerald-600: #a83f29;
+  --color-emerald-700: #873120;
+  --color-emerald-800: #68261d;
+  --color-emerald-900: #4c1b16;
+  --color-emerald-950: #32110e;
 
-  /* Customize Amber to a premium golden ochre */
-  --color-amber-50: #fffbeb;
-  --color-amber-100: #fef3c7;
-  --color-amber-200: #fde68a;
-  --color-amber-300: #fcd34d;
-  --color-amber-400: #fbbf24;
-  --color-amber-500: #f59e0b;
-  --color-amber-600: #d97706;
-  --color-amber-700: #b45309;
-  --color-amber-800: #92400e;
-  --color-amber-900: #78350f;
+  /* Ocre pour les éléments d'attention et les données de production. */
+  --color-amber-50: #fff8e8;
+  --color-amber-100: #ffedbf;
+  --color-amber-200: #f8d48a;
+  --color-amber-300: #eab75e;
+  --color-amber-400: #d79a33;
+  --color-amber-500: #b97b20;
+  --color-amber-600: #966018;
+  --color-amber-700: #764a15;
+  --color-amber-800: #5e3b15;
+  --color-amber-900: #493012;
 
-  /* Customize Sky to clean mineral cyan-blue */
-  --color-sky-50: #f0f9ff;
-  --color-sky-100: #e0f2fe;
-  --color-sky-200: #bae6fd;
-  --color-sky-300: #7dd3fc;
-  --color-sky-400: #38bdf8;
-  --color-sky-500: #0ea5e9;
-  --color-sky-600: #0284c7;
-  --color-sky-700: #0369a1;
-  --color-sky-800: #075985;
-  --color-sky-900: #0c4a6e;
+  /* Indigo minéral pour les modules d'information et la navigation secondaire. */
+  --color-sky-50: #eff2ff;
+  --color-sky-100: #dde4ff;
+  --color-sky-200: #c5d0ff;
+  --color-sky-300: #9baefa;
+  --color-sky-400: #748bea;
+  --color-sky-500: #566dd1;
+  --color-sky-600: #4054af;
+  --color-sky-700: #334287;
+  --color-sky-800: #29366b;
+  --color-sky-900: #222c56;
 
-  /* Customize Rose to a clean, highly modern coral red */
-  --color-rose-50: #fff1f2;
-  --color-rose-100: #ffe4e6;
-  --color-rose-200: #fecdd3;
-  --color-rose-300: #fda4af;
-  --color-rose-400: #fb7185;
-  --color-rose-500: #f43f5e;
-  --color-rose-600: #e11d48;
-  --color-rose-700: #be123c;
-  --color-rose-800: #9f1239;
-  --color-rose-900: #881337;
+  /* Bronze clair pour les vues cultures, sans revenir au vert dominant. */
+  --color-lime-50: #fff7eb;
+  --color-lime-100: #feeac7;
+  --color-lime-200: #f8d39a;
+  --color-lime-300: #e8b76c;
+  --color-lime-400: #ce9240;
+  --color-lime-500: #ad7029;
+  --color-lime-600: #8b561f;
+  --color-lime-700: #6d431b;
+  --color-lime-800: #563519;
+  --color-lime-900: #452b16;
+
+  /* Grenat réservé aux anomalies et aux urgences. */
+  --color-rose-50: #fff2f0;
+  --color-rose-100: #ffe1dc;
+  --color-rose-200: #fec6bd;
+  --color-rose-300: #f29b91;
+  --color-rose-400: #df7068;
+  --color-rose-500: #c5524e;
+  --color-rose-600: #a63d3c;
+  --color-rose-700: #853135;
+  --color-rose-800: #68282f;
+  --color-rose-900: #4d2028;
+}
+
+:root {
+  background: var(--color-slate-50);
+  color: var(--color-slate-900);
+  color-scheme: light;
+}
+
+::selection {
+  background: var(--color-emerald-200);
+  color: var(--color-slate-950);
 }
 
 /* Smooth Fade-in Entry Animations */
@@ -97,10 +119,21 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d5c4b4;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #9f8f86;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
