@@ -45,14 +45,14 @@ function create(container,options){
   const std=(color,rough,extra)=>new THREE.MeshStandardMaterial(Object.assign({color:color,roughness:rough},extra||{}));
   const DS=THREE.DoubleSide;
   const M={
-    skin:std(0x96552f,0.55), cream:std(0xf3e2b3,0.8), green:std(0x9d4f36,0.85),
-    green2:std(0xd87750,0.85), black:std(0x151515,0.6), white:std(0xffffff,0.35),
+    skin:std(0x96552f,0.55), cream:std(0xf3e2b3,0.8), green:std(0x256b3a,0.85),
+    green2:std(0x2c7a44,0.85), black:std(0x151515,0.6), white:std(0xffffff,0.35),
     iris:std(0x4a2a14,0.4), mouth:std(0x6b1f1f,0.6,{side:DS}), teeth:std(0xffffff,0.35,{side:DS}),
     lips:std(0x7a4124,0.6), wood:std(0xb5723c,0.7),
     metal:std(0x9aa0a6,0.35,{metalness:0.85}), steel:std(0x5d6268,0.4,{metalness:0.9}),
-    sole:std(0x1a1d1a,0.9), soil:std(0x5a3b24,1), sprout:std(0xd79a33,0.7),
-    greenDS:std(0x9d4f36,0.85,{side:DS}), green2DS:std(0xd87750,0.85,{side:DS}),
-    boot:new THREE.MeshPhysicalMaterial({color:0x343960,roughness:0.35,clearcoat:0.6,clearcoatRoughness:0.3})
+    sole:std(0x1a1d1a,0.9), soil:std(0x5a3b24,1), sprout:std(0x58b24a,0.7),
+    greenDS:std(0x256b3a,0.85,{side:DS}), green2DS:std(0x2c7a44,0.85,{side:DS}),
+    boot:new THREE.MeshPhysicalMaterial({color:0x1f5c33,roughness:0.35,clearcoat:0.6,clearcoatRoughness:0.3})
   };
   function strawTexture(rx,ry){
     const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d');

@@ -265,31 +265,31 @@ export default function AuthGate({
     <div className="ferm-auth">
       <style>{`
         .ferm-auth {
-          --text: #171b33;
-          --text-soft: #3e3a3b;
-          --text-muted: #766963;
-          --border: rgba(23, 27, 51, 0.1);
-          --border-strong: rgba(23, 27, 51, 0.14);
-          --accent: #c95436;
-          --accent-bright: #df7650;
-          --accent-soft: rgba(201, 84, 54, 0.1);
-          --accent-glow: rgba(201, 84, 54, 0.25);
+          --text: #0f172a;
+          --text-soft: #334155;
+          --text-muted: #64748b;
+          --border: rgba(15, 23, 42, 0.1);
+          --border-strong: rgba(15, 23, 42, 0.14);
+          --accent: #0d9488;
+          --accent-bright: #14b8a6;
+          --accent-soft: rgba(13, 148, 136, 0.1);
+          --accent-glow: rgba(13, 148, 136, 0.25);
           --error: #dc2626;
           --error-bg: #fef2f2;
-          --success: #4054af;
-          --success-bg: #eff2ff;
+          --success: #059669;
+          --success-bg: #ecfdf5;
           --radius: 18px;
           --radius-sm: 14px;
           --radius-pill: 999px;
-          --shadow: 0 20px 50px rgba(23, 27, 51, 0.1);
-          --shadow-lg: 0 28px 60px rgba(23, 27, 51, 0.12);
+          --shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
+          --shadow-lg: 0 28px 60px rgba(15, 23, 42, 0.12);
           position: relative;
           min-height: 100vh;
           overflow-x: hidden;
           font-family: "Inter", system-ui, -apple-system, sans-serif;
           color: var(--text);
           -webkit-font-smoothing: antialiased;
-          background: #f3ece4;
+          background: #e8f7f2;
         }
         .ferm-auth * {
           box-sizing: border-box;
@@ -305,7 +305,7 @@ export default function AuthGate({
           object-position: center center;
           z-index: 0;
           transform: scale(1.06);
-          filter: saturate(0.7) sepia(0.16) hue-rotate(330deg) brightness(1.08) contrast(1.02);
+          filter: saturate(1.08) brightness(1.08) contrast(1.02);
           will-change: transform;
         }
         .auth-bg-overlay {
@@ -314,15 +314,15 @@ export default function AuthGate({
           z-index: 1;
           pointer-events: none;
           background:
-            radial-gradient(ellipse 90% 70% at 15% 20%, rgba(255, 200, 166, 0.38) 0%, transparent 55%),
-            radial-gradient(ellipse 70% 50% at 90% 10%, rgba(197, 208, 255, 0.38) 0%, transparent 50%),
-            radial-gradient(ellipse 60% 40% at 50% 100%, rgba(255, 245, 237, 0.58) 0%, transparent 55%),
+            radial-gradient(ellipse 90% 70% at 15% 20%, rgba(167, 243, 208, 0.28) 0%, transparent 55%),
+            radial-gradient(ellipse 70% 50% at 90% 10%, rgba(204, 251, 241, 0.32) 0%, transparent 50%),
+            radial-gradient(ellipse 60% 40% at 50% 100%, rgba(236, 253, 245, 0.45) 0%, transparent 55%),
             linear-gradient(
               115deg,
-              rgba(251, 247, 242, 0.86) 0%,
-              rgba(255, 245, 237, 0.68) 32%,
+              rgba(248, 252, 250, 0.82) 0%,
+              rgba(240, 253, 250, 0.62) 32%,
               rgba(255, 255, 255, 0.42) 52%,
-              rgba(243, 236, 228, 0.82) 100%
+              rgba(248, 250, 252, 0.75) 100%
             );
         }
         .auth-bg-grain {
@@ -347,14 +347,14 @@ export default function AuthGate({
         .auth-orb-1 {
           width: 300px;
           height: 300px;
-          background: rgba(223, 118, 80, 0.42);
+          background: rgba(45, 212, 191, 0.4);
           top: 5%;
           left: 5%;
         }
         .auth-orb-2 {
           width: 240px;
           height: 240px;
-          background: rgba(116, 139, 234, 0.34);
+          background: rgba(110, 231, 183, 0.35);
           bottom: 10%;
           right: 15%;
           animation-delay: -4s;
@@ -363,7 +363,7 @@ export default function AuthGate({
         .auth-orb-3 {
           width: 180px;
           height: 180px;
-          background: rgba(248, 212, 138, 0.42);
+          background: rgba(153, 246, 228, 0.4);
           top: 50%;
           left: 42%;
           animation-delay: -7s;
@@ -379,7 +379,7 @@ export default function AuthGate({
           width: 360px;
           height: 360px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(223, 118, 80, 0.16) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(45, 212, 191, 0.14) 0%, transparent 70%);
           pointer-events: none;
           z-index: 2;
           transform: translate(-50%, -50%);
@@ -422,7 +422,7 @@ export default function AuthGate({
           width: 44px;
           height: 44px;
           border-radius: 14px;
-          background: linear-gradient(135deg, #df7650, #a83f29);
+          background: linear-gradient(135deg, #2dd4bf, #0d9488);
           display: grid;
           place-items: center;
           box-shadow: 0 8px 24px var(--accent-glow);
@@ -444,7 +444,7 @@ export default function AuthGate({
         }
         @keyframes authPulseGlow {
           0%, 100% { box-shadow: 0 8px 24px var(--accent-glow); }
-          50% { box-shadow: 0 10px 32px rgba(201, 84, 54, 0.4); }
+          50% { box-shadow: 0 10px 32px rgba(13, 148, 136, 0.4); }
         }
         .auth-eyebrow {
           display: inline-flex;
@@ -511,7 +511,7 @@ export default function AuthGate({
         .auth-pill:hover {
           transform: translateY(-2px);
           background: #fff;
-          border-color: rgba(201, 84, 54, 0.4);
+          border-color: rgba(13, 148, 136, 0.4);
           box-shadow: 0 8px 20px var(--accent-glow);
         }
         .auth-feature-cards {
@@ -534,7 +534,7 @@ export default function AuthGate({
         .auth-feature-card:hover {
           transform: translateY(-4px);
           background: #fff;
-          border-color: rgba(201, 84, 54, 0.3);
+          border-color: rgba(13, 148, 136, 0.3);
           box-shadow: 0 14px 32px rgba(15, 23, 42, 0.1);
         }
         .auth-feature-icon {
@@ -546,7 +546,7 @@ export default function AuthGate({
           display: grid;
           place-items: center;
           margin-bottom: 0.85rem;
-          border: 1px solid rgba(201, 84, 54, 0.15);
+          border: 1px solid rgba(13, 148, 136, 0.15);
         }
         .auth-feature-icon svg {
           width: 16px;
@@ -593,7 +593,7 @@ export default function AuthGate({
           width: 220px;
           height: 220px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(223, 118, 80, 0.18) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(45, 212, 191, 0.18) 0%, transparent 70%);
           pointer-events: none;
           animation: authFloatOrb 10s ease-in-out infinite;
         }
@@ -681,11 +681,11 @@ export default function AuthGate({
           position: relative;
         }
         .auth-register-box {
-          border: 1.5px solid rgba(201, 84, 54, 0.16);
+          border: 1.5px solid rgba(13, 148, 136, 0.12);
           border-radius: var(--radius-sm);
           padding: 0.95rem;
           margin-bottom: 1.35rem;
-          background: linear-gradient(135deg, rgba(255, 245, 237, 0.94), rgba(255, 255, 255, 0.72));
+          background: linear-gradient(135deg, rgba(236, 253, 245, 0.92), rgba(255, 255, 255, 0.7));
         }
         .auth-register-chip {
           display: inline-flex;
@@ -694,13 +694,13 @@ export default function AuthGate({
           margin-bottom: 0.8rem;
           padding: 0.42rem 0.8rem;
           border-radius: var(--radius-pill);
-          border: 1px solid rgba(201, 84, 54, 0.2);
+          border: 1px solid rgba(13, 148, 136, 0.18);
           background: rgba(255,255,255,0.88);
           font-size: 0.7rem;
           font-weight: 700;
           letter-spacing: 0.14em;
           text-transform: uppercase;
-          color: #873120;
+          color: #0f766e;
         }
         .auth-register-step {
           display: flex;
@@ -723,7 +723,7 @@ export default function AuthGate({
           background: var(--accent-soft);
           color: var(--accent);
           flex-shrink: 0;
-          border: 1px solid rgba(201, 84, 54, 0.15);
+          border: 1px solid rgba(13, 148, 136, 0.15);
         }
         .auth-register-icon svg {
           width: 16px;
@@ -802,7 +802,7 @@ export default function AuthGate({
         }
         .ferm-auth input:focus {
           border-color: var(--accent);
-          box-shadow: 0 0 0 3px rgba(201, 84, 54, 0.18);
+          box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
         }
         .auth-toggle-password {
           position: absolute;
@@ -839,7 +839,7 @@ export default function AuthGate({
           padding: 0.8rem 1.1rem;
           border: none;
           border-radius: var(--radius-sm);
-          background: linear-gradient(135deg, #df7650 0%, #c95436 45%, #a83f29 100%);
+          background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 45%, #0d9488 100%);
           color: #fff;
           font-family: inherit;
           font-size: 0.95rem;
@@ -849,7 +849,7 @@ export default function AuthGate({
           align-items: center;
           justify-content: center;
           gap: 0.5rem;
-          box-shadow: 0 10px 28px rgba(201, 84, 54, 0.3);
+          box-shadow: 0 10px 28px rgba(13, 148, 136, 0.3);
           transition: transform 0.15s, box-shadow 0.2s, filter 0.15s, opacity 0.2s;
           position: relative;
           overflow: hidden;
@@ -872,7 +872,7 @@ export default function AuthGate({
         }
         .auth-submit:hover:not(:disabled) {
           filter: brightness(1.05);
-          box-shadow: 0 14px 36px rgba(201, 84, 54, 0.4);
+          box-shadow: 0 14px 36px rgba(13, 148, 136, 0.4);
           transform: translateY(-2px);
         }
         .auth-submit:active:not(:disabled) {
@@ -904,11 +904,11 @@ export default function AuthGate({
           background: rgba(148, 163, 184, 0.35);
         }
         .auth-google-box {
-          border: 1.5px solid rgba(201, 84, 54, 0.16);
+          border: 1.5px solid rgba(13, 148, 136, 0.12);
           border-radius: var(--radius-sm);
           padding: 0.95rem;
           margin: 1.25rem 0 1.1rem;
-          background: linear-gradient(135deg, rgba(239, 242, 255, 0.92), rgba(255, 255, 255, 0.84));
+          background: linear-gradient(135deg, rgba(240, 253, 250, 0.92), rgba(255, 255, 255, 0.82));
         }
         .auth-google-help {
           margin-top: 0.7rem;
@@ -932,7 +932,7 @@ export default function AuthGate({
           border-radius: var(--radius-sm);
           padding: 1rem 1.05rem;
           margin-bottom: 1.1rem;
-          background: #fbf7f2;
+          background: #f8fafc;
           position: relative;
         }
         .auth-admin-title {
@@ -1015,7 +1015,7 @@ export default function AuthGate({
           border: 1.5px solid var(--border-strong);
           background: rgba(255, 255, 255, 0.88);
           backdrop-filter: blur(12px);
-          box-shadow: 0 4px 14px rgba(23, 27, 51, 0.08);
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
           font-size: 0.78rem;
           font-weight: 600;
           color: var(--text-soft);
@@ -1041,12 +1041,12 @@ export default function AuthGate({
           }
           .auth-bg-overlay {
             background:
-              radial-gradient(ellipse 90% 50% at 50% 0%, rgba(255, 200, 166, 0.38) 0%, transparent 50%),
+              radial-gradient(ellipse 90% 50% at 50% 0%, rgba(167, 243, 208, 0.3) 0%, transparent 50%),
               linear-gradient(
                 180deg,
-                rgba(251, 247, 242, 0.72) 0%,
+                rgba(248, 252, 250, 0.65) 0%,
                 rgba(255, 255, 255, 0.72) 45%,
-                rgba(243, 236, 228, 0.9) 100%
+                rgba(248, 250, 252, 0.88) 100%
               );
           }
         }

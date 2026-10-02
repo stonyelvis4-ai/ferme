@@ -402,7 +402,7 @@ export default function StocksView({
         )}
       </div>
 
-      <section className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(201,84,54,0.18),_transparent_34%),linear-gradient(135deg,_#ffffff_0%,_#fbf7f2_48%,_#fff5ed_100%)] p-6 shadow-sm">
+      <section className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_34%),linear-gradient(135deg,_#ffffff_0%,_#f8fafc_48%,_#ecfdf5_100%)] p-6 shadow-sm">
         <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-emerald-200/20 blur-3xl" />
         <div className="relative z-10 space-y-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
