@@ -60,7 +60,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::post('/auth/password', [AuthController::class, 'changePassword'])->middleware('throttle:auth-password');
 
-        Route::middleware(['tenant'])->group(function () {
+        Route::middleware(['tenant', 'throttle:api-authenticated'])->group(function () {
             Route::post('/assistant/chat', [FarmAssistantController::class, 'chat'])->middleware('throttle:ai-chat');
             Route::get('/dashboard', [DashboardController::class, 'index']);
             Route::get('/audit', [AuditController::class, 'index'])->middleware('admin');
@@ -71,8 +71,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/sanitary', [SanitaryController::class, 'index']);
             Route::get('/reports', [ReportController::class, 'index']);
             Route::get('/reports/{section}', [ReportController::class, 'show']);
-            Route::get('/reports/{section}/export/{format}', [ReportController::class, 'export']);
-            Route::get('/sync', [SyncController::class, 'index']);
+            Route::get('/reports/{section}/export/{format}', [ReportController::class, 'export'])->middleware('throttle:exports');
+            Route::get('/sync', [SyncController::class, 'index'])->middleware('throttle:sync');
             Route::get('/pondeuses', [PondeusesController::class, 'index']);
             Route::get('/pondeuses/{pondeuse}', [PondeusesController::class, 'show']);
             Route::get('/cultures', [CulturesController::class, 'index']);
@@ -86,11 +86,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/farms/{farm}', [FarmController::class, 'show']);
             Route::get('/tasks', [TaskController::class, 'index']);
             Route::patch('/me/preferences', [UserController::class, 'updateMyPreferences']);
-            Route::get('/users', [UserController::class, 'index']);
-            Route::get('/users/{user}', [UserController::class, 'show']);
+            Route::get('/users', [UserController::class, 'index'])->middleware('admin');
+            Route::get('/users/{user}', [UserController::class, 'show'])->middleware('admin');
             Route::get('/settings', [SettingsController::class, 'show'])->middleware('admin');
 
-            Route::middleware(['admin', 'idempotent'])->group(function () {
+            Route::middleware(['admin', 'idempotent', 'throttle:api-write'])->group(function () {
                 Route::post('/farms', [FarmController::class, 'store']);
                 Route::patch('/farms/{farm}', [FarmController::class, 'update']);
                 Route::post('/farms/{farm}/owner', [OwnerController::class, 'store']);
@@ -149,10 +149,10 @@ Route::prefix('v1')->group(function () {
                 Route::post('/infrastructures/enclosures', [InfrastructureController::class, 'storeEnclosure']);
                 Route::patch('/infrastructures/enclosures/{enclosure}', [InfrastructureController::class, 'updateEnclosure']);
                 Route::delete('/infrastructures/enclosures/{enclosure}', [InfrastructureController::class, 'destroyEnclosure']);
-                Route::post('/sync', [SyncController::class, 'store']);
-                Route::post('/sync/operations', [SyncController::class, 'operations']);
-                Route::patch('/sync/{entry}/process', [SyncController::class, 'process']);
-                Route::patch('/sync/{entry}/fail', [SyncController::class, 'fail']);
+                Route::post('/sync', [SyncController::class, 'store'])->middleware('throttle:sync');
+                Route::post('/sync/operations', [SyncController::class, 'operations'])->middleware('throttle:sync');
+                Route::patch('/sync/{entry}/process', [SyncController::class, 'process'])->middleware('throttle:sync');
+                Route::patch('/sync/{entry}/fail', [SyncController::class, 'fail'])->middleware('throttle:sync');
                 Route::post('/pisciculture', [PiscicultureController::class, 'store']);
                 Route::patch('/pisciculture/{pisciculture}', [PiscicultureController::class, 'update']);
                 Route::delete('/pisciculture/{pisciculture}', [PiscicultureController::class, 'destroy']);

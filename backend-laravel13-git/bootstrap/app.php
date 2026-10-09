@@ -13,7 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->api(prepend: [\App\Http\Middleware\ValidateApiOrigin::class]);
+        $middleware->api(
+            prepend: [\App\Http\Middleware\ValidateApiOrigin::class],
+            append: [\App\Http\Middleware\SecureApiResponse::class],
+        );
         $middleware->prependToPriorityList(
             \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
             \App\Http\Middleware\PromoteApiTokenCookie::class,

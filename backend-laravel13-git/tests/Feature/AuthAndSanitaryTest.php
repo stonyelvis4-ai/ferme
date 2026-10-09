@@ -11,8 +11,11 @@ use App\Models\SanitaryTreatment;
 use App\Models\StockItem;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\StockService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -126,7 +129,7 @@ class AuthAndSanitaryTest extends TestCase
         ])->assertForbidden();
     }
 
-    public function test_owner_cannot_access_administration_audit_or_settings_but_can_change_own_password(): void
+    public function test_owner_cannot_access_administration_data_but_can_change_own_password(): void
     {
         $owner = User::factory()->create([
             'role' => Role::Owner,
@@ -145,10 +148,18 @@ class AuthAndSanitaryTest extends TestCase
         ]);
         $owner->forceFill(['farm_id' => $farm->id])->save();
         $owner->createToken('ancienne-session');
+        $otherUser = User::factory()->create([
+            'role' => Role::Admin,
+            'account_status' => 'active',
+            'is_active' => true,
+            'farm_id' => $farm->id,
+        ]);
         Sanctum::actingAs($owner);
 
         $this->getJson('/api/v1/audit')->assertForbidden();
         $this->getJson('/api/v1/settings')->assertForbidden();
+        $this->getJson('/api/v1/users')->assertForbidden();
+        $this->getJson('/api/v1/users/'.$otherUser->id)->assertForbidden();
 
         $this->postJson('/api/v1/auth/password', [
             'current_password' => 'password',
@@ -157,6 +168,38 @@ class AuthAndSanitaryTest extends TestCase
         ])->assertOk();
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_stock_image_storage_uses_the_verified_mime_type_instead_of_the_client_extension(): void
+    {
+        [$admin, $farm] = $this->adminWithFarm('safe-image');
+        Storage::fake('public');
+
+        $request = request();
+        $sourceImage = UploadedFile::fake()->image('justificatif.png', 24, 24);
+        $request->files->set('image', new UploadedFile(
+            $sourceImage->path(),
+            'justificatif.php',
+            'image/png',
+            UPLOAD_ERR_OK,
+            true,
+        ));
+        $request->setUserResolver(fn () => $admin);
+
+        $item = app(StockService::class)->createItem([
+            'farm_id' => $farm->id,
+            'name' => 'Aliment avec justificatif',
+            'category' => 'Aliment',
+            'unit' => 'kg',
+            'current_quantity' => 1,
+            'unit_cost' => 500,
+            'minimum_threshold' => 0,
+        ]);
+        $path = (string) $item->image_path;
+
+        $this->assertStringEndsWith('.png', $path);
+        $this->assertStringNotContainsString('.php', $path);
+        Storage::disk('public')->assertExists($path);
     }
 
     public function test_completed_sanitary_treatment_creates_stock_and_expense_entries(): void

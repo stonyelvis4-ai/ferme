@@ -242,7 +242,9 @@ export async function changePassword(
   }, token);
 }
 
-export async function loadWorkspaceSnapshot(token: string): Promise<WorkspaceSnapshot> {
+export async function loadWorkspaceSnapshot(token: string, role?: AuthUser['role']): Promise<WorkspaceSnapshot> {
+  const isAdmin = (role ?? getStoredAuthUser<AuthUser>()?.role) === 'admin';
+  const adminOnlyEmpty = Promise.resolve({ data: [] } as ApiResponse<unknown[]>);
   const [
     dashboard,
     farms,
@@ -263,11 +265,11 @@ export async function loadWorkspaceSnapshot(token: string): Promise<WorkspaceSna
   ] = await Promise.allSettled([
     requestJson<ApiResponse<Record<string, number>>>('/dashboard', {}, token),
     requestJson<ApiResponse<unknown[]>>('/farms', {}, token),
-    requestJson<ApiResponse<unknown[]>>('/users', {}, token),
-    requestJson<ApiResponse<Record<string, unknown> | null>>('/settings', {}, token),
+    isAdmin ? requestJson<ApiResponse<unknown[]>>('/users', {}, token) : adminOnlyEmpty,
+    isAdmin ? requestJson<ApiResponse<Record<string, unknown> | null>>('/settings', {}, token) : Promise.resolve({ data: null } as ApiResponse<Record<string, unknown> | null>),
     requestJson<ApiResponse<unknown[]>>('/tasks', {}, token),
     requestJson<ApiResponse<unknown[]>>('/alerts', {}, token),
-    requestJson<ApiResponse<unknown[]>>('/audit', {}, token),
+    isAdmin ? requestJson<ApiResponse<unknown[]>>('/audit', {}, token) : adminOnlyEmpty,
     requestJson<ApiResponse<{ items?: unknown[]; movements?: unknown[] }>>('/stocks', {}, token),
     requestJson<ApiResponse<unknown[]>>('/finances', {}, token),
     requestJson<ApiResponse<unknown[]>>('/sanitary', {}, token),

@@ -33,6 +33,29 @@ class DeploymentSecurityAuditTest extends TestCase
         $this->assertNotNull(User::where('email', 'audit@example.test')->firstOrFail()->tokens()->firstOrFail()->expires_at);
     }
 
+    public function test_registration_can_be_closed_after_the_initial_administrator(): void
+    {
+        $this->administrator();
+        config(['services.ferm.public_registration' => false]);
+
+        $this->postJson('/api/v1/auth/register-admin', [
+            'name' => 'Inscription refusée',
+            'email' => 'registration-closed@example.test',
+            'password' => 'SecurePassword!123',
+        ])->assertForbidden();
+    }
+
+    public function test_api_responses_include_defensive_browser_headers(): void
+    {
+        $this->getJson('/api/v1/health')
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
+            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->assertHeader('Permissions-Policy', 'geolocation=(), microphone=(), payment=()')
+            ->assertHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'self'; base-uri 'none'");
+    }
+
     public function test_public_auth_rejects_cross_site_forms(): void
     {
         $this->post('/api/v1/auth/login', ['email' => 'attacker@example.test', 'password' => 'irrelevant'])->assertStatus(415);

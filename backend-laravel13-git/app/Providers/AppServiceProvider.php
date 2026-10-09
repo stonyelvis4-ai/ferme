@@ -97,6 +97,34 @@ class AppServiceProvider extends ServiceProvider
                     )),
             ];
         });
+
+        RateLimiter::for('api-authenticated', function (Request $request) {
+            $key = (string) ($request->user()?->id ?? 'guest').'|'.$request->ip();
+
+            return Limit::perMinute(180)->by($key)->response(
+                fn (Request $request, array $headers) => $this->tooManyAttemptsResponse('Trop de requêtes API. Réessayez dans un instant.', $headers)
+            );
+        });
+
+        RateLimiter::for('api-write', function (Request $request) {
+            $key = (string) ($request->user()?->id ?? 'guest').'|'.$request->ip();
+
+            return Limit::perMinute(60)->by($key)->response(
+                fn (Request $request, array $headers) => $this->tooManyAttemptsResponse('Trop de modifications en peu de temps. Réessayez dans un instant.', $headers)
+            );
+        });
+
+        RateLimiter::for('exports', function (Request $request) {
+            return Limit::perMinute(10)->by((string) ($request->user()?->id ?? 'guest'))->response(
+                fn (Request $request, array $headers) => $this->tooManyAttemptsResponse('Trop d’exports demandés. Réessayez dans un instant.', $headers)
+            );
+        });
+
+        RateLimiter::for('sync', function (Request $request) {
+            return Limit::perMinute(30)->by((string) ($request->user()?->id ?? 'guest'))->response(
+                fn (Request $request, array $headers) => $this->tooManyAttemptsResponse('Trop de synchronisations demandées. Réessayez dans un instant.', $headers)
+            );
+        });
     }
 
     private function tooManyAttemptsResponse(string $message, array $headers): JsonResponse

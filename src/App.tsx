@@ -777,7 +777,7 @@ export default function App() {
     const silent = options?.silent ?? false;
 
     try {
-      const snapshot = await loadWorkspaceSnapshot(token);
+      const snapshot = await loadWorkspaceSnapshot(token, authUser?.role ?? getStoredAuthUser<AuthUser>()?.role);
       const storedUser = getStoredAuthUser<AuthUser>();
       const getData = (payload: unknown) => {
         if (payload && typeof payload === 'object' && 'data' in payload) {
@@ -1488,7 +1488,7 @@ export default function App() {
     syncBusyRef.current = true;
     try {
     // Validate the session before replaying any local writes.
-    await loadWorkspaceSnapshot(authToken);
+    await loadWorkspaceSnapshot(authToken, authUser?.role ?? getStoredAuthUser<AuthUser>()?.role);
 
     const completedOperationIds = await flushDurableCreationOutbox();
     const localCache = readWorkspaceCache(authUser?.id);
