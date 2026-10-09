@@ -92,6 +92,41 @@ export interface AnimalFeedPlan {
   feedingsPerDay: number;
   targetDailyQuantityKg: number;
   startDate: string;
+  endDate?: string;
+  tasksEnabled?: boolean;
+  notes?: string;
+  isActive: boolean;
+}
+
+export interface FishFeedPlan {
+  id: string;
+  bassinId: string;
+  bassinName?: string;
+  articleId?: string;
+  articleName?: string;
+  planName: string;
+  rationMode: 'fixed_kg' | 'biomass_percent';
+  rationValue: number;
+  feedingsPerDay: number;
+  targetDailyQuantityKg: number;
+  startDate: string;
+  endDate?: string;
+  notes?: string;
+  isActive: boolean;
+}
+
+export interface CropNutritionPlan {
+  id: string;
+  campaignId: string;
+  campaignName?: string;
+  parcelleId: string;
+  parcelleName?: string;
+  parcelleArea: number;
+  articleId?: string;
+  articleName?: string;
+  planName: string;
+  doseKgPerHectare: number;
+  applicationDates: string[];
   notes?: string;
   isActive: boolean;
 }
@@ -108,6 +143,7 @@ export interface FishBassin {
   status: 'active' | 'harvested' | 'inactive';
   waterTemperature?: number;
   waterPh?: number;
+  biomassKg?: number;
   unitCost?: number;
   acquisitionCost?: number;
 }

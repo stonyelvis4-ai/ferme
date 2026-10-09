@@ -41,7 +41,8 @@ interface ElevageViewProps {
     feedingsPerDay: number,
     startDate: string,
     articleId?: string,
-    notes?: string
+    notes?: string,
+    endDate?: string
   ) => void;
   onRecordFeeding: (lotId: string, articleId: string, quantity: number, feedingDate: string, feedingTime?: string, notes?: string) => void;
   onRecordWeighing: (lotId: string, averageWeightKg: number, weighingDate: string, sampleSize?: number, notes?: string) => void;
@@ -90,6 +91,7 @@ export default function ElevageView({
   const [rationPerHeadKg, setRationPerHeadKg] = useState<number | ''>('');
   const [feedingsPerDay, setFeedingsPerDay] = useState<number | ''>(2);
   const [feedPlanStartDate, setFeedPlanStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [feedPlanEndDate, setFeedPlanEndDate] = useState('');
   const [feedPlanNotes, setFeedPlanNotes] = useState('');
 
   const [feedingLotId, setFeedingLotId] = useState('');
@@ -307,12 +309,14 @@ export default function ElevageView({
       normalizedFrequency,
       feedPlanStartDate,
       feedPlanArticleId || undefined,
-      feedPlanNotes
+      feedPlanNotes,
+      feedPlanEndDate || undefined
     );
 
     setFeedPlanLotId('');
     setFeedPlanArticleId('');
     setFeedPlanName('Plan standard');
+    setFeedPlanEndDate('');
     setRationPerHeadKg('');
     setFeedingsPerDay(2);
     setFeedPlanNotes('');
@@ -675,6 +679,12 @@ export default function ElevageView({
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Date de debut *</label>
               <input type="date" value={feedPlanStartDate} onChange={(e) => setFeedPlanStartDate(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" required />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Date de fin (facultative)</label>
+              <input type="date" min={feedPlanStartDate} value={feedPlanEndDate} onChange={(e) => setFeedPlanEndDate(e.target.value)} className="w-full border border-slate-300 bg-slate-50/70 rounded-xl p-3 text-sm text-slate-900 focus:border-lime-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-lime-100" />
+              <p className="mt-1 text-[10px] text-slate-500">Sans date de fin, la visibilité est maintenue à 30 jours.</p>
             </div>
           </div>
 
@@ -1275,7 +1285,7 @@ export default function ElevageView({
                   </div>
                   <div className="rounded-xl border border-slate-100 bg-white px-3 py-2">
                     <div className="text-slate-400">Debut</div>
-                    <div className="mt-1 font-bold text-slate-800">{plan.startDate}</div>
+                    <div className="mt-1 font-bold text-slate-800">{plan.startDate}{plan.endDate ? ` → ${plan.endDate}` : ''}</div>
                   </div>
                 </div>
 

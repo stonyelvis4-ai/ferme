@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\SanitaryController;
 use App\Http\Controllers\Api\StockController;
 use App\Http\Controllers\Api\TaskController;
+use App\Http\Controllers\Api\NutritionPlanController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -125,6 +126,14 @@ Route::prefix('v1')->group(function () {
                 Route::post('/pondeuses/feedings', [PondeusesController::class, 'feeding']);
                 Route::post('/pondeuses/weighings', [PondeusesController::class, 'weighing']);
                 Route::post('/pondeuses/feed-plans', [PondeusesController::class, 'feedPlan']);
+                Route::post('/pondeuses/feed-plans/{plan}/resync', [NutritionPlanController::class, 'resyncLayer']);
+                Route::patch('/pondeuses/feed-plans/{plan}', [NutritionPlanController::class, 'updateLayer']);
+                Route::post('/pisciculture/feed-plans', [NutritionPlanController::class, 'storeFish']);
+                Route::patch('/pisciculture/feed-plans/{plan}', [NutritionPlanController::class, 'updateFish']);
+                Route::post('/cultures/nutrition-plans', [NutritionPlanController::class, 'storeCrop']);
+                Route::patch('/cultures/nutrition-plans/{plan}', [NutritionPlanController::class, 'updateCrop']);
+                Route::post('/nutrition-plans/{type}/{plan}/deactivate', [NutritionPlanController::class, 'deactivate']);
+                Route::post('/nutrition-plan-occurrences/{occurrence}/complete', [NutritionPlanController::class, 'complete']);
                 Route::post('/cultures', [CulturesController::class, 'store']);
                 Route::patch('/cultures/{culture}', [CulturesController::class, 'update']);
                 Route::delete('/cultures/{culture}', [CulturesController::class, 'destroy']);

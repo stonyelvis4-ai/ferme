@@ -5,14 +5,17 @@
 
 import React, { useEffect, useState } from 'react';
 import { Sprout, Plus, Map, Layers, Lock, Scissors } from 'lucide-react';
-import { CultureParcelle, Campaign, UserRole } from '../types';
+import { CultureParcelle, Campaign, CropNutritionPlan, StockArticle, UserRole } from '../types';
 import AdminEntityActions from './AdminEntityActions';
 import FormDialog from './FormDialog';
+import CropNutritionPlanPanel, { CropNutritionPlanInput } from './CropNutritionPlanPanel';
 
 interface CulturesViewProps {
   role: UserRole;
   parcelles: CultureParcelle[];
   campaigns: Campaign[];
+  articles: StockArticle[];
+  nutritionPlans: CropNutritionPlan[];
   currency: string;
   onHarvestCampaign: (campaignId: string, actualYieldTons: number, salesRevenue: number) => void;
   onAddParcelle: (data: Omit<CultureParcelle, 'id'>) => void;
@@ -21,12 +24,17 @@ interface CulturesViewProps {
   onAddCampaign: (data: Omit<Campaign, 'id' | 'expenses' | 'revenues'>) => void;
   onUpdateCampaign: (campaignId: string, updates: Partial<Campaign>) => void;
   onDeleteCampaign: (campaignId: string) => void;
+  onCreateNutritionPlan: (plan: CropNutritionPlanInput) => void | Promise<void>;
+  onUpdateNutritionPlan: (planId: string, plan: CropNutritionPlanInput) => void | Promise<void>;
+  onDeactivateNutritionPlan: (planId: string) => void | Promise<void>;
 }
 
 export default function CulturesView({
   role,
   parcelles,
   campaigns,
+  articles,
+  nutritionPlans,
   currency,
   onHarvestCampaign,
   onAddParcelle,
@@ -34,7 +42,10 @@ export default function CulturesView({
   onDeleteParcelle,
   onAddCampaign,
   onUpdateCampaign,
-  onDeleteCampaign
+  onDeleteCampaign,
+  onCreateNutritionPlan,
+  onUpdateNutritionPlan,
+  onDeactivateNutritionPlan
 }: CulturesViewProps) {
   const [showParcelleForm, setShowParcelleForm] = useState(false);
   const [showCampaignForm, setShowCampaignForm] = useState(false);
@@ -166,6 +177,18 @@ export default function CulturesView({
           </span>
         )}
       </div>
+
+      <CropNutritionPlanPanel
+        role={role}
+        campaigns={campaigns}
+        parcelles={parcelles}
+        articles={articles}
+        plans={nutritionPlans}
+        currency={currency}
+        onCreate={onCreateNutritionPlan}
+        onUpdate={onUpdateNutritionPlan}
+        onDeactivate={onDeactivateNutritionPlan}
+      />
 
       {showParcelleForm && role === 'admin' && (
         <form onSubmit={handleCreateParcelle} className="bg-white border border-lime-100 p-5 rounded-2xl shadow-sm space-y-4">

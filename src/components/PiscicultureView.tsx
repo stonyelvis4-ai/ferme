@@ -14,21 +14,26 @@ import {
   Zap,
   History
 } from 'lucide-react';
-import { FishBassin, StockArticle, StockMovement, UserRole } from '../types';
+import { FishBassin, FishFeedPlan, StockArticle, StockMovement, UserRole } from '../types';
 import AdminEntityActions from './AdminEntityActions';
 import FormDialog from './FormDialog';
+import FishNutritionPlanPanel, { FishFeedPlanInput } from './FishNutritionPlanPanel';
 
 interface PiscicultureViewProps {
   role: UserRole;
   bassins: FishBassin[];
   articles: StockArticle[];
   movements: StockMovement[];
+  feedPlans: FishFeedPlan[];
   currency: string;
   onFeedFish: (bassinId: string, articleId: string, quantity: number) => void;
   onHarvestFish: (bassinId: string, harvestWeightKg: number, revenueAmount: number) => void;
   onAddBassin: (data: Omit<FishBassin, 'id' | 'currentCount' | 'mortalityCount'>) => void;
   onUpdateBassin: (bassinId: string, updates: Partial<FishBassin>) => void;
   onDeleteBassin: (bassinId: string) => void;
+  onCreateFeedPlan: (plan: FishFeedPlanInput) => void | Promise<void>;
+  onUpdateFeedPlan: (planId: string, plan: FishFeedPlanInput) => void | Promise<void>;
+  onDeactivateFeedPlan: (planId: string) => void | Promise<void>;
 }
 
 export default function PiscicultureView({
@@ -36,12 +41,16 @@ export default function PiscicultureView({
   bassins,
   articles,
   movements,
+  feedPlans,
   currency,
   onFeedFish,
   onHarvestFish,
   onAddBassin,
   onUpdateBassin,
-  onDeleteBassin
+  onDeleteBassin,
+  onCreateFeedPlan,
+  onUpdateFeedPlan,
+  onDeactivateFeedPlan
 }: PiscicultureViewProps) {
   const [selectedBassinId, setSelectedBassinId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -217,6 +226,17 @@ export default function PiscicultureView({
           </span>
         )}
       </div>
+
+      <FishNutritionPlanPanel
+        role={role}
+        bassins={bassins}
+        articles={articles}
+        plans={feedPlans}
+        currency={currency}
+        onCreate={onCreateFeedPlan}
+        onUpdate={onUpdateFeedPlan}
+        onDeactivate={onDeactivateFeedPlan}
+      />
 
       <section className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm" aria-labelledby="feeding-history-title">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

@@ -37,6 +37,8 @@ import {
   EggSale,
   AnimalFeeding,
   AnimalFeedPlan,
+  FishFeedPlan,
+  CropNutritionPlan,
   AnimalWeighing,
   FishBassin,
   CultureParcelle,
@@ -95,9 +97,11 @@ import {
   mapAuthUser,
   mapBuildings,
   mapCampaigns,
+  mapCropNutritionPlans,
   mapEggProductions,
   mapEggSales,
   mapFishBassins,
+  mapFishFeedPlans,
   mapLots,
   mapMovements,
   mapParcelles,
@@ -109,6 +113,8 @@ import {
   mapTreatments,
   mapSuppliers
 } from './services/fermMappers';
+import type { FishFeedPlanInput } from './components/FishNutritionPlanPanel';
+import type { CropNutritionPlanInput } from './components/CropNutritionPlanPanel';
 import {
   enqueueOfflineOperation,
   listReadyOfflineOperations,
@@ -149,10 +155,12 @@ type WorkspaceLocalCache = {
   eggSales: EggSale[];
   animalFeedings: AnimalFeeding[];
   animalFeedPlans: AnimalFeedPlan[];
+  fishFeedPlans: FishFeedPlan[];
   animalWeighings: AnimalWeighing[];
   fishBassins: FishBassin[];
   parcelles: CultureParcelle[];
   campaigns: Campaign[];
+  cropNutritionPlans: CropNutritionPlan[];
   articles: StockArticle[];
   movements: StockMovement[];
   transactions: FinanceTransaction[];
@@ -220,10 +228,12 @@ function createPendingWorkspaceCache(localCache: WorkspaceLocalCache): Workspace
     eggSales: [],
     animalFeedings: [],
     animalFeedPlans: [],
+    fishFeedPlans: [],
     animalWeighings: [],
     fishBassins: [],
     parcelles: [],
     campaigns: [],
+    cropNutritionPlans: [],
     articles: [],
     movements: [],
     transactions: [],
@@ -244,10 +254,12 @@ function countPendingWorkspaceEntries(localCache: WorkspaceLocalCache | null) {
     localCache.eggSales,
     localCache.animalFeedings,
     localCache.animalFeedPlans,
+    localCache.fishFeedPlans,
     localCache.animalWeighings,
     localCache.fishBassins,
     localCache.parcelles,
     localCache.campaigns,
+    localCache.cropNutritionPlans,
     localCache.articles,
     localCache.transactions,
     localCache.tasks,
@@ -688,10 +700,12 @@ export default function App() {
   const [eggSales, setEggSales] = useState<EggSale[]>([]);
   const [animalFeedings, setAnimalFeedings] = useState<AnimalFeeding[]>([]);
   const [animalFeedPlans, setAnimalFeedPlans] = useState<AnimalFeedPlan[]>([]);
+  const [fishFeedPlans, setFishFeedPlans] = useState<FishFeedPlan[]>([]);
   const [animalWeighings, setAnimalWeighings] = useState<AnimalWeighing[]>([]);
   const [fishBassins, setFishBassins] = useState<FishBassin[]>([]);
   const [parcelles, setParcelles] = useState<CultureParcelle[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [cropNutritionPlans, setCropNutritionPlans] = useState<CropNutritionPlan[]>([]);
   const [articles, setArticles] = useState<StockArticle[]>([]);
   const [stockCategories, setStockCategories] = useState<StockCategoryOption[]>([]);
   const [stockSuppliers, setStockSuppliers] = useState<SupplierOption[]>([]);
@@ -813,6 +827,7 @@ export default function App() {
       const mappedAnimalFeedPlans = mapAnimalFeedPlans(((layersObject.feed_plans ?? []) as unknown[]) ?? []);
       const mappedAnimalWeighings = mapAnimalWeighings(((layersObject.weighings ?? []) as unknown[]) ?? []);
       const mappedBassins = mapFishBassins(((pondObject.ponds ?? pondObject.data ?? []) as unknown[]) ?? []);
+      const mappedFishFeedPlans = mapFishFeedPlans(((pondObject.feed_plans ?? []) as unknown[]) ?? []);
       const rawPlots = ((culturesObject.plots ?? culturesObject.data ?? []) as unknown[]) ?? [];
       const rawCrops = ((culturesObject.crops ?? culturesObject.data ?? []) as unknown[]) ?? [];
       const stockMeta = (stocksObject.meta && typeof stocksObject.meta === 'object' && !Array.isArray(stocksObject.meta))
@@ -820,6 +835,7 @@ export default function App() {
         : {};
       const mappedParcelles = mapParcelles(rawPlots);
       const mappedCampaigns = mapCampaigns(rawCrops, rawPlots);
+      const mappedCropNutritionPlans = mapCropNutritionPlans(((culturesObject.nutrition_plans ?? []) as unknown[]) ?? []);
       const mappedBuildings = mapBuildings(((infraObject.buildings ?? []) as unknown[]) ?? []);
       const mappedArticles = mapArticles(((stocksObject.items ?? []) as unknown[]) ?? []);
       const mappedMovements = mapMovements(((stocksObject.movements ?? []) as unknown[]) ?? []);
@@ -875,8 +891,10 @@ export default function App() {
       setAnimalFeedPlans(pickMapped(layersObject.feed_plans, mappedAnimalFeedPlans, localCache?.animalFeedPlans ?? mappedAnimalFeedPlans));
       setAnimalWeighings(pickMapped(layersObject.weighings, mappedAnimalWeighings, localCache?.animalWeighings ?? mappedAnimalWeighings));
       setFishBassins(pickMapped(pondObject.ponds ?? pondObject.data, mappedBassins, localCache?.fishBassins ?? mappedBassins));
+      setFishFeedPlans(pickMapped(pondObject.feed_plans, mappedFishFeedPlans, localCache?.fishFeedPlans ?? mappedFishFeedPlans));
       setParcelles(pickMapped(culturesObject.plots ?? culturesObject.data, mappedParcelles, localCache?.parcelles ?? mappedParcelles));
       setCampaigns(pickMapped(culturesObject.crops ?? culturesObject.data, mappedCampaigns, localCache?.campaigns ?? mappedCampaigns));
+      setCropNutritionPlans(pickMapped(culturesObject.nutrition_plans, mappedCropNutritionPlans, localCache?.cropNutritionPlans ?? mappedCropNutritionPlans));
       setArticles(pickMapped(stocksObject.items, mappedArticles, localCache?.articles ?? mappedArticles));
       setStockCategories(mappedStockCategories);
       setStockSuppliers(mappedSuppliers);
@@ -925,10 +943,12 @@ export default function App() {
         setEggSales(localCache.eggSales ?? []);
         setAnimalFeedings(localCache.animalFeedings);
         setAnimalFeedPlans(localCache.animalFeedPlans ?? []);
+        setFishFeedPlans(localCache.fishFeedPlans ?? []);
         setAnimalWeighings(localCache.animalWeighings ?? []);
         setFishBassins(localCache.fishBassins);
         setParcelles(localCache.parcelles);
         setCampaigns(localCache.campaigns);
+        setCropNutritionPlans(localCache.cropNutritionPlans ?? []);
         setArticles(localCache.articles);
         setMovements(localCache.movements);
         setTransactions(localCache.transactions);
@@ -1077,10 +1097,12 @@ export default function App() {
       eggSales,
       animalFeedings,
       animalFeedPlans,
+      fishFeedPlans,
       animalWeighings,
       fishBassins,
       parcelles,
       campaigns,
+      cropNutritionPlans,
       articles,
       movements,
       transactions,
@@ -1096,10 +1118,12 @@ export default function App() {
     authToken,
     animalFeedings,
     animalFeedPlans,
+    fishFeedPlans,
     animalWeighings,
     authUser?.id,
     buildings,
     campaigns,
+    cropNutritionPlans,
     eggProductions,
     eggSales,
     fishBassins,
@@ -1920,7 +1944,8 @@ export default function App() {
     feedingsPerDay: number,
     startDate: string,
     articleId?: string,
-    notes?: string
+    notes?: string,
+    endDate?: string
   ) => {
     const targetLot = lots.find((lot) => lot.id === lotId);
     const targetArticle = articleId ? articles.find((article) => article.id === articleId) : undefined;
@@ -1939,6 +1964,7 @@ export default function App() {
       feedingsPerDay,
       targetDailyQuantityKg,
       startDate,
+      endDate,
       notes: notes?.trim() || '',
       isActive: true,
     };
@@ -1972,7 +1998,9 @@ export default function App() {
               feedings_per_day: feedingsPerDay,
               target_daily_quantity_kg: targetDailyQuantityKg,
               start_date: startDate,
+              end_date: endDate ?? null,
               notes: notes?.trim() || '',
+              tasks_enabled: true,
               is_active: true,
             },
             authToken
@@ -2087,6 +2115,76 @@ export default function App() {
       `Vente de plateaux d'œufs`,
       `Œufs vendus: ${count}, Revenu: ${revenue} ${settings.currency}, Stock restant: ${newStock}`
     );
+  };
+
+  const handleCreateFishFeedPlan = async (plan: FishFeedPlanInput) => {
+    if (!authToken || !activeFarmId) throw new Error('Connectez-vous à la ferme avant de programmer un plan.');
+    try {
+      const response = await postJson('/pisciculture/feed-plans', {
+        farm_id: Number(activeFarmId), fish_pond_id: Number(plan.bassinId), stock_item_id: Number(plan.articleId),
+        plan_name: plan.planName, ration_mode: plan.rationMode, ration_value: plan.rationValue,
+        feedings_per_day: plan.feedingsPerDay, start_date: plan.startDate, end_date: plan.endDate ?? null, notes: plan.notes ?? '',
+      }, authToken);
+      const mapped = mapFishFeedPlans([response.data])[0];
+      if (mapped) setFishFeedPlans((previous) => [mapped, ...previous.filter((item) => item.bassinId !== mapped.bassinId)]);
+      pushNotice('success', 'Plan piscicole programmé', 'Les 30 prochains jours de tâches sont prêts ; le stock ne sera sorti qu’après validation du réel.');
+    } catch (error) {
+      pushNotice('error', 'Plan piscicole non créé', error instanceof Error ? error.message : 'Réessayez après avoir vérifié la connexion.');
+      throw error;
+    }
+  };
+
+  const handleUpdateFishFeedPlan = async (planId: string, plan: FishFeedPlanInput) => {
+    if (!authToken || !/^\d+$/.test(planId)) throw new Error('Ce plan doit être synchronisé avant modification.');
+    const response = await patchJson(`/pisciculture/feed-plans/${planId}`, {
+      fish_pond_id: Number(plan.bassinId), stock_item_id: Number(plan.articleId), plan_name: plan.planName,
+      ration_mode: plan.rationMode, ration_value: plan.rationValue, feedings_per_day: plan.feedingsPerDay,
+      start_date: plan.startDate, end_date: plan.endDate ?? null, notes: plan.notes ?? '',
+    }, authToken);
+    const mapped = mapFishFeedPlans([response.data])[0];
+    if (mapped) setFishFeedPlans((previous) => [mapped, ...previous.filter((item) => item.id !== planId && item.bassinId !== mapped.bassinId)]);
+    pushNotice('success', 'Plan piscicole remplacé', 'Les tâches futures de l’ancien plan ont été annulées puis régénérées.');
+  };
+
+  const handleDeactivateFishFeedPlan = async (planId: string) => {
+    if (!authToken || !/^\d+$/.test(planId)) return;
+    await postJson(`/nutrition-plans/fish/${planId}/deactivate`, {}, authToken);
+    setFishFeedPlans((previous) => previous.map((plan) => plan.id === planId ? { ...plan, isActive: false } : plan));
+    pushNotice('success', 'Plan piscicole arrêté', 'Les tâches futures associées ont été annulées.');
+  };
+
+  const handleCreateCropNutritionPlan = async (plan: CropNutritionPlanInput) => {
+    if (!authToken || !activeFarmId) throw new Error('Connectez-vous à la ferme avant de programmer un plan.');
+    try {
+      const response = await postJson('/cultures/nutrition-plans', {
+        farm_id: Number(activeFarmId), crop_id: Number(plan.campaignId), plot_id: Number(plan.parcelleId), stock_item_id: Number(plan.articleId),
+        plan_name: plan.planName, dose_kg_per_hectare: plan.doseKgPerHectare, application_dates: plan.applicationDates, notes: plan.notes ?? '',
+      }, authToken);
+      const mapped = mapCropNutritionPlans([response.data])[0];
+      if (mapped) setCropNutritionPlans((previous) => [mapped, ...previous.filter((item) => item.campaignId !== mapped.campaignId)]);
+      pushNotice('success', 'Apports planifiés', 'Les tâches d’application sont prêtes ; aucune sortie de stock n’a été faite.');
+    } catch (error) {
+      pushNotice('error', 'Plan de fertilisation non créé', error instanceof Error ? error.message : 'Réessayez après avoir vérifié la connexion.');
+      throw error;
+    }
+  };
+
+  const handleUpdateCropNutritionPlan = async (planId: string, plan: CropNutritionPlanInput) => {
+    if (!authToken || !/^\d+$/.test(planId)) throw new Error('Ce plan doit être synchronisé avant modification.');
+    const response = await patchJson(`/cultures/nutrition-plans/${planId}`, {
+      crop_id: Number(plan.campaignId), plot_id: Number(plan.parcelleId), stock_item_id: Number(plan.articleId), plan_name: plan.planName,
+      dose_kg_per_hectare: plan.doseKgPerHectare, application_dates: plan.applicationDates, notes: plan.notes ?? '',
+    }, authToken);
+    const mapped = mapCropNutritionPlans([response.data])[0];
+    if (mapped) setCropNutritionPlans((previous) => [mapped, ...previous.filter((item) => item.id !== planId && item.campaignId !== mapped.campaignId)]);
+    pushNotice('success', 'Plan de fertilisation remplacé', 'Les futures tâches de l’ancien plan ont été remplacées.');
+  };
+
+  const handleDeactivateCropNutritionPlan = async (planId: string) => {
+    if (!authToken || !/^\d+$/.test(planId)) return;
+    await postJson(`/nutrition-plans/crop/${planId}/deactivate`, {}, authToken);
+    setCropNutritionPlans((previous) => previous.map((plan) => plan.id === planId ? { ...plan, isActive: false } : plan));
+    pushNotice('success', 'Plan de fertilisation arrêté', 'Les applications à venir ont été annulées.');
   };
 
   // 8. Feed Fish (distribute pellets from stock)
@@ -2728,6 +2826,23 @@ export default function App() {
       `Modification du statut de la tâche : ${currentTask.title}`,
       `Nouveau statut : ${newStatus}`
     );
+  };
+
+  const handleCompleteNutritionOccurrence = async (occurrenceId: string, actualQuantityKg: number, stockItemId?: string, notes?: string) => {
+    if (!authToken || !/^\d+$/.test(occurrenceId)) throw new Error('Cette tâche nutritionnelle doit être synchronisée avant validation.');
+    const response = await postJson(`/nutrition-plan-occurrences/${occurrenceId}/complete`, {
+      actual_quantity_kg: actualQuantityKg,
+      ...(stockItemId ? { stock_item_id: Number(stockItemId) } : {}),
+      notes: notes ?? '',
+    }, authToken);
+    const occurrence = response.data && typeof response.data === 'object' ? response.data as Record<string, unknown> : {};
+    const completedTaskId = occurrence.task && typeof occurrence.task === 'object'
+      ? String((occurrence.task as Record<string, unknown>).id ?? '')
+      : '';
+    if (completedTaskId) setTasks((previous) => previous.map((task) => task.id === completedTaskId ? { ...task, status: 'completed' } : task));
+    if (stockItemId) setArticles((previous) => previous.map((article) => article.id === stockItemId ? { ...article, quantity: Math.max(0, article.quantity - actualQuantityKg) } : article));
+    pushNotice('success', 'Réel validé', 'La sortie de stock et la traçabilité métier ont été enregistrées.');
+    void hydrateWorkspace(authToken, { silent: true });
   };
 
   // 14. Dismiss Alert
@@ -3809,9 +3924,12 @@ const handleDeleteStockArticle = async (articleId: string) => {
     setBuildings([]);
     setLots([]);
     setEggProductions([]);
+    setAnimalFeedPlans([]);
+    setFishFeedPlans([]);
     setFishBassins([]);
     setParcelles([]);
     setCampaigns([]);
+    setCropNutritionPlans([]);
     setArticles([]);
     setMovements([]);
     setTransactions([]);
@@ -4564,12 +4682,16 @@ const handleDeleteStockArticle = async (articleId: string) => {
                 bassins={fishBassins}
                 articles={articles}
                 movements={movements}
+                feedPlans={fishFeedPlans}
                 currency={settings.currency}
                 onFeedFish={handleFeedFish}
                 onHarvestFish={handleHarvestFish}
                 onAddBassin={handleAddBassin}
                 onUpdateBassin={handleUpdateBassin}
                 onDeleteBassin={handleDeleteBassin}
+                onCreateFeedPlan={handleCreateFishFeedPlan}
+                onUpdateFeedPlan={handleUpdateFishFeedPlan}
+                onDeactivateFeedPlan={handleDeactivateFishFeedPlan}
               />
             )}
 
@@ -4578,6 +4700,8 @@ const handleDeleteStockArticle = async (articleId: string) => {
                 role={role}
                 parcelles={parcelles}
                 campaigns={campaigns}
+                articles={articles}
+                nutritionPlans={cropNutritionPlans}
                 currency={settings.currency}
                 onHarvestCampaign={handleHarvestCampaign}
                 onAddParcelle={handleAddParcelle}
@@ -4586,6 +4710,9 @@ const handleDeleteStockArticle = async (articleId: string) => {
                 onAddCampaign={handleAddCampaign}
                 onUpdateCampaign={handleUpdateCampaign}
                 onDeleteCampaign={handleDeleteCampaign}
+                onCreateNutritionPlan={handleCreateCropNutritionPlan}
+                onUpdateNutritionPlan={handleUpdateCropNutritionPlan}
+                onDeactivateNutritionPlan={handleDeactivateCropNutritionPlan}
               />
             )}
 
@@ -4654,6 +4781,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
               <AgendaView
                 role={role}
                 tasks={tasks}
+                articles={articles}
                 onToggleTaskStatus={handleToggleTaskStatus}
               />
             )}
@@ -4666,6 +4794,7 @@ const handleDeleteStockArticle = async (articleId: string) => {
                 onToggleTaskStatus={handleToggleTaskStatus}
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
+                onCompleteNutritionOccurrence={handleCompleteNutritionOccurrence}
               />
             )}
 

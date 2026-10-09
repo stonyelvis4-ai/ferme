@@ -25,8 +25,10 @@ class StoreLayerFeedPlanRequest extends FormRequest
             'feedings_per_day' => ['required', 'integer', 'min:1', 'max:12'],
             'target_daily_quantity_kg' => ['nullable', 'numeric', 'min:0'],
             'start_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['sometimes', 'boolean'],
+            'tasks_enabled' => ['sometimes', 'boolean'],
         ];
     }
 }

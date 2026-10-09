@@ -12,6 +12,8 @@ use App\Http\Requests\Pisciculture\UpdateFishPondRequest;
 use App\Models\FishHarvest;
 use App\Models\FishMonitoring;
 use App\Models\FishPond;
+use App\Models\FishFeedPlan;
+use App\Models\NutritionPlanOccurrence;
 use App\Models\FishSale;
 use App\Models\FishStocking;
 use App\Services\PiscicultureService;
@@ -34,6 +36,19 @@ class PiscicultureController extends Controller
                 ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
                 ->withCount(['stockings', 'monitorings', 'harvests', 'sales'])
                 ->latest()
+                ->get(),
+            'feed_plans' => FishFeedPlan::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->with(['pond:id,name,biomass_kg', 'stockItem:id,name,unit,current_quantity,unit_cost'])
+                ->latest()
+                ->get(),
+            'nutrition_occurrences' => NutritionPlanOccurrence::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->where('plan_type', 'fish')
+                ->with('task:id,status,due_at')
+                ->whereDate('scheduled_for', '>=', now()->toDateString())
+                ->orderBy('scheduled_for')
+                ->limit(30)
                 ->get(),
             'stockings' => FishStocking::query()
                 ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
