@@ -2,6 +2,17 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
+use App\Services\NutritionPlanService;
+
+Schedule::command('ferm:alerts:evaluate')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Schedule::call(fn (NutritionPlanService $plans) => $plans->maintainHorizon())
+    ->dailyAt('00:10')
+    ->name('ferm:nutrition:maintain-horizon')
+    ->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

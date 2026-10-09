@@ -11,10 +11,12 @@ use App\Http\Requests\Cultures\StorePlotRequest;
 use App\Http\Requests\Cultures\UpdatePlotRequest;
 use App\Http\Requests\Cultures\UpdateCropRequest;
 use App\Models\Crop;
+use App\Models\CropNutritionPlan;
 use App\Models\CropHarvest;
 use App\Models\CropOperation;
 use App\Models\CropSale;
 use App\Models\Plot;
+use App\Models\NutritionPlanOccurrence;
 use App\Services\CulturesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,6 +47,19 @@ class CulturesController extends Controller
                 ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
                 ->latest()
                 ->limit(100)
+                ->get(),
+            'nutrition_plans' => CropNutritionPlan::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->with(['crop:id,name', 'plot:id,name,area', 'stockItem:id,name,unit,current_quantity,unit_cost'])
+                ->latest()
+                ->get(),
+            'nutrition_occurrences' => NutritionPlanOccurrence::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->where('plan_type', 'crop')
+                ->with('task:id,status,due_at')
+                ->whereDate('scheduled_for', '>=', now()->toDateString())
+                ->orderBy('scheduled_for')
+                ->limit(30)
                 ->get(),
             'harvests' => CropHarvest::query()
                 ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))

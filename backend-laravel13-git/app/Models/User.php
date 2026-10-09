@@ -27,6 +27,7 @@ class User extends Authenticatable
         'is_active',
         'last_login_at',
         'last_activity_at',
+        'preferences',
     ];
 
     protected $hidden = [
@@ -38,6 +39,7 @@ class User extends Authenticatable
         'is_active' => 'boolean',
         'last_login_at' => 'datetime',
         'last_activity_at' => 'datetime',
+        'preferences' => 'array',
         'role' => Role::class,
     ];
 

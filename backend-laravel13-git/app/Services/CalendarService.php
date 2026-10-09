@@ -10,6 +10,11 @@ class CalendarService
     public function syncFromTask(Task $task): ?CalendarEvent
     {
         if (! $task->start_at && ! $task->due_at) {
+            CalendarEvent::query()
+                ->where('farm_id', $task->farm_id)
+                ->where('linked_task_id', $task->id)
+                ->delete();
+
             return null;
         }
 
@@ -30,5 +35,13 @@ class CalendarService
                 'source_entity_id' => $task->source_entity_id ?? (string) $task->id,
             ]
         );
+    }
+
+    public function forgetTask(Task $task): void
+    {
+        CalendarEvent::query()
+            ->where('farm_id', $task->farm_id)
+            ->where('linked_task_id', $task->id)
+            ->delete();
     }
 }

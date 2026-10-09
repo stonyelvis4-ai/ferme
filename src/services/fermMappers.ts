@@ -13,6 +13,8 @@ import {
   EggSale,
   AnimalFeeding,
   AnimalFeedPlan,
+  FishFeedPlan,
+  CropNutritionPlan,
   AnimalWeighing,
   FarmSettings,
   FinanceTransaction,
@@ -59,6 +61,14 @@ const labelOrFallback = (value: unknown, fallback: string) => {
 export function mapAuthUser(data: unknown): AuthUser | null {
   if (!data || typeof data !== 'object') return null;
   const item = data as Record<string, unknown>;
+  const rawPreferences = item.preferences && typeof item.preferences === 'object'
+    ? item.preferences as Record<string, unknown>
+    : {};
+  const rawDefaultView = toText(rawPreferences.default_view, 'dashboard');
+  const defaultView = ['dashboard', 'agenda', 'tasks', 'alerts'].includes(rawDefaultView)
+    ? rawDefaultView as NonNullable<AuthUser['preferences']>['default_view']
+    : 'dashboard';
+  const alertVolume = Math.min(Math.max(toNumber(rawPreferences.alert_volume, 100), 0), 100);
 
   return {
     id: item.id as string | number,
@@ -70,6 +80,13 @@ export function mapAuthUser(data: unknown): AuthUser | null {
     farm_id: (item.farm_id as string | number | null | undefined) ?? null,
     last_login_at: item.last_login_at ? toText(item.last_login_at, null as unknown as string) : null,
     last_activity_at: item.last_activity_at ? toText(item.last_activity_at, null as unknown as string) : null,
+    preferences: {
+      sound_alerts: rawPreferences.sound_alerts !== false,
+      warning_alerts: rawPreferences.warning_alerts !== false,
+      critical_alerts: rawPreferences.critical_alerts !== false,
+      alert_volume: alertVolume,
+      default_view: defaultView,
+    },
   };
 }
 
@@ -253,6 +270,61 @@ export function mapAnimalFeedPlans(data: unknown[]): AnimalFeedPlan[] {
       feedingsPerDay: toNumber(plan.feedings_per_day ?? plan.feedingsPerDay, 1),
       targetDailyQuantityKg: toNumber(plan.target_daily_quantity_kg ?? plan.targetDailyQuantityKg, 0),
       startDate: toDate(plan.start_date ?? plan.startDate),
+      endDate: plan.end_date ?? plan.endDate ? toDate(plan.end_date ?? plan.endDate) : undefined,
+      tasksEnabled: Boolean(plan.tasks_enabled ?? plan.tasksEnabled ?? true),
+      notes: toText(plan.notes, ''),
+      isActive: Boolean(plan.is_active ?? plan.isActive ?? true),
+    };
+  });
+}
+
+export function mapFishFeedPlans(data: unknown[]): FishFeedPlan[] {
+  return data.map((item, index) => {
+    const plan = item as Record<string, unknown>;
+    const pond = (plan.pond ?? plan.fish_pond ?? {}) as Record<string, unknown>;
+    const stockItem = (plan.stock_item ?? plan.stockItem ?? {}) as Record<string, unknown>;
+
+    return {
+      id: toText(plan.id, `fish-plan-${index + 1}`),
+      bassinId: toText(plan.fish_pond_id ?? plan.bassinId, ''),
+      bassinName: toText(pond.name ?? plan.bassin_name ?? plan.bassinName, ''),
+      articleId: toText(plan.stock_item_id ?? plan.articleId, ''),
+      articleName: toText(stockItem.name ?? plan.article_name ?? plan.articleName, ''),
+      planName: labelOrFallback(plan.plan_name ?? plan.planName, 'Plan d’alimentation'),
+      rationMode: (toText(plan.ration_mode ?? plan.rationMode, 'fixed_kg') as FishFeedPlan['rationMode']) || 'fixed_kg',
+      rationValue: toNumber(plan.ration_value ?? plan.rationValue, 0),
+      feedingsPerDay: toNumber(plan.feedings_per_day ?? plan.feedingsPerDay, 1),
+      targetDailyQuantityKg: toNumber(plan.target_daily_quantity_kg ?? plan.targetDailyQuantityKg, 0),
+      startDate: toDate(plan.start_date ?? plan.startDate),
+      endDate: plan.end_date ?? plan.endDate ? toDate(plan.end_date ?? plan.endDate) : undefined,
+      notes: toText(plan.notes, ''),
+      isActive: Boolean(plan.is_active ?? plan.isActive ?? true),
+    };
+  });
+}
+
+export function mapCropNutritionPlans(data: unknown[]): CropNutritionPlan[] {
+  return data.map((item, index) => {
+    const plan = item as Record<string, unknown>;
+    const crop = (plan.crop ?? {}) as Record<string, unknown>;
+    const plot = (plan.plot ?? plan.parcelle ?? {}) as Record<string, unknown>;
+    const stockItem = (plan.stock_item ?? plan.stockItem ?? {}) as Record<string, unknown>;
+    const dates = Array.isArray(plan.application_dates ?? plan.applicationDates)
+      ? (plan.application_dates ?? plan.applicationDates) as unknown[]
+      : [];
+
+    return {
+      id: toText(plan.id, `crop-plan-${index + 1}`),
+      campaignId: toText(plan.crop_id ?? plan.campaignId, ''),
+      campaignName: toText(crop.name ?? plan.campaign_name ?? plan.campaignName, ''),
+      parcelleId: toText(plan.plot_id ?? plan.parcelleId, ''),
+      parcelleName: toText(plot.name ?? plan.parcelle_name ?? plan.parcelleName, ''),
+      parcelleArea: toNumber(plot.area ?? plan.parcelle_area ?? plan.parcelleArea, 0),
+      articleId: toText(plan.stock_item_id ?? plan.articleId, ''),
+      articleName: toText(stockItem.name ?? plan.article_name ?? plan.articleName, ''),
+      planName: labelOrFallback(plan.plan_name ?? plan.planName, 'Plan de fertilisation'),
+      doseKgPerHectare: toNumber(plan.dose_kg_per_hectare ?? plan.doseKgPerHectare, 0),
+      applicationDates: dates.map((date) => toDate(date)).filter(Boolean),
       notes: toText(plan.notes, ''),
       isActive: Boolean(plan.is_active ?? plan.isActive ?? true),
     };
@@ -274,6 +346,7 @@ export function mapFishBassins(data: unknown[]): FishBassin[] {
       status: (toText(pond.status, 'active') as FishBassin['status']) || 'active',
       waterTemperature: pond.water_temperature ?? pond.waterTemperature ? toNumber(pond.water_temperature ?? pond.waterTemperature, 0) : undefined,
       waterPh: pond.ph ?? pond.water_ph ?? pond.waterPh ? toNumber(pond.ph ?? pond.water_ph ?? pond.waterPh, 0) : undefined,
+      biomassKg: toNumber(pond.biomass_kg ?? pond.biomassKg, 0),
       unitCost: toNumber(pond.unit_cost ?? pond.unitCost, 0),
       acquisitionCost: toNumber(pond.acquisition_cost ?? pond.acquisitionCost, 0),
     };

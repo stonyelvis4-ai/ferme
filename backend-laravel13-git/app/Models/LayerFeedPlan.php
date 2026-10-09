@@ -19,8 +19,10 @@ class LayerFeedPlan extends Model
         'feedings_per_day',
         'target_daily_quantity_kg',
         'start_date',
+        'end_date',
         'notes',
         'is_active',
+        'tasks_enabled',
     ];
 
     protected $casts = [
@@ -28,7 +30,9 @@ class LayerFeedPlan extends Model
         'feedings_per_day' => 'integer',
         'target_daily_quantity_kg' => 'decimal:3',
         'start_date' => 'date',
+        'end_date' => 'date',
         'is_active' => 'boolean',
+        'tasks_enabled' => 'boolean',
     ];
 
     public function batch(): BelongsTo

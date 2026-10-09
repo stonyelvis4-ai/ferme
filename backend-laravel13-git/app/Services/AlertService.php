@@ -17,7 +17,7 @@ class AlertService
 {
     public function createOverdueTaskAlert(Task $task): Alert
     {
-        return Alert::firstOrCreate(
+        return $this->open(
             [
                 'farm_id' => $task->farm_id,
                 'type' => 'task_overdue',
@@ -36,7 +36,7 @@ class AlertService
 
     public function createLowStockAlert(StockItem $item): Alert
     {
-        return Alert::firstOrCreate(
+        return $this->open(
             [
                 'farm_id' => $item->farm_id,
                 'type' => 'low_stock',
@@ -57,6 +57,44 @@ class AlertService
                 'status' => 'open',
             ]
         );
+    }
+
+    public function createTaskReminderAlert(Task $task): Alert
+    {
+        return $this->open(
+            [
+                'farm_id' => $task->farm_id,
+                'type' => 'task_reminder',
+                'source_entity_type' => 'task',
+                'source_entity_id' => (string) $task->id,
+            ],
+            [
+                'severity' => 'low',
+                'title' => sprintf('Rappel: %s', $task->title),
+                'description' => $task->description ?? 'Une tâche planifiée arrive à échéance.',
+                'source_module' => 'tasks',
+                'status' => 'open',
+            ]
+        );
+    }
+
+    /**
+     * Keep one current alert per source while reopening it when the triggering
+     * condition is still present after it was previously marked as resolved.
+     */
+    private function open(array $identity, array $values): Alert
+    {
+        $alert = Alert::firstOrCreate($identity, $values);
+
+        if ($alert->status === 'resolved') {
+            $alert->update([
+                ...$values,
+                'status' => 'open',
+                'resolved_at' => null,
+            ]);
+        }
+
+        return $alert;
     }
 
     public function createFishWaterAlert(int $farmId, FishPond $pond, string $type, string $title, string $description): Alert

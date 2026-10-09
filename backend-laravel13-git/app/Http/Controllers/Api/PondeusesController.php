@@ -16,13 +16,15 @@ use App\Models\LayerBatch;
 use App\Models\LayerFeedPlan;
 use App\Models\LayerFeeding;
 use App\Models\LayerWeighing;
+use App\Models\NutritionPlanOccurrence;
 use App\Services\LayerService;
+use App\Services\NutritionPlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PondeusesController extends Controller
 {
-    public function __construct(private readonly LayerService $layerService)
+    public function __construct(private readonly LayerService $layerService, private readonly NutritionPlanService $nutritionPlans)
     {
     }
 
@@ -67,6 +69,14 @@ class PondeusesController extends Controller
                 ->latest('start_date')
                 ->latest()
                 ->limit(100)
+                ->get(),
+            'nutrition_occurrences' => NutritionPlanOccurrence::query()
+                ->when($farmId, fn ($q) => $q->where('farm_id', $farmId))
+                ->where('plan_type', 'layer')
+                ->with('task:id,status,due_at')
+                ->whereDate('scheduled_for', '>=', now()->toDateString())
+                ->orderBy('scheduled_for')
+                ->limit(30)
                 ->get(),
         ]);
     }
@@ -132,7 +142,15 @@ class PondeusesController extends Controller
 
     public function feedPlan(StoreLayerFeedPlanRequest $request): JsonResponse
     {
-        $plan = $this->layerService->createFeedPlan($request->validated());
+        $data = $request->validated();
+        LayerFeedPlan::query()
+            ->where('farm_id', $data['farm_id'])
+            ->where('layer_batch_id', $data['layer_batch_id'])
+            ->where('is_active', true)
+            ->get()
+            ->each(fn (LayerFeedPlan $existing) => $this->nutritionPlans->deactivate('layer', $existing->id, (int) $data['farm_id']));
+        $plan = $this->layerService->createFeedPlan($data);
+        $this->nutritionPlans->syncLayerPlan($plan);
 
         return response()->json(['data' => $plan], 201);
     }

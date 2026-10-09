@@ -13,10 +13,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->api(prepend: [\App\Http\Middleware\ValidateApiOrigin::class]);
+        $middleware->api(
+            prepend: [\App\Http\Middleware\ValidateApiOrigin::class],
+            append: [\App\Http\Middleware\SecureApiResponse::class],
+        );
         $middleware->prependToPriorityList(
             \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
             \App\Http\Middleware\PromoteApiTokenCookie::class,
+        );
+        // Run idempotency after authentication, but before route model binding so a
+        // replayed DELETE can return its saved response after the model is gone.
+        $middleware->appendToPriorityList(
+            \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            \App\Http\Middleware\IdempotentCreation::class,
         );
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,

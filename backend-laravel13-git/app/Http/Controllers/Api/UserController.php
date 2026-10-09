@@ -67,6 +67,48 @@ class UserController extends Controller
         return response()->json(['data' => $user]);
     }
 
+    public function updateMyPreferences(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 401);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
+            'preferences' => ['required', 'array'],
+            'preferences.sound_alerts' => ['required', 'boolean'],
+            'preferences.warning_alerts' => ['required', 'boolean'],
+            'preferences.critical_alerts' => ['required', 'boolean'],
+            'preferences.alert_volume' => ['required', 'integer', 'min:0', 'max:100'],
+            'preferences.default_view' => ['required', 'in:dashboard,agenda,tasks,alerts'],
+        ]);
+
+        $preferences = $data['preferences'];
+        $user->forceFill([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'preferences' => [
+                'sound_alerts' => (bool) $preferences['sound_alerts'],
+                'warning_alerts' => (bool) $preferences['warning_alerts'],
+                'critical_alerts' => (bool) $preferences['critical_alerts'],
+                'alert_volume' => (int) $preferences['alert_volume'],
+                'default_view' => $preferences['default_view'],
+            ],
+        ])->save();
+
+        $this->auditService->record([
+            'farm_id' => $user->farm_id,
+            'user_id' => $user->id,
+            'module' => 'account',
+            'entity_type' => 'user',
+            'entity_id' => (string) $user->id,
+            'action' => 'personal_preferences_updated',
+            'source' => 'web',
+        ]);
+
+        return response()->json(['data' => $user->fresh()]);
+    }
+
     public function assignFarms(AssignUserFarmsRequest $request, User $user): JsonResponse
     {
         $this->ensureManagedUser($user, $request->user());

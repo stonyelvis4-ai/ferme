@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\CalendarEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class CalendarController extends Controller
 {
@@ -32,12 +31,10 @@ class CalendarController extends Controller
             'farm_id' => ['required', 'integer', 'exists:farms,id'],
             'title' => ['required', 'string', 'max:255'],
             'start_at' => ['required', 'date'],
-            'end_at' => ['nullable', 'date'],
-            'linked_task_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('tasks', 'id')->where(fn ($query) => $query->where('farm_id', $request->user()?->farm_id)),
-            ],
+            'end_at' => ['nullable', 'date', 'after_or_equal:start_at'],
+            // Les événements liés à une tâche sont exclusivement générés par TaskService.
+            // Cela empêche qu'un POST agenda crée un second événement pour la même tâche.
+            'linked_task_id' => ['prohibited'],
             'source_module' => ['nullable', 'string', 'max:255'],
             'source_entity_type' => ['nullable', 'string', 'max:255'],
             'source_entity_id' => ['nullable', 'string', 'max:255'],

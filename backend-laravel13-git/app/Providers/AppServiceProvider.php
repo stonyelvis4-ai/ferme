@@ -77,6 +77,54 @@ class AppServiceProvider extends ServiceProvider
                     )),
             ];
         });
+
+        RateLimiter::for('ai-chat', function (Request $request) {
+            $userId = (string) ($request->user()?->id ?? 'guest');
+            $farmId = (string) ($request->user()?->farm_id ?? 'none');
+
+            return [
+                Limit::perMinute(12)
+                    ->by($userId.'|'.$farmId)
+                    ->response(fn (Request $request, array $headers) => $this->tooManyAttemptsResponse(
+                        'L’assistant agricole reçoit beaucoup de demandes. Patientez un instant avant de recommencer.',
+                        $headers
+                    )),
+                Limit::perDay(120)
+                    ->by($userId.'|'.$farmId)
+                    ->response(fn (Request $request, array $headers) => $this->tooManyAttemptsResponse(
+                        'La limite quotidienne de l’assistant agricole est atteinte. Réessayez demain.',
+                        $headers
+                    )),
+            ];
+        });
+
+        RateLimiter::for('api-authenticated', function (Request $request) {
+            $key = (string) ($request->user()?->id ?? 'guest').'|'.$request->ip();
+
+            return Limit::perMinute(180)->by($key)->response(
+                fn (Request $request, array $headers) => $this->tooManyAttemptsResponse('Trop de requêtes API. Réessayez dans un instant.', $headers)
+            );
+        });
+
+        RateLimiter::for('api-write', function (Request $request) {
+            $key = (string) ($request->user()?->id ?? 'guest').'|'.$request->ip();
+
+            return Limit::perMinute(60)->by($key)->response(
+                fn (Request $request, array $headers) => $this->tooManyAttemptsResponse('Trop de modifications en peu de temps. Réessayez dans un instant.', $headers)
+            );
+        });
+
+        RateLimiter::for('exports', function (Request $request) {
+            return Limit::perMinute(10)->by((string) ($request->user()?->id ?? 'guest'))->response(
+                fn (Request $request, array $headers) => $this->tooManyAttemptsResponse('Trop d’exports demandés. Réessayez dans un instant.', $headers)
+            );
+        });
+
+        RateLimiter::for('sync', function (Request $request) {
+            return Limit::perMinute(30)->by((string) ($request->user()?->id ?? 'guest'))->response(
+                fn (Request $request, array $headers) => $this->tooManyAttemptsResponse('Trop de synchronisations demandées. Réessayez dans un instant.', $headers)
+            );
+        });
     }
 
     private function tooManyAttemptsResponse(string $message, array $headers): JsonResponse

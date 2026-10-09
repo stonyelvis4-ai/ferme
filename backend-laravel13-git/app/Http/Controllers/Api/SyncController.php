@@ -5,13 +5,39 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SyncQueueEntry;
 use App\Services\SyncService;
+use App\Services\SyncOperationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SyncController extends Controller
 {
-    public function __construct(private readonly SyncService $syncService)
+    public function __construct(
+        private readonly SyncService $syncService,
+        private readonly SyncOperationService $syncOperationService,
+    )
     {
+    }
+
+    public function operations(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'operations' => ['required', 'array', 'min:1', 'max:50'],
+            'operations.*.operation_id' => ['required', 'string', 'max:160', 'regex:/^[A-Za-z0-9:_.-]+$/'],
+            'operations.*.method' => ['required', 'string', 'max:10'],
+            'operations.*.path' => ['required', 'string', 'max:255'],
+            'operations.*.payload' => ['present', 'array'],
+            'operations.*.dependencies' => ['sometimes', 'array', 'max:50'],
+        ]);
+
+        $ids = array_column($data['operations'], 'operation_id');
+        if (count($ids) !== count(array_unique($ids))) {
+            return response()->json(['message' => 'Chaque operation_id doit être unique dans ce lot.'], 422);
+        }
+
+        $user = $request->user();
+        $results = array_map(fn (array $operation) => $this->syncOperationService->execute($user, $operation), $data['operations']);
+
+        return response()->json(['data' => ['results' => $results]]);
     }
 
     public function index(Request $request): JsonResponse

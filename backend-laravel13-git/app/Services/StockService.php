@@ -333,11 +333,19 @@ public function deleteItem(StockItem $item): ?FinancialTransaction
             }
 
             $file = request()->file('image');
+            $extension = match ($file->getMimeType()) {
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/webp' => 'webp',
+                default => throw ValidationException::withMessages([
+                    'image' => 'Le fichier image fourni n’est pas pris en charge.',
+                ]),
+            };
             $safeName = sprintf(
                 'stock/%d/%s.%s',
                 $farmId,
                 Str::uuid()->toString(),
-                strtolower($file->getClientOriginalExtension())
+                $extension
             );
             $payload['image_path'] = $file->storeAs('', $safeName, 'public');
         }

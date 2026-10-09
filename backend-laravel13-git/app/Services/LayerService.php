@@ -536,8 +536,10 @@ class LayerService
                 'feedings_per_day' => (int) $data['feedings_per_day'],
                 'target_daily_quantity_kg' => $targetDailyQuantity,
                 'start_date' => $data['start_date'],
+                'end_date' => $data['end_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'is_active' => (bool) ($data['is_active'] ?? true),
+                'tasks_enabled' => (bool) ($data['tasks_enabled'] ?? true),
             ]);
 
             $this->auditService->record([

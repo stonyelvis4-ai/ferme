@@ -33,6 +33,11 @@ class AuthController extends Controller
 
     public function registerAdmin(RegisterAdminRequest $request): JsonResponse
     {
+        abort_unless(
+            User::query()->doesntExist() || (bool) config('services.ferm.public_registration', false),
+            403,
+            'Les inscriptions publiques sont désactivées. Demandez un accès à l’administrateur.'
+        );
         $data = $request->validated();
 
         $user = DB::transaction(function () use ($data) {
@@ -166,7 +171,8 @@ class AuthController extends Controller
                 return $user->refresh();
             }
 
-            $shouldCreateAdmin = $intent === 'register' || User::count() === 0;
+            $shouldCreateAdmin = User::query()->doesntExist()
+                || ($intent === 'register' && (bool) config('services.ferm.public_registration', false));
 
             if (! $shouldCreateAdmin) {
                 abort(response()->json([

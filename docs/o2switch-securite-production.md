@@ -36,8 +36,11 @@ Points critiques :
 - `SESSION_HTTP_ONLY=true`
 - `SESSION_SAME_SITE=lax`
 - `API_TOKEN_COOKIE_SAME_SITE=lax`
+- `FERM_ALLOW_PUBLIC_REGISTRATION=false`
 - `LOG_LEVEL=warning`
 - `FILESYSTEM_DISK=local`
+
+Laissez l'inscription publique fermee : le tout premier administrateur peut initialiser l'application, puis les comptes suivants sont crees depuis l'administration. N'activez `FERM_ALLOW_PUBLIC_REGISTRATION=true` que pour un service dont l'inscription libre est un choix explicite.
 
 Ne jamais versionner :
 
@@ -72,6 +75,9 @@ Verifier au minimum :
 - `bootstrap/cache/` en ecriture
 - pas de listing de dossiers publics
 - le sous-domaine API pointe bien vers `public/`
+- le serveur interdit l'execution PHP sous `public/storage/` (les justificatifs de stock sont des fichiers utilisateurs)
+
+Les images de stock sont acceptees uniquement en JPEG, PNG ou WebP, puis renommees par le serveur selon leur type de contenu. Ne rendez jamais un dossier de televersement executable, meme si les fichiers sont controles par l'application.
 
 ## Check de securite avant ouverture
 
@@ -83,7 +89,8 @@ Verifier au minimum :
 6. un proprietaire reste bien en lecture seule.
 7. les exports rapports ne fonctionnent qu'en `pdf` ou `xlsx`.
 8. les operations metier restent rattachees a la ferme connectee.
-9. `php artisan ferm:verify-production` reussit avant l'ouverture publique.
+9. l'endpoint `/api/v1/users` est inaccessible a un proprietaire.
+10. `php artisan ferm:verify-production` reussit avant l'ouverture publique.
 
 ## Verifications navigateur
 
@@ -93,6 +100,7 @@ Dans l'onglet reseau / stockage du navigateur :
 - les cookies sensibles sont `HttpOnly`
 - l'API n'accepte pas d'origine inconnue
 - aucune erreur CORS ne remonte
+- les reponses API contiennent `X-Content-Type-Options`, `X-Frame-Options`, une politique de referer et une politique de permissions
 
 ## Hygiene operationnelle
 

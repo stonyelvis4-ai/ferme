@@ -12,12 +12,14 @@ class IdempotentCreation
     public function handle(Request $request, Closure $next)
     {
         $key = $request->header('Idempotency-Key');
-        if ($request->method() !== 'POST' || $key === null) {
+        if (! in_array($request->method(), ['POST', 'PATCH', 'DELETE'], true) || $key === null) {
             return $next($request);
         }
         abort_unless(is_string($key) && preg_match('/^[A-Za-z0-9:_.-]{1,160}$/D', $key), 422);
         $user = $request->user();
-        $scope = hash('sha256', json_encode([$user->farm_id, $user->id, $request->path(), $key]));
+        // The HTTP method is part of the operation identity: a PATCH and a DELETE on
+        // the same resource may legitimately use the same client-generated key.
+        $scope = hash('sha256', json_encode([$user->farm_id, $user->id, $request->method(), $request->path(), $key]));
         $fingerprint = hash('sha256', $request->getContent());
 
         return DB::transaction(function () use ($request, $next, $scope, $fingerprint, $user) {
