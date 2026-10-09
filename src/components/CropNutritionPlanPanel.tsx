@@ -28,7 +28,7 @@ type Props = {
 const today = () => new Date().toISOString().slice(0, 10);
 const number = (value: number, digits = 2) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: digits }).format(value);
 
-export default function CropNutritionPlanPanel({ role, campaigns, parcelles, articles, plans, currency, onCreate, onUpdate, onDeactivate }: Props) {
+export default function CropNutritionPlanPanel({ role, campaigns = [], parcelles = [], articles = [], plans = [], currency, onCreate, onUpdate, onDeactivate }: Props) {
   const [open, setOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<CropNutritionPlan | null>(null);
   const [campaignId, setCampaignId] = useState('');

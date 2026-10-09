@@ -33,7 +33,7 @@ const formatNumber = (value: number, digits = 2) => new Intl.NumberFormat('fr-FR
 }).format(value);
 
 export default function FishNutritionPlanPanel({
-  role, bassins, articles, plans, currency, onCreate, onUpdate, onDeactivate,
+  role, bassins = [], articles = [], plans = [], currency, onCreate, onUpdate, onDeactivate,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<FishFeedPlan | null>(null);

@@ -30,7 +30,7 @@ interface TasksViewProps {
 export default function TasksView({
   role,
   tasks,
-  articles,
+  articles = [],
   onAddTask,
   onToggleTaskStatus,
   onUpdateTask,
